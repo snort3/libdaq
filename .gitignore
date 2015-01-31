@@ -1,29 +1,45 @@
 # Object files
 *.o
-*.ko
-*.obj
-*.elf
-
-# Precompiled Headers
-*.gch
-*.pch
 
 # Libraries
-*.lib
 *.a
 *.la
 *.lo
 
 # Shared objects (inc. Windows DLLs)
-*.dll
 *.so
 *.so.*
-*.dylib
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+# Autotools stuff
+.deps
+.libs
+/autom4te.cache
+/aclocal.m4
+/compile
+/config.guess
+/config.h
+/config.h.in~
+/config.log
+/config.status
+/config.sub
+/configure
+/depcomp
+/install-sh
+/libtool
+/ltmain.sh
+/m4/libtool.m4
+/m4/ltoptions.m4
+/m4/ltsugar.m4
+/m4/ltversion.m4
+/m4/lt~obsolete.m4
+/missing
+/stamp-h1
+Makefile
+Makefile.in
+
+# Locally generated artifacts
+os-daq-modules/daq-modules-config
+sfbpf/sf_grammar.c
+sfbpf/sf_scanner.c
+sfbpf/sf_scanner.h
+sfbpf/tokdefs.h
