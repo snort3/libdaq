@@ -3,10 +3,10 @@
 
 AC_PREREQ(2.62)
 AC_INIT([daq], [2.0.4], [snort-team@sourcefire.com])
-AM_INIT_AUTOMAKE([daq], [2.0.4])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([sfbpf/gencode.h])
 AC_CONFIG_HEADERS([config.h])
+AM_INIT_AUTOMAKE
 
 # Checks for programs.
 AC_PROG_CC
