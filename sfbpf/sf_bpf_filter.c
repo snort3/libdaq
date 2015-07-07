@@ -43,7 +43,7 @@
 
 #if !(defined(lint) || defined(KERNEL) || defined(_KERNEL))
 static const char rcsid[] =
-    "@(#) $Header: /usr/cvsroot/sfeng/ims/src/libraries/daq/daq/sfbpf/sf_bpf_filter.c,v 1.5 2014/06/10 13:38:55 cwaxman Exp $ (LBL)";
+    "@(#) $Header$ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H

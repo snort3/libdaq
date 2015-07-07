@@ -24,7 +24,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/cvsroot/sfeng/ims/src/libraries/daq/daq/sfbpf/sf_optimize.c,v 1.3 2013/06/28 14:57:30 rcombs Exp $ (LBL)";
+    "@(#) $Header$ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H

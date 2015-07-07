@@ -29,7 +29,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * @(#) $Header: /usr/cvsroot/sfeng/ims/src/libraries/daq/daq/sfbpf/sunatmpos.h,v 1.1 2010/04/15 19:18:36 maltizer Exp $ (LBL)
+ * @(#) $Header$ (LBL)
  */
 
 /* SunATM header for ATM packet */

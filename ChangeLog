@@ -1,3 +1,19 @@
+Changes in 2.0.5 Release on 2015-04-22:
+---------------------------------------
+2015-04-22 18:58  jocornet
+
+    * api/daq_common.h:
+      Fixed build issue on windows. 
+
+2015-04-01 14:56 maltizer
+
+    * configure.ac, os-daq-modules/Makefile.am,
+      os-daq-modules/daq_dump.c, os-daq-modules/daq_netmap.c,
+      os-daq-modules/daq_static_modules.h, sfbpf/Makefile.am:
+      Fixed build issues on FreeBSD. 
+      Fixed overflowable snaplen in dump module.
+      Fixed issues with netmap module.
+
 Changes in 2.0.4 Released on 2014-09-06:
 ----------------------------------------
 2014-07-21 16:05  stechew

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2014 Cisco and/or its affiliates. All rights reserved.
+** Copyright (C) 2014-2015 Cisco and/or its affiliates. All rights reserved.
 ** Copyright (C) 2010-2013 Sourcefire, Inc.
 ** Author: Michael R. Altizer <maltizer@sourcefire.com>
 **
@@ -38,4 +38,7 @@ extern const DAQ_Module_t nfq_daq_module_data;
 #endif
 #ifdef BUILD_PCAP_MODULE
 extern const DAQ_Module_t pcap_daq_module_data;
+#endif
+#ifdef BUILD_NETMAP_MODULE
+extern const DAQ_Module_t netmap_daq_module_data;
 #endif
