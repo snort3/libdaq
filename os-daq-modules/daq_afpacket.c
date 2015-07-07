@@ -24,11 +24,13 @@
 #endif
 
 #include <errno.h>
+#include <limits.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,7 +44,7 @@
 #include "daq_api.h"
 #include "sfbpf.h"
 
-#define DAQ_AFPACKET_VERSION 5
+#define DAQ_AFPACKET_VERSION 6
 
 #define AF_PACKET_DEFAULT_BUFFER_SIZE   128
 #define AF_PACKET_MAX_INTERFACES    32
@@ -83,6 +85,15 @@ typedef struct _af_packet_instance
     struct sockaddr_ll sll;
 } AFPacketInstance;
 
+#ifdef PACKET_FANOUT
+typedef struct _af_packet_fanout_cfg
+{
+    uint16_t fanout_flags;
+    uint16_t fanout_type;
+    bool enabled;
+} AFPacketFanoutCfg;
+#endif
+
 typedef struct _afpacket_context
 {
     char *device;
@@ -98,6 +109,9 @@ typedef struct _afpacket_context
     DAQ_Stats_t stats;
     DAQ_State state;
     char errbuf[256];
+#ifdef PACKET_FANOUT
+    AFPacketFanoutCfg fanout_cfg;
+#endif
 } AFPacket_Context_t;
 
 /* VLAN defintions stolen from LibPCAP's vlan.h. */
@@ -416,6 +430,22 @@ static int mmap_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     return DAQ_SUCCESS;
 }
 
+#ifdef PACKET_FANOUT
+static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance)
+{
+    int fanout_arg;
+
+    fanout_arg = ((afpc->fanout_cfg.fanout_type | afpc->fanout_cfg.fanout_flags)) << 16 | instance->index;
+    if (setsockopt(instance->fd, SOL_PACKET, PACKET_FANOUT, &fanout_arg, sizeof(fanout_arg)) == -1)
+    {
+        DPE(afpc->errbuf, "%s: Could not configure packet fanout: %s", __FUNCTION__, strerror(errno));
+        return DAQ_ERROR;
+    }
+
+    return DAQ_SUCCESS;
+}
+#endif
+
 static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
     struct packet_mreq mr;
@@ -467,9 +497,14 @@ static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     /* ...and, finally, set up a userspace ring buffer to represent the kernel RX ring... */
     if (set_up_ring(afpc, instance, &instance->rx_ring) != DAQ_SUCCESS)
         return -1;
-    /* ...as well as one for the TX ring if we're in inline mode. */
+    /* ...as well as one for the TX ring if we're in inline mode... */
     if (instance->peer && set_up_ring(afpc, instance, &instance->tx_ring) != DAQ_SUCCESS)
         return -1;
+#ifdef PACKET_FANOUT
+    /* ...and configure packet fanout if requested. */
+    if (afpc->fanout_cfg.enabled && configure_fanout(afpc, instance) != DAQ_SUCCESS)
+        return -1;
+#endif
 
     return 0;
 }
@@ -657,7 +692,57 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
             size_str = entry->value;
         else if (!strcmp(entry->key, "debug"))
             afpc->debug = 1;
+#ifdef PACKET_FANOUT
+        else if (!strcmp(entry->key, "fanout_type"))
+        {
+            if (!entry->value)
+            {
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                goto err;
+            }
+            /* Using anything other than 'hash' is probably asking for trouble, but
+                I'll never stop you from shooting yourself in the foot. */
+            if (!strcmp(entry->value, "hash"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_HASH;
+            else if (!strcmp(entry->value, "lb"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_LB;
+            else if (!strcmp(entry->value, "cpu"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_CPU;
+            else if (!strcmp(entry->value, "rollover"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_ROLLOVER;
+            else if (!strcmp(entry->value, "rnd"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_RND;
+#ifdef PACKET_FANOUT_QM
+            else if (!strcmp(entry->value, "qm"))
+                afpc->fanout_cfg.fanout_type = PACKET_FANOUT_QM;
+#endif
+            else
+            {
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                goto err;
+            }
+            afpc->fanout_cfg.enabled = true;
+        }
+        else if (!strcmp(entry->key, "fanout_flag"))
+        {
+            if (!entry->value)
+            {
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                goto err;
+            }
+            if (!strcmp(entry->value, "rollover"))
+                afpc->fanout_cfg.fanout_flags |= PACKET_FANOUT_FLAG_ROLLOVER;
+            else if (!strcmp(entry->value, "defrag"))
+                afpc->fanout_cfg.fanout_flags |= PACKET_FANOUT_FLAG_DEFRAG;
+            else
+            {
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                goto err;
+            }
+        }
+#endif /* PACKET_FANOUT */
     }
+
     /* Fall back to the environment variable. */
     if (!size_str)
         size_str = getenv("AF_PACKET_BUFFER_SIZE");

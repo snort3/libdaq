@@ -115,6 +115,31 @@ default packet memory with a snaplen of 1518, the numbers break down like this:
 NOTE: Linux kernel version 2.6.31 or higher is required for the AFPacket DAQ
 module due to its dependency on both TPACKET v2 and PACKET_TX_RING support.
 
+Fanout (Kernel Loadbalancing)
+-----------------------------
+More recent Linux kernel versions (3.1+) support various kernel-space
+loadbalancing methods within AFPacket configured using the PACKET_FANOUT ioctl.
+This allows you to have multiple AFPacket DAQ module instances processing
+packets from the same interfaces in parallel for significantly improved
+throughput.
+
+To configure PACKET_FANOUT in the AFPacket DAQ module, two DAQ variables are
+used:
+
+    --daq-var fanout_type=<hash|lb|cpu|rollover|rnd|qm>
+
+and (optionally):
+
+    --daq-var fanout_flag=<rollover|defrag>
+
+In general, you're going to want to use the 'hash' fanout type, but the others
+have been included for completeness.  The 'defrag' fanout flag is probably a
+good idea to correctly handle loadbalancing of flows containing fragmented
+packets.
+
+Please read the man page for 'packet' or packet_mmap.txt in the Linux kernel
+source for more details on the different fanout types and modifier flags.
+
 
 NFQ Module
 ==========
