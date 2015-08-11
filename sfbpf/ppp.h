@@ -1,4 +1,3 @@
-/* @(#) $Header$ (LBL) */
 /*
  * Point to Point Protocol (PPP) RFC1331
  *

@@ -7,7 +7,6 @@
 # means that neither Flex nor Lex was found, so we report an error and
 # quit.
 #
-# @(#) $Header$
 #
 
 #

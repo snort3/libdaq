@@ -29,7 +29,6 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * @(#) $Header$ (LBL)
  */
 
 /* Based on UNI3.1 standard by ATM Forum */

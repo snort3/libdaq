@@ -39,7 +39,6 @@
  *
  *      @(#)bpf.h       7.1 (Berkeley) 5/7/91
  *
- * @(#) $Header$ (LBL)
  */
 
 /*

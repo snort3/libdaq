@@ -43,7 +43,6 @@
 
 #if !(defined(lint) || defined(KERNEL) || defined(_KERNEL))
 static const char rcsid[] =
-    "@(#) $Header$ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
