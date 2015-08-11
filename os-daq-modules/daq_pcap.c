@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2014-2015 Cisco and/or its affiliates. All rights reserved.
+** Copyright (C) 2014 Cisco and/or its affiliates. All rights reserved.
 ** Copyright (C) 2010-2013 Sourcefire, Inc.
 ** Author: Michael R. Altizer <maltizer@sourcefire.com>
 **
@@ -41,6 +41,7 @@
 #include "daq_api.h"
 
 #define DAQ_PCAP_VERSION 3
+#define DAQ_PCAP_ROLLOVER_LIM 1000000000 //Check for rollover every billionth packet
 
 typedef struct _pcap_context
 {
@@ -66,6 +67,7 @@ typedef struct _pcap_context
     uint32_t wrap_recv;
     uint32_t wrap_drop;
     DAQ_State state;
+    uint32_t hwupdate_count;
 } Pcap_Context_t;
 
 static void pcap_daq_reset_stats(void *handle);
@@ -189,6 +191,7 @@ static int update_hw_stats(Pcap_Context_t *context)
 
         context->stats.hw_packets_received = context->rollover_recv + context->wrap_recv - context->base_recv;
         context->stats.hw_packets_dropped = context->rollover_drop + context->wrap_drop - context->base_drop;
+        context->hwupdate_count = 0;
     }
 
     return DAQ_SUCCESS;
@@ -257,6 +260,7 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
         }
     }
 
+    context->hwupdate_count = 0;
     context->state = DAQ_STATE_INITIALIZED;
 
     *ctxt_ptr = context;
@@ -359,6 +363,10 @@ static void pcap_process_loop(u_char *user, const struct pcap_pkthdr *pkth, cons
     context->packets++;
     /* ...and then the module instance's packet counter. */
     context->stats.packets_received++;
+    /* Update hw packet counters to make sure we detect counter overflow */
+    if (context->hwupdate_count++ == DAQ_PCAP_ROLLOVER_LIM)
+        update_hw_stats(context);
+
     verdict = context->analysis_func(context->user_data, &hdr, data);
     if (verdict >= MAX_DAQ_VERDICT)
         verdict = DAQ_VERDICT_PASS;

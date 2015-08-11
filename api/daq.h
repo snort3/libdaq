@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2014-2015 Cisco and/or its affiliates. All rights reserved.
+** Copyright (C) 2014 Cisco and/or its affiliates. All rights reserved.
 ** Copyright (C) 2010-2013 Sourcefire, Inc.
 ** Author: Michael R. Altizer <maltizer@sourcefire.com>
 **
@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <daq_common.h>
 
-#define DAQ_VERSION_2
+#define DAQ_VERSION 3
 
 /* Definition of the structures returned by daq_get_module_list(). */
 typedef struct {
@@ -78,7 +78,8 @@ DAQ_LINKAGE uint32_t daq_get_capabilities(const DAQ_Module_t *module, void *hand
 DAQ_LINKAGE int daq_get_datalink_type(const DAQ_Module_t *module, void *handle);
 DAQ_LINKAGE const char *daq_get_error(const DAQ_Module_t *module, void *handle);
 DAQ_LINKAGE void daq_clear_error(const DAQ_Module_t *module, void *handle);
-DAQ_LINKAGE int daq_modify_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_ModFlow_t *modify);
+DAQ_LINKAGE int daq_modify_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
+DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
 DAQ_LINKAGE int daq_hup_prep(const DAQ_Module_t *module, void *handle, void **new_config);
 DAQ_LINKAGE int daq_hup_apply(const DAQ_Module_t *module, void *handle, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_hup_post(const DAQ_Module_t *module, void *handle, void *old_config);
