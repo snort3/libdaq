@@ -20,9 +20,6 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
  */
-#ifndef lint
-static const char rcsid[] =
-#endif
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"

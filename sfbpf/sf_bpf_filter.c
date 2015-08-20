@@ -41,10 +41,6 @@
  *	@(#)bpf.c	7.5 (Berkeley) 7/15/91
  */
 
-#if !(defined(lint) || defined(KERNEL) || defined(_KERNEL))
-static const char rcsid[] =
-#endif
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif

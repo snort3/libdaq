@@ -25,10 +25,6 @@
  * These functions are not time critical.
  */
 
-#ifndef lint
-static const char rcsid[] =
-#endif
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
