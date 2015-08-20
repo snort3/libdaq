@@ -144,7 +144,7 @@ static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *i
     /* Any pending errors, e.g., network is down? */
     if (getsockopt(instance->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) || err)
     {
-        DPE(afpc->errbuf, "%s: getsockopt: %s", __FUNCTION__, strerror(errno));
+        DPE(afpc->errbuf, "%s: getsockopt: %s", __FUNCTION__, err ? strerror(err) : strerror(errno));
         return DAQ_ERROR;
     }
 
@@ -898,7 +898,12 @@ static int afpacket_daq_acquire(void *handle, int cnt, DAQ_Analysis_Func_t callb
                     memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
 
                     tag = (struct vlan_tag *) (data + vlan_offset);
-                    tag->vlan_tpid = htons(ETH_P_8021Q);
+#if defined(TP_STATUS_VLAN_TPID_VALID)
+                    if (hdr.h2->tp_vlan_tpid && (hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
+                        tag->vlan_tpid = htons(hdr.h2->tp_vlan_tpid);
+                    else
+#endif
+                        tag->vlan_tpid = htons(ETH_P_8021Q);
                     tag->vlan_tci = htons(hdr.h2->tp_vlan_tci);
 
                     tp_snaplen += VLAN_TAG_LEN;
