@@ -288,15 +288,15 @@ static int start_instance(Netmap_Context_t *nmc, NetmapInstance *instance)
     return DAQ_SUCCESS;
 }
 
-static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, char *errbuf, size_t errlen)
+static int netmap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t errlen)
 {
     Netmap_Context_t *nmc;
     NetmapInstance *instance;
-    DAQ_Dict *entry;
+    const char *varKey, *varValue;
+    char *name1, *name2, *dev;
     char intf[IFNAMSIZ];
     uint32_t num_intfs = 0;
     size_t len;
-    char *name1, *name2, *dev;
     int rval = DAQ_ERROR;
 
     nmc = calloc(1, sizeof(Netmap_Context_t));
@@ -307,7 +307,7 @@ static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, c
         goto err;
     }
 
-    nmc->device = strdup(config->name);
+    nmc->device = strdup(daq_config_get_name(config));
     if (!nmc->device)
     {
         snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
@@ -315,12 +315,12 @@ static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, c
         goto err;
     }
 
-    nmc->snaplen = config->snaplen;
-    nmc->timeout = (config->timeout > 0) ? (int) config->timeout : -1;
+    nmc->snaplen = daq_config_get_snaplen(config);
+    nmc->timeout = (daq_config_get_timeout(config) > 0) ? (int) daq_config_get_timeout(config) : -1;
 
     dev = nmc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') || 
-            (config->mode == DAQ_MODE_PASSIVE && strstr(dev, "::")))
+            (daq_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, nmc->device);
         goto err;
@@ -351,7 +351,7 @@ static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, c
             instance->next = nmc->instances;
             nmc->instances = instance;
             num_intfs++;
-            if (config->mode != DAQ_MODE_PASSIVE)
+            if (daq_config_get_mode(config) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
                 {
@@ -376,7 +376,7 @@ static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, c
     }
 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!nmc->instances || (config->mode != DAQ_MODE_PASSIVE && num_intfs != 0))
+    if (!nmc->instances || (daq_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!",
                     __FUNCTION__, nmc->device);
@@ -387,10 +387,12 @@ static int netmap_daq_initialize(const DAQ_Config_t * config, void **ctxt_ptr, c
     nmc->debug = 0;
 
     /* Import the configuration dictionary requests. */
-    for (entry = config->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if (!strcmp(entry->key, "debug"))
+        if (!strcmp(varKey, "debug"))
             nmc->debug = 1;
+        daq_config_next_variable(config, &varKey, &varValue);
     }
 
     nmc->state = DAQ_STATE_INITIALIZED;
@@ -864,5 +866,6 @@ const DAQ_Module_t netmap_daq_module_data =
     /* .hup_prep = */ NULL,
     /* .hup_apply = */ NULL,
     /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL
 };
