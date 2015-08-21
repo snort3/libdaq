@@ -75,46 +75,43 @@ static void ipfw_daq_shutdown(void*);
 
 #define DEFAULT_PORT 8000
 
-static int ipfw_daq_get_setup (
-    IpfwImpl* impl, const DAQ_Config_t* cfg, char* errBuf, size_t errMax)
+static int ipfw_daq_get_setup (IpfwImpl *impl, const DAQ_Config_h config, char *errBuf, size_t errMax)
 {
-    DAQ_Dict* entry;
+    const char *varKey, *varValue;
 
     impl->proto = PF_INET;  // TBD add ip6 support when ipfw does
     impl->port = DEFAULT_PORT;
 
-    for ( entry = cfg->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if ( !entry->value || !*entry->value )
+        if (!varValue || !*varValue)
         {
-            snprintf(errBuf, errMax,
-                "%s: variable needs value (%s)\n", __FUNCTION__, entry->key);
-                return DAQ_ERROR;
+            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __FUNCTION__, varKey);
+            return DAQ_ERROR;
         }
-        else if ( !strcmp(entry->key, "port") )
+        else if (!strcmp(varKey, "port"))
         {
-            char* end = entry->value;
-            impl->port = (int)strtol(entry->value, &end, 0);
+            char *endptr = NULL;
+            impl->port = (int) strtol(varValue, &endptr, 0);
 
-            if ( *end || impl->port <= 0 || impl->port > 65535 )
+            if (*endptr != '\0' || impl->port <= 0 || impl->port > 65535)
             {
-                snprintf(errBuf, errMax, "%s: bad port (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: bad port (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
         else
         {
-            snprintf(errBuf, errMax,
-                "%s: unsupported variable (%s=%s)\n",
-                    __FUNCTION__, entry->key, entry->value);
+            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __FUNCTION__, varKey, varValue);
                 return DAQ_ERROR;
         }
+        daq_config_next_variable(config, &varKey, &varValue);
     }
 
-    impl->snaplen = cfg->snaplen ? cfg->snaplen : IP_MAXPACKET;
-    impl->timeout = cfg->timeout;
-    impl->passive = ( cfg->mode == DAQ_MODE_PASSIVE );
+    impl->snaplen = daq_config_get_snaplen(config) ? daq_config_get_snaplen(config) : IP_MAXPACKET;
+    impl->timeout = daq_config_get_timeout(config);
+    impl->passive = (daq_config_get_mode(config) == DAQ_MODE_PASSIVE);
 
     impl->sin.sin_family = impl->proto;
     impl->sin.sin_addr.s_addr = INADDR_ANY;
@@ -126,29 +123,26 @@ static int ipfw_daq_get_setup (
 //-------------------------------------------------------------------------
 // initialization and clean up
 
-static int ipfw_daq_initialize (
-    const DAQ_Config_t* cfg, void** handle, char* errBuf, size_t errMax)
+static int ipfw_daq_initialize(const DAQ_Config_h config, void **handle, char* errBuf, size_t errMax)
 {
     IpfwImpl* impl = calloc(1, sizeof(*impl));
 
-    if ( !impl )
+    if (!impl)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw context!",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw context!", __FUNCTION__);
         return DAQ_ERROR_NOMEM;
     }
 
-    if ( ipfw_daq_get_setup(impl, cfg, errBuf, errMax) != DAQ_SUCCESS )
+    if (ipfw_daq_get_setup(impl, config, errBuf, errMax) != DAQ_SUCCESS)
     {
         ipfw_daq_shutdown(impl);
         return DAQ_ERROR;
     }
     impl->buf = malloc(impl->snaplen);
 
-    if ( !impl->buf )
+    if (!impl->buf)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw buffer!",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw buffer!", __FUNCTION__);
         ipfw_daq_shutdown(impl);
         return DAQ_ERROR_NOMEM;
     }
