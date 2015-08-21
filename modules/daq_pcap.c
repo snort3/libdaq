@@ -197,11 +197,11 @@ static int update_hw_stats(Pcap_Context_t *context)
     return DAQ_SUCCESS;
 }
 
-static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char *errbuf, size_t len)
+static int pcap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len)
 {
     Pcap_Context_t *context;
 #ifndef PCAP_OLDSTYLE
-    DAQ_Dict *entry;
+    const char *varKey, *varValue;
 #endif
 
     context = calloc(1, sizeof(Pcap_Context_t));
@@ -211,25 +211,28 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
         return DAQ_ERROR_NOMEM;
     }
 
-    context->snaplen = config->snaplen;
-    context->promisc_flag = (config->flags & DAQ_CFG_PROMISC);
-    context->timeout = config->timeout;
+    context->snaplen = daq_config_get_snaplen(config);
+    context->promisc_flag = (daq_config_get_flags(config) & DAQ_CFG_PROMISC);
+    context->timeout = daq_config_get_timeout(config);
 
 #ifndef PCAP_OLDSTYLE
     /* Retrieve the requested buffer size (default = 0) */
-    for (entry = config->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if (!strcmp(entry->key, "buffer_size"))
-            context->buffer_size = strtol(entry->value, NULL, 10);
+        if (!strcmp(varKey, "buffer_size"))
+            context->buffer_size = strtol(varValue, NULL, 10);
+
+        daq_config_next_variable(config, &varKey, &varValue);
     }
     /* Try to account for legacy PCAP_FRAMES environment variable if we weren't passed a buffer size. */
     if (context->buffer_size == 0)
         context->buffer_size = translate_PCAP_FRAMES(context->snaplen);
 #endif
 
-    if (config->mode == DAQ_MODE_READ_FILE)
+    if (daq_config_get_mode(config) == DAQ_MODE_READ_FILE)
     {
-        context->file = strdup(config->name);
+        context->file = strdup(daq_config_get_name(config));
         if (!context->file)
         {
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the filename string!", __FUNCTION__);
@@ -240,7 +243,7 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
     }
     else
     {
-        context->device = strdup(config->name);
+        context->device = strdup(daq_config_get_name(config));
         if (!context->device)
         {
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
