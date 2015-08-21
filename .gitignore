@@ -39,7 +39,7 @@ Makefile
 Makefile.in
 
 # Locally generated artifacts
-os-daq-modules/daq-modules-config
+modules/daq-modules-config
 sfbpf/sf_grammar.c
 sfbpf/sf_scanner.c
 sfbpf/sf_scanner.h
