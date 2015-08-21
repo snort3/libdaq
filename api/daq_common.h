@@ -277,6 +277,7 @@ typedef DAQ_Verdict (*DAQ_Analysis_Func_t)(void *user, const DAQ_PktHdr_t *hdr, 
 typedef int (*DAQ_Meta_Func_t)(void *user, const DAQ_MetaHdr_t *hdr, const uint8_t *data);
 
 typedef enum {
+    DAQ_MODE_NONE,
     DAQ_MODE_PASSIVE,
     DAQ_MODE_INLINE,
     DAQ_MODE_READ_FILE,
@@ -285,18 +286,7 @@ typedef enum {
 
 #define DAQ_CFG_PROMISC     0x01
 
-typedef struct _daq_dict_entry DAQ_Dict;
-
-typedef struct _daq_config
-{
-    char *name;         /* Name of the interface(s) or file to be opened */
-    int snaplen;        /* Maximum packet capture length */
-    unsigned timeout;   /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
-    DAQ_Mode mode;      /* Module mode (DAQ_MODE_*) */
-    uint32_t flags;     /* Other configuration flags (DAQ_CFG_*) */
-    DAQ_Dict *values;   /* Dictionary of arbitrary key[:value] string pairs. */
-    char *extra;        /* Miscellaneous configuration data to be passed to the DAQ module */
-} DAQ_Config_t;
+typedef struct _daq_config *DAQ_Config_h;
 
 typedef enum {
     DAQ_STATE_UNINITIALIZED,
@@ -369,5 +359,24 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
 
 typedef struct _daq_module DAQ_Module_t;
+
+/* DAQ Configuration Functions */
+DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
+DAQ_LINKAGE int daq_config_set_name(DAQ_Config_h cfg, const char *name);
+DAQ_LINKAGE const char *daq_config_get_name(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_h cfg, int snaplen);
+DAQ_LINKAGE int daq_config_get_snaplen(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_timeout(DAQ_Config_h cfg, unsigned timeout);
+DAQ_LINKAGE unsigned daq_config_get_timeout(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_mode(DAQ_Config_h cfg, DAQ_Mode mode);
+DAQ_LINKAGE DAQ_Mode daq_config_get_mode(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_flag(DAQ_Config_h cfg, uint32_t flag);
+DAQ_LINKAGE uint32_t daq_config_get_flags(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_variable(DAQ_Config_h cfg, const char *key, const char *value);
+DAQ_LINKAGE const char *daq_config_get_variable(DAQ_Config_h cfg, const char *key);
+DAQ_LINKAGE void daq_config_delete_variable(DAQ_Config_h cfg, const char *key);
+DAQ_LINKAGE int daq_config_first_variable(DAQ_Config_h cfg, const char **key, const char **value);
+DAQ_LINKAGE int daq_config_next_variable(DAQ_Config_h cfg, const char **key, const char **value);
+DAQ_LINKAGE void daq_config_clear_variables(DAQ_Config_h cfg);
 
 #endif /* _DAQ_COMMON_H */

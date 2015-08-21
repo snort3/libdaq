@@ -48,18 +48,12 @@ DAQ_LINKAGE const char *daq_mode_string(DAQ_Mode mode);
 DAQ_LINKAGE const char *daq_state_string(DAQ_State state);
 DAQ_LINKAGE const char *daq_verdict_string(DAQ_Verdict verdict);
 
-/* DAQ Configuration Dictionary Functions */
-DAQ_LINKAGE const char *daq_config_get_value(DAQ_Config_t *config, const char *key);
-DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, const char *value);
-DAQ_LINKAGE void daq_config_clear_value(DAQ_Config_t *config, const char *key);
-DAQ_LINKAGE void daq_config_clear_values(DAQ_Config_t *config);
-
 /* DAQ Module functions. */
 DAQ_LINKAGE const char *daq_get_name(const DAQ_Module_t *module);
 DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module);
 
 /* DAQ Module Instance functions */
-DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_t *config, void **handle, char *errbuf, size_t len);
+DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_h config, void **handle, char *errbuf, size_t len);
 DAQ_LINKAGE int daq_set_filter(const DAQ_Module_t *module, void *handle, const char *filter);
 DAQ_LINKAGE int daq_start(const DAQ_Module_t *module, void *handle);
 DAQ_LINKAGE int daq_acquire(const DAQ_Module_t *module, void *handle, int cnt, DAQ_Analysis_Func_t callback, void *user);

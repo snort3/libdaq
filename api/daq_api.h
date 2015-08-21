@@ -24,13 +24,6 @@
 
 #include <daq_common.h>
 
-struct _daq_dict_entry
-{
-    char *key;
-    char *value;
-    struct _daq_dict_entry *next;
-};
-
 struct _daq_module
 {
     /* The version of the API this module implements.
@@ -44,7 +37,7 @@ struct _daq_module
     const uint32_t type;
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
-    int (*initialize) (const DAQ_Config_t *config, void **ctxt_ptr, char *errbuf, size_t len);
+    int (*initialize) (const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len);
     /* Set the module's BPF based on the given string */
     int (*set_filter) (void *handle, const char *filter);
     /* Complete device opening and begin queuing packets if they have not been already. */

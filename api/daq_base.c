@@ -68,6 +68,7 @@
 
 #include "daq.h"
 #include "daq_api.h"
+#include "daq_api_internal.h"
 
 #define NAME_SIZE       512
 
@@ -76,25 +77,7 @@ extern const DAQ_Module_t *static_modules[];
 extern const int num_static_modules;
 #endif
 
-static int daq_verbosity = 0;
-
-#ifdef WIN32
-inline void DEBUG(char *fmt, ...)
-{
-
-    if (daq_verbosity > 0)
-    {
-        va_list ap;
-        va_start(ap, fmt);
-
-        printf(fmt, ap);
-
-        va_end(ap);
-    }
-}
-#else
-#define DEBUG(...) do { if (daq_verbosity > 0) { printf(__VA_ARGS__); } } while (0)
-#endif
+int daq_verbosity = 0;
 
 typedef struct _daq_list_node
 {
@@ -495,107 +478,4 @@ DAQ_LINKAGE void daq_set_verbosity(int level)
 {
     daq_verbosity = level;
     DEBUG("DAQ verbosity level is set to %d.\n", daq_verbosity);
-}
-
-DAQ_LINKAGE const char *daq_config_get_value(DAQ_Config_t *config, const char *key)
-{
-    DAQ_Dict *entry;
-
-    if (!config || !key)
-        return NULL;
-
-    for (entry = config->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-            return entry->value;
-    }
-
-    return NULL;
-}
-
-DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, const char *value)
-{
-    DAQ_Dict *entry;
-
-    if (!config || !key)
-        return;
-
-    for (entry = config->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-            break;
-    }
-
-    if (!entry)
-    {
-        entry = calloc(1, sizeof(struct _daq_dict_entry));
-        if (!entry)
-        {
-            fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry!\n",
-                    __FUNCTION__, (unsigned long) sizeof(struct _daq_dict_entry));
-            return;
-        }
-        entry->key = strdup(key);
-        if (!entry->key)
-        {
-            fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry key!\n",
-                    __FUNCTION__, (unsigned long) (strlen(key) + 1));
-            return;
-        }
-        entry->next = config->values;
-        config->values = entry;
-    }
-    free(entry->value);
-    if (value)
-    {
-        entry->value = strdup(value);
-        if (!entry->value)
-        {
-            fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry value!\n",
-                    __FUNCTION__, (unsigned long) (strlen(value) + 1));
-            return;
-        }
-    }
-    DEBUG("Set config dictionary entry '%s' => '%s'.\n", entry->key, entry->value);
-}
-
-DAQ_LINKAGE void daq_config_clear_value(DAQ_Config_t *config, const char *key)
-{
-    DAQ_Dict *entry, *prev = NULL;
-
-    if (!config || !key)
-        return;
-
-    for (entry = config->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-        {
-            if (prev)
-                prev->next = entry->next;
-            else
-                config->values = entry->next;
-            free(entry->key);
-            free(entry->value);
-            free(entry);
-            return;
-        }
-        prev = entry;
-    }
-}
-
-DAQ_LINKAGE void daq_config_clear_values(DAQ_Config_t *config)
-{
-    DAQ_Dict *entry;
-
-    if (!config)
-        return;
-
-    while (config->values)
-    {
-        entry = config->values;
-        config->values = entry->next;
-        free(entry->key);
-        free(entry->value);
-        free(entry);
-    }
 }

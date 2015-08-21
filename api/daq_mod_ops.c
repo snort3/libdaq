@@ -29,8 +29,10 @@
 /*
  * Functions that apply to instances of DAQ modules go here.
  */
-DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_t *config, void **handle, char *errbuf, size_t len)
+DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_h config, void **handle, char *errbuf, size_t len)
 {
+    DAQ_Mode mode;
+
     /* Don't do this. */
     if (!errbuf)
         return DAQ_ERROR;
@@ -50,11 +52,12 @@ DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_t *c
         return DAQ_ERROR_INVAL;
     }
 
-    if ((config->mode == DAQ_MODE_PASSIVE && !(module->type & DAQ_TYPE_INTF_CAPABLE)) ||
-        (config->mode == DAQ_MODE_INLINE && !(module->type & DAQ_TYPE_INLINE_CAPABLE)) ||
-        (config->mode == DAQ_MODE_READ_FILE && !(module->type & DAQ_TYPE_FILE_CAPABLE)))
+    mode = daq_config_get_mode(config);
+    if ((mode == DAQ_MODE_PASSIVE && !(module->type & DAQ_TYPE_INTF_CAPABLE)) ||
+        (mode == DAQ_MODE_INLINE && !(module->type & DAQ_TYPE_INLINE_CAPABLE)) ||
+        (mode == DAQ_MODE_READ_FILE && !(module->type & DAQ_TYPE_FILE_CAPABLE)))
     {
-        snprintf(errbuf, len, "The %s DAQ module does not support %s mode!", module->name, daq_mode_string(config->mode));
+        snprintf(errbuf, len, "The %s DAQ module does not support %s mode!", module->name, daq_mode_string(mode));
         return DAQ_ERROR_INVAL;
     }
 
