@@ -281,21 +281,21 @@ SOURCE=.\sfbpf\sunatmpos.h
 SOURCE=".\sfbpf\win32-stdinc.h"
 # End Source File
 # End Group
-# Begin Group "os-daq-modules"
+# Begin Group "modules"
 
 # PROP Default_Filter ""
 # Begin Source File
 
-SOURCE=".\os-daq-modules\daq_pcap.c"
+SOURCE=".\modules\daq_pcap.c"
 # ADD CPP /I "../src/win32/WIN32-Includes/WinPCAP"
 # End Source File
 # Begin Source File
 
-SOURCE=".\os-daq-modules\daq_static_modules.c"
+SOURCE=".\modules\daq_static_modules.c"
 # End Source File
 # Begin Source File
 
-SOURCE=".\os-daq-modules\daq_static_modules.h"
+SOURCE=".\modules\daq_static_modules.h"
 # End Source File
 # End Group
 # End Target

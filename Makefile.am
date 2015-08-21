@@ -1,7 +1,7 @@
 AUTOMAKE_OPTIONS = foreign
 
 if BUILD_MODULES
-    MODULES_DIR = os-daq-modules
+    MODULES_DIR = modules
 endif
 SUBDIRS = api sfbpf $(MODULES_DIR)
 

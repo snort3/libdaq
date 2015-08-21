@@ -294,8 +294,8 @@ AC_SUBST(LIBDL)
 
 AC_CONFIG_FILES([Makefile
                  api/Makefile
-                 os-daq-modules/Makefile
-                 os-daq-modules/daq-modules-config
+                 modules/Makefile
+                 modules/daq-modules-config
                  sfbpf/Makefile])
 AC_OUTPUT
 
