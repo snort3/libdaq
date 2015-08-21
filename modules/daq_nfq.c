@@ -113,91 +113,98 @@ static int nfq_daq_get_protos (const char* s)
     return 0;
 }
 
-static int nfq_daq_get_setup (
-    NfqImpl* impl, const DAQ_Config_t* cfg, char* errBuf, size_t errMax)
+static int nfq_daq_get_setup(NfqImpl *impl, const DAQ_Config_h config, char *errBuf, size_t errMax)
 {
-    DAQ_Dict* entry;
+    const char *varKey, *varValue;
 
     impl->protos = 0x1;
     impl->qid = DEFAULT_Q;
     impl->qlen = 0;
 
-    for ( entry = cfg->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if ( !entry->value || !*entry->value )
+        if (!varValue || !*varValue)
         {
-            snprintf(errBuf, errMax,
-                "%s: variable needs value (%s)\n", __FUNCTION__, entry->key);
-                return DAQ_ERROR;
+            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __FUNCTION__, varKey);
+            return DAQ_ERROR;
         }
-        else if ( !strcmp(entry->key, "device") )
+        else if (!strcmp(varKey, "device"))
         {
-            impl->device = strdup(entry->value);
-            if ( !impl->device )
+            impl->device = strdup(varValue);
+            if (!impl->device)
             {
-                snprintf(errBuf, errMax,
-                    "%s: can't allocate memory for device (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: can't allocate memory for device (%s)\n",
+                    __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
-        else if ( !strcmp(entry->key, "proto") )
+        else if (!strcmp(varKey, "proto"))
         {
-            impl->protos = nfq_daq_get_protos(entry->value);
-            if ( !impl->protos )
+            impl->protos = nfq_daq_get_protos(varValue);
+            if (!impl->protos)
             {
-                snprintf(errBuf, errMax, "%s: bad proto (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: bad proto (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
-        else if ( !strcmp(entry->key, "queue") )
+        else if (!strcmp(varKey, "queue"))
         {
-            char* end = entry->value;
+            char *endptr = NULL;
 
-            impl->qid = (int)strtol(entry->value, &end, 0);
-
-            if ( *end || impl->qid < 0 || impl->qid > 65535 )
+            if (!varValue)
             {
-                snprintf(errBuf, errMax, "%s: bad queue (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: %s requires an argument!", __FUNCTION__, varKey);
+                return DAQ_ERROR;
+            }
+
+            impl->qid = (int) strtol(varValue, &endptr, 0);
+
+            if (*endptr != '\0' || impl->qid < 0 || impl->qid > 65535 )
+            {
+                snprintf(errBuf, errMax, "%s: bad queue (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
-        else if ( !strcmp(entry->key, "queue_len") )
+        else if (!strcmp(varKey, "queue_len"))
         {
-            char* end = entry->value;
-            impl->qlen = (int)strtol(entry->value, &end, 0);
+            char *endptr = NULL;
 
-            if ( *end || impl->qlen < 0 || impl->qlen > 65535 )
+            if (!varValue)
             {
-                snprintf(errBuf, errMax, "%s: bad queue length (%s)\n",
-                        __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: %s requires an argument!", __FUNCTION__, varKey);
+                return DAQ_ERROR;
+            }
+
+            impl->qlen = (int) strtol(varValue, &endptr, 0);
+
+            if (*endptr != '\0' || impl->qlen < 0 || impl->qlen > 65535)
+            {
+                snprintf(errBuf, errMax, "%s: bad queue length (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
         else
         {
-            snprintf(errBuf, errMax,
-                "%s: unsupported variable (%s=%s)\n",
-                    __FUNCTION__, entry->key, entry->value);
-                return DAQ_ERROR;
+            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n",
+                    __FUNCTION__, varKey, varValue);
+            return DAQ_ERROR;
         }
+        daq_config_next_variable(config, &varKey, &varValue);
     }
 
-    impl->snaplen = cfg->snaplen ? cfg->snaplen : IP_MAXPACKET;
-    impl->timeout = cfg->timeout / 1000;    // convert ms to secs
-    impl->passive = ( cfg->mode == DAQ_MODE_PASSIVE );
+    impl->snaplen = daq_config_get_snaplen(config) ? daq_config_get_snaplen(config) : IP_MAXPACKET;
+    impl->timeout = daq_config_get_timeout(config) / 1000;    // convert ms to secs
+    impl->passive = ( daq_config_get_mode(config) == DAQ_MODE_PASSIVE );
 
     return DAQ_SUCCESS;
 }
 
 //-------------------------------------------------------------------------
 
-static int nfq_daq_initialize (
-    const DAQ_Config_t* cfg, void** handle, char* errBuf, size_t errMax)
+static int nfq_daq_initialize(const DAQ_Config_h config, void **handle, char *errBuf, size_t errMax)
 {
-    if(cfg->name && *(cfg->name))
+    if (daq_config_get_name(config))
     {
         snprintf(errBuf, errMax, "The nfq DAQ module does not support interface or readback mode!");
         return DAQ_ERROR_INVAL;
@@ -205,14 +212,13 @@ static int nfq_daq_initialize (
     // setup internal stuff
     NfqImpl *impl = calloc(1, sizeof(*impl));
 
-    if ( !impl )
+    if (!impl)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate nfq context\n",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate nfq context", __FUNCTION__);
         return DAQ_ERROR_NOMEM;
     }
 
-    if ( nfq_daq_get_setup(impl, cfg, errBuf, errMax) != DAQ_SUCCESS )
+    if (nfq_daq_get_setup(impl, config, errBuf, errMax) != DAQ_SUCCESS)
     {
         nfq_daq_shutdown(impl);
         return DAQ_ERROR;
@@ -220,8 +226,7 @@ static int nfq_daq_initialize (
 
     if ( (impl->buf = malloc(MSG_BUF_SIZE)) == NULL )
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate nfq buffer\n",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate nfq buffer", __FUNCTION__);
         nfq_daq_shutdown(impl);
         return DAQ_ERROR_NOMEM;
     }
@@ -391,7 +396,7 @@ static inline int SetPktHdr (
     DAQ_PktHdr_t* hdr,
     uint8_t** pkt
 ) {
-    int len = nfq_get_payload(nfad, (char**)pkt);
+    int len = nfq_get_payload(nfad, pkt);
 
     if ( len <= 0 )
         return -1;
