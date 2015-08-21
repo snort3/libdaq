@@ -589,18 +589,17 @@ static void reset_stats(AFPacket_Context_t *afpc)
         getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len);
 }
 
-static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char *errbuf, size_t errlen)
+static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t errlen)
 {
     AFPacket_Context_t *afpc;
     AFPacketInstance *instance;
-    const char *size_str = NULL;
+    const char *varKey, *varValue, *size_str = NULL;
     char *name1, *name2, *dev;
     char intf[IFNAMSIZ];
     uint32_t size;
     size_t len;
     int num_rings, num_intfs = 0;
     int rval = DAQ_ERROR;
-    DAQ_Dict *entry;
 
     afpc = calloc(1, sizeof(AFPacket_Context_t));
     if (!afpc)
@@ -610,7 +609,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
         goto err;
     }
 
-    afpc->device = strdup(config->name);
+    afpc->device = strdup(daq_config_get_name(config));
     if (!afpc->device)
     {
         snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
@@ -618,11 +617,12 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
         goto err;
     }
 
-    afpc->snaplen = config->snaplen;
-    afpc->timeout = (config->timeout > 0) ? (int) config->timeout : -1;
+    afpc->snaplen = daq_config_get_snaplen(config);
+    afpc->timeout = (daq_config_get_timeout(config) > 0) ? (int) daq_config_get_timeout(config) : -1;
 
     dev = afpc->device;
-    if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') || (config->mode == DAQ_MODE_PASSIVE && strstr(dev, "::")))
+    if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') ||
+            (daq_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -652,7 +652,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
             instance->next = afpc->instances;
             afpc->instances = instance;
             num_intfs++;
-            if (config->mode != DAQ_MODE_PASSIVE)
+            if (daq_config_get_mode(config) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
                 {
@@ -676,7 +676,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
     }
 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (config->mode != DAQ_MODE_PASSIVE && num_intfs != 0))
+    if (!afpc->instances || (daq_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -686,61 +686,64 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
      * Determine the dimensions of the kernel RX ring(s) to request.
      */
     /* 1. Find the total desired packet buffer memory for all instances. */
-    for (entry = config->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if (!strcmp(entry->key, "buffer_size_mb"))
-            size_str = entry->value;
-        else if (!strcmp(entry->key, "debug"))
+        if (!strcmp(varKey, "buffer_size_mb"))
+            size_str = varValue;
+        else if (!strcmp(varKey, "debug"))
             afpc->debug = 1;
 #ifdef PACKET_FANOUT
-        else if (!strcmp(entry->key, "fanout_type"))
+        else if (!strcmp(varKey, "fanout_type"))
         {
-            if (!entry->value)
+            if (!varValue)
             {
-                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, varKey);
                 goto err;
             }
             /* Using anything other than 'hash' is probably asking for trouble, but
                 I'll never stop you from shooting yourself in the foot. */
-            if (!strcmp(entry->value, "hash"))
+            if (!strcmp(varValue, "hash"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_HASH;
-            else if (!strcmp(entry->value, "lb"))
+            else if (!strcmp(varValue, "lb"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_LB;
-            else if (!strcmp(entry->value, "cpu"))
+            else if (!strcmp(varValue, "cpu"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_CPU;
-            else if (!strcmp(entry->value, "rollover"))
+            else if (!strcmp(varValue, "rollover"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_ROLLOVER;
-            else if (!strcmp(entry->value, "rnd"))
+            else if (!strcmp(varValue, "rnd"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_RND;
 #ifdef PACKET_FANOUT_QM
-            else if (!strcmp(entry->value, "qm"))
+            else if (!strcmp(varValue, "qm"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_QM;
 #endif
             else
             {
-                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, varKey, varValue);
                 goto err;
             }
             afpc->fanout_cfg.enabled = true;
         }
-        else if (!strcmp(entry->key, "fanout_flag"))
+        else if (!strcmp(varKey, "fanout_flag"))
         {
-            if (!entry->value)
+            if (!varValue)
             {
-                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, varKey);
                 goto err;
             }
-            if (!strcmp(entry->value, "rollover"))
+            if (!strcmp(varValue, "rollover"))
                 afpc->fanout_cfg.fanout_flags |= PACKET_FANOUT_FLAG_ROLLOVER;
-            else if (!strcmp(entry->value, "defrag"))
+            else if (!strcmp(varValue, "defrag"))
                 afpc->fanout_cfg.fanout_flags |= PACKET_FANOUT_FLAG_DEFRAG;
             else
             {
-                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, varKey, varValue);
                 goto err;
             }
         }
 #endif /* PACKET_FANOUT */
+
+        daq_config_next_variable(config, &varKey, &varValue);
     }
 
     /* Fall back to the environment variable. */
