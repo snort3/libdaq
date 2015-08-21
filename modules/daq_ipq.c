@@ -88,54 +88,49 @@ static int ipq_daq_get_proto (const char* s)
     return 0;
 }
 
-static int ipq_daq_get_setup (
-    IpqImpl* impl, const DAQ_Config_t* cfg, char* errBuf, size_t errMax)
+static int ipq_daq_get_setup(IpqImpl *impl, const DAQ_Config_h config, char *errBuf, size_t errMax)
 {
-    DAQ_Dict* entry;
+    const char *varKey, *varValue;
 
     impl->proto = PF_INET;
 
-    for ( entry = cfg->values; entry; entry = entry->next)
+    daq_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        if ( !entry->value || !*entry->value )
+        if (!varValue || *varValue == '\0')
         {
-            snprintf(errBuf, errMax,
-                "%s: variable needs value (%s)\n", __FUNCTION__, entry->key);
-                return DAQ_ERROR;
+            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __FUNCTION__, varKey);
+            return DAQ_ERROR;
         }
-        else if ( !strcmp(entry->key, "proto") )
+        else if (!strcmp(varKey, "proto"))
         {
-            impl->proto = ipq_daq_get_proto(entry->value);
-            if ( !impl->proto )
+            impl->proto = ipq_daq_get_proto(varValue);
+            if (!impl->proto)
             {
-                snprintf(errBuf, errMax, "%s: bad proto (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: bad proto (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
-        else if ( !strcmp(entry->key, "device") )
+        else if (!strcmp(varKey, "device"))
         {
-            impl->device = strdup(entry->value);
-            if ( !impl->device )
+            impl->device = strdup(varValue);
+            if (!impl->device)
             {
-                snprintf(errBuf, errMax,
-                    "%s: can't allocate memory for device (%s)\n",
-                    __FUNCTION__, entry->value);
+                snprintf(errBuf, errMax, "%s: can't allocate memory for device (%s)\n", __FUNCTION__, varValue);
                 return DAQ_ERROR;
             }
         }
         else
         {
-            snprintf(errBuf, errMax,
-                "%s: unsupported variable (%s=%s)\n",
-                    __FUNCTION__, entry->key, entry->value);
+            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __FUNCTION__, varKey, varValue);
                 return DAQ_ERROR;
         }
+        daq_config_next_variable(config, &varKey, &varValue);
     }
 
-    impl->snaplen = cfg->snaplen ? cfg->snaplen : IP_MAXPACKET;
-    impl->timeout = cfg->timeout * 1000;  // cfg is ms, ipq is us
-    impl->passive = ( cfg->mode == DAQ_MODE_PASSIVE );
+    impl->snaplen = daq_config_get_snaplen(config) ? daq_config_get_snaplen(config) : IP_MAXPACKET;
+    impl->timeout = daq_config_get_timeout(config) * 1000;  // cfg is ms, ipq is us
+    impl->passive = (daq_config_get_mode(config) == DAQ_MODE_PASSIVE);
 
     return DAQ_SUCCESS;
 }
@@ -143,27 +138,25 @@ static int ipq_daq_get_setup (
 //-------------------------------------------------------------------------
 // initialization and clean up
 
-static int ipq_daq_initialize (
-    const DAQ_Config_t* cfg, void** handle, char* errBuf, size_t errMax)
+static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *errBuf, size_t errMax)
 {
     int status;
 
-    if(cfg->name && *(cfg->name))
+    if (daq_config_get_name(config))
     {
         snprintf(errBuf, errMax, "The ipq DAQ module does not support interface or readback mode!");
         return DAQ_ERROR_INVAL;
     }
 
-    IpqImpl* impl = calloc(1, sizeof(*impl));
+    IpqImpl *impl = calloc(1, sizeof(*impl));
 
-    if ( !impl )
+    if (!impl)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipq context!",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipq context!", __FUNCTION__);
         return DAQ_ERROR_NOMEM;
     }
 
-    if ( ipq_daq_get_setup(impl, cfg, errBuf, errMax) != DAQ_SUCCESS )
+    if (ipq_daq_get_setup(impl, config, errBuf, errMax) != DAQ_SUCCESS)
     {
         ipq_daq_shutdown(impl);
         return DAQ_ERROR;
