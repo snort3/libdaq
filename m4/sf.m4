@@ -60,7 +60,7 @@ AC_DEFUN([AC_SF_COMPILER_SETUP],
         AX_CFLAGS_GCC_OPTION(-Wno-unused-parameter)
         AX_CFLAGS_GCC_OPTION(-fno-strict-aliasing)
         AX_CFLAGS_GCC_OPTION(-fdiagnostics-show-option)
-        AX_CFLAGS_GCC_OPTION(-pedantic -std=c99 -D_GNU_SOURCE)
+        AX_CFLAGS_GCC_OPTION(-D_GNU_SOURCE)
     fi
 ])
 
