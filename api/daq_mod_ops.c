@@ -99,43 +99,6 @@ DAQ_LINKAGE int daq_start(const DAQ_Module_t *module, void *handle)
     return module->start(handle);
 }
 
-DAQ_LINKAGE int daq_acquire(const DAQ_Module_t *module, void *handle, int cnt,
-                            DAQ_Analysis_Func_t callback, void *user)
-{
-    if (!module)
-        return DAQ_ERROR_NOMOD;
-
-    if (!handle)
-        return DAQ_ERROR_NOCTX;
-
-    if (module->check_status(handle) != DAQ_STATE_STARTED)
-    {
-        module->set_errbuf(handle, "Can't acquire packets from an instance that isn't started!");
-        return DAQ_ERROR;
-    }
-
-    return module->acquire(handle, cnt, callback, NULL, user);
-}
-
-DAQ_LINKAGE int daq_acquire_with_meta(const DAQ_Module_t *module, void *handle, int cnt,
-                                      DAQ_Analysis_Func_t callback,
-                                      DAQ_Meta_Func_t metaback, void *user)
-{
-    if (!module)
-        return DAQ_ERROR_NOMOD;
-
-    if (!handle)
-        return DAQ_ERROR_NOCTX;
-
-    if (module->check_status(handle) != DAQ_STATE_STARTED)
-    {
-        module->set_errbuf(handle, "Can't acquire packets from an instance that isn't started!");
-        return DAQ_ERROR;
-    }
-
-    return module->acquire(handle, cnt, callback, metaback, user);
-}
-
 DAQ_LINKAGE int daq_inject(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     if (!module)
@@ -243,11 +206,8 @@ DAQ_LINKAGE int daq_get_snaplen(const DAQ_Module_t *module, void *handle)
 
 DAQ_LINKAGE uint32_t daq_get_capabilities(const DAQ_Module_t *module, void *handle)
 {
-    if (!module)
-        return DAQ_ERROR_NOMOD;
-
-    if (!handle)
-        return DAQ_ERROR_NOCTX;
+    if (!module || !handle)
+        return 0;
 
     return module->get_capabilities(handle);
 }
@@ -362,6 +322,44 @@ DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const D
         return DAQ_SUCCESS;
 
     return module->query_flow(handle, hdr, query);
+}
+
+DAQ_LINKAGE int daq_msg_receive(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t **msgptr)
+{
+    if (!module)
+        return DAQ_ERROR_NOMOD;
+
+    if (!handle)
+        return DAQ_ERROR_NOCTX;
+
+    return module->msg_receive(handle, msgptr);
+}
+
+DAQ_LINKAGE int daq_msg_finalize(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+{
+    if (!module)
+        return DAQ_ERROR_NOMOD;
+
+    if (!handle)
+        return DAQ_ERROR_NOCTX;
+
+    return module->msg_finalize(handle, msg, verdict);
+}
+
+DAQ_LINKAGE DAQ_PktHdr_t *daq_packet_header_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
+{
+    if (!module || !handle)
+        return NULL;
+
+    return module->packet_header_from_msg(handle, msg);
+}
+
+DAQ_LINKAGE const uint8_t *daq_packet_data_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
+{
+    if (!module || !handle)
+        return NULL;
+
+    return module->packet_data_from_msg(handle, msg);
 }
 
 /*

@@ -81,6 +81,24 @@
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
 #define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
+typedef enum
+{
+    DAQ_MSG_TYPE_PACKET = 1,    /* Packet data */
+    DAQ_MSG_TYPE_PAYLOAD,       /* Payload data */
+    DAQ_MSG_TYPE_SOF,           /* Start of Flow statistics */
+    DAQ_MSG_TYPE_EOF,           /* End of Flow statistics */
+    DAQ_MSG_TYPE_VPN_LOGIN,     /* VPN login info */
+    DAQ_MSG_TYPE_VPN_LOGOUT,    /* VPN logout info */
+    DAQ_MSG_TYPE_HA_STATE,      /* HA State blob */
+    MAX_DAQ_MSG_TYPE
+} DAQ_MsgType;
+
+typedef struct _daq_msg
+{
+    DAQ_MsgType type;
+    void *msg;
+} DAQ_Msg_t;
+
 #define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x00001 /* The DAQ module reports that the checksum for this packet is good. */
 #define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
 #define DAQ_PKT_FLAG_NOT_FORWARDING     0x00004 /* The DAQ module will not be actively forwarding this packet
@@ -128,6 +146,8 @@ typedef struct _daq_pkthdr
     struct in6_addr real_dIP;
     uint16_t n_real_sPort;
     uint16_t n_real_dPort;
+
+    const uint8_t *data;    /* Packet data */
 } DAQ_PktHdr_t;
 
 
@@ -336,6 +356,7 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_TYPE_INLINE_CAPABLE 0x04    /* can form an inline bridge */
 #define DAQ_TYPE_MULTI_INSTANCE 0x08    /* can be instantiated multiple times */
 #define DAQ_TYPE_NO_UNPRIV      0x10    /* can not run unprivileged */
+#define DAQ_TYPE_WRAPPER        0x20    /* must decorate another DAQ module */
 
 /* DAQ module capability flags */
 #define DAQ_CAPA_NONE           0x00000000   /* no capabilities */
@@ -378,5 +399,6 @@ DAQ_LINKAGE void daq_config_delete_variable(DAQ_Config_h cfg, const char *key);
 DAQ_LINKAGE int daq_config_first_variable(DAQ_Config_h cfg, const char **key, const char **value);
 DAQ_LINKAGE int daq_config_next_variable(DAQ_Config_h cfg, const char **key, const char **value);
 DAQ_LINKAGE void daq_config_clear_variables(DAQ_Config_h cfg);
+DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 #endif /* _DAQ_COMMON_H */

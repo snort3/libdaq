@@ -42,11 +42,6 @@ struct _daq_module
     int (*set_filter) (void *handle, const char *filter);
     /* Complete device opening and begin queuing packets if they have not been already. */
     int (*start) (void *handle);
-    /* Acquire up to <cnt> packets and call <callback> for each with <user> as the final argument.
-       The return value of the callback will determine the action taken by the DAQ for each packet.
-       If <cnt> is 0, packets will continue to be acquired until some other factor breaks the
-       acquisition loop. */
-    int (*acquire) (void *handle, int cnt, DAQ_Analysis_Func_t callback, DAQ_Meta_Func_t metaback, void *user);
     /* Inject a new packet going either the same or opposite direction as the specified packet. */
     int (*inject) (void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse);
     /* Force breaking out of the acquisition loop after the current iteration. */
@@ -92,6 +87,11 @@ struct _daq_module
     int (*dp_add_dc) (void *handle, const DAQ_PktHdr_t * hdr, DAQ_DP_key_t * dp_key, const uint8_t * packet_data);
     /* Query a flow */
     int (*query_flow) (void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
+
+    int (*msg_receive) (void *handle, const DAQ_Msg_t **msgptr);
+    int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
+    DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
+    const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);
 };
 
 #define DAQ_API_VERSION    0x00010003

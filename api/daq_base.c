@@ -100,6 +100,7 @@ static const char *daq_verdict_strings[MAX_DAQ_VERDICT] = {
 };
 
 static const char *daq_mode_strings[MAX_DAQ_MODE] = {
+    "none",         // DAQ_MODE_NONE
     "passive",      // DAQ_MODE_PASSIVE
     "inline",       // DAQ_MODE_INLINE
     "read-file"     // DAQ_MODE_READ_FILE
@@ -163,7 +164,7 @@ static int register_module(const DAQ_Module_t *dm, void *dl_handle)
     }
 
     /* Check to make sure that ALL of the function pointers are populated. */
-    if (!dm->initialize || !dm->set_filter || !dm->start || !dm->acquire || !dm->inject || !dm->breakloop ||
+    if (!dm->initialize || !dm->set_filter || !dm->start || !dm->inject || !dm->breakloop ||
         !dm->stop || !dm->shutdown || !dm->check_status || !dm->get_stats || !dm->reset_stats ||
         !dm->get_snaplen || !dm->get_capabilities || !dm->get_errbuf || !dm->set_errbuf || !dm->get_device_index)
     {
