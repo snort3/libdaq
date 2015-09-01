@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign
 if BUILD_MODULES
     MODULES_DIR = modules
 endif
-SUBDIRS = api sfbpf $(MODULES_DIR)
+SUBDIRS = api example sfbpf $(MODULES_DIR)
 
 ACLOCAL_AMFLAGS = -I m4
 
