@@ -137,18 +137,18 @@ static int pcap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char 
     context->mode = daq_config_get_mode(config);
     if (context->mode == DAQ_MODE_READ_FILE)
     {
-        context->fp = fopen(daq_config_get_name(config), "rb");
+        context->fp = fopen(daq_config_get_input(config), "rb");
         if (!context->fp)
         {
             snprintf(errbuf, len, "%s: Couldn't open file '%s' for reading: %s", __FUNCTION__,
-                    daq_config_get_name(config), strerror(errno));
+                    daq_config_get_input(config), strerror(errno));
             free(context);
             return DAQ_ERROR_NOMEM;
         }
     }
     else
     {
-        context->device = strdup(daq_config_get_name(config));
+        context->device = strdup(daq_config_get_input(config));
         if (!context->device)
         {
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);

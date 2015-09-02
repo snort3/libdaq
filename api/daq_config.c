@@ -39,7 +39,7 @@ typedef struct _daq_dict_entry
 
 typedef struct _daq_config
 {
-    char *name;             /* Name of the interface(s) or file to be opened */
+    char *input;             /* Name of the interface(s) or file to be opened */
     int snaplen;            /* Maximum packet capture length */
     unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_Mode mode;          /* Module mode (DAQ_MODE_*) */
@@ -64,31 +64,31 @@ DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr)
     return DAQ_SUCCESS;
 }
 
-DAQ_LINKAGE int daq_config_set_name(DAQ_Config_t *cfg, const char *name)
+DAQ_LINKAGE int daq_config_set_input(DAQ_Config_t *cfg, const char *input)
 {
     if (!cfg)
         return DAQ_ERROR_INVAL;
 
-    if (cfg->name)
+    if (cfg->input)
     {
-        free(cfg->name);
-        cfg->name = NULL;
+        free(cfg->input);
+        cfg->input = NULL;
     }
 
-    if (name)
+    if (input)
     {
-        cfg->name = strdup(name);
-        if (!cfg->name)
+        cfg->input = strdup(input);
+        if (!cfg->input)
             return DAQ_ERROR_NOMEM;
     }
 
     return DAQ_SUCCESS;
 }
 
-DAQ_LINKAGE const char *daq_config_get_name(DAQ_Config_t *cfg)
+DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_t *cfg)
 {
     if (cfg)
-        return cfg->name;
+        return cfg->input;
 
     return NULL;
 }
@@ -332,7 +332,7 @@ DAQ_LINKAGE void daq_config_destroy(DAQ_Config_t *cfg)
     if (!cfg)
         return;
 
-    free(cfg->name);
+    free(cfg->input);
     daq_config_clear_variables(cfg);
     free(cfg);
 }

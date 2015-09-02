@@ -1056,7 +1056,7 @@ int main(int argc, char *argv[])
     if (performance_mode)
         printf("In performance mode, no decoding will be done!\n");
 
-    daq_config_set_name(config, input);
+    daq_config_set_input(config, input);
     daq_config_set_snaplen(config, snaplen);
     daq_config_set_timeout(config, timeout);
     daq_config_set_mode(config, mode);

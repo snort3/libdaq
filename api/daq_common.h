@@ -383,8 +383,8 @@ typedef struct _daq_module DAQ_Module_t;
 
 /* DAQ Configuration Functions */
 DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
-DAQ_LINKAGE int daq_config_set_name(DAQ_Config_h cfg, const char *name);
-DAQ_LINKAGE const char *daq_config_get_name(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_input(DAQ_Config_h cfg, const char *input);
+DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_h cfg, int snaplen);
 DAQ_LINKAGE int daq_config_get_snaplen(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_set_timeout(DAQ_Config_h cfg, unsigned timeout);

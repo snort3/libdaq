@@ -622,7 +622,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
         goto err;
     }
 
-    afpc->device = strdup(daq_config_get_name(config));
+    afpc->device = strdup(daq_config_get_input(config));
     if (!afpc->device)
     {
         snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
