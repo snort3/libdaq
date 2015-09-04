@@ -19,7 +19,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-#include <daq.h>
+#include <daq_api.h>
 
 #ifdef BUILD_AFPACKET_MODULE
 extern const DAQ_Module_t afpacket_daq_module_data;
