@@ -62,7 +62,7 @@ typedef struct _VlanTagHdr
 
 static unsigned long packets = 0;
 static unsigned long metas = 0;
-static const DAQ_Module_t *dm = NULL;
+static DAQ_Module_h dm = NULL;
 static void *handle = NULL;
 static DAQ_Mode mode = DAQ_MODE_PASSIVE;
 static PingAction ping_action = PING_ACTION_PASS;
@@ -1006,15 +1006,35 @@ int main(int argc, char *argv[])
 
     if (list_and_exit)
     {
-        DAQ_Module_Info_t *info;
-        int i, num_modules;
+        const DAQ_VariableDesc_t *var_desc_table;
+        DAQ_Module_h module;
+        int num_var_descs, i;
 
-        num_modules = daq_get_module_list(&info);
-        for (i = 0; i < num_modules; i++)
+        module = daq_modules_first();
+        while (module)
         {
-            printf(" Name: %s\n Version: %u\n Type: %u\n\n", info[i].name, info[i].version, info[i].type);
+            printf("\n[%s]\n", daq_get_name(module));
+            printf(" Version: %u\n", daq_get_version(module));
+            printf(" Type: 0x%x\n", daq_get_type(module));
+            num_var_descs = daq_get_variable_descriptions(module, &var_desc_table);
+            if (num_var_descs)
+            {
+                printf(" Variables:\n");
+                for (i = 0; i < num_var_descs; i++)
+                {
+                    printf("  %s ", var_desc_table[i].name);
+                    if (var_desc_table[i].flags & DAQ_VAR_DESC_REQUIRES_ARGUMENT)
+                        printf("<arg> ");
+                    else if (!(var_desc_table[i].flags & DAQ_VAR_DESC_FORBIDS_ARGUMENT))
+                        printf("[arg] ");
+                    printf("- %s\n", var_desc_table[i].description);
+                }
+            }
+
+            module = daq_modules_next();
         }
-        daq_free_module_list(info, num_modules);
+        printf("\n");
+
         return 0;
     }
 
