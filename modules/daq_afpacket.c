@@ -134,6 +134,13 @@ struct vlan_tag {
 };
 #define VLAN_TAG_LEN    4
 
+static DAQ_VariableDesc_t afpacket_variable_descriptions[] = {
+    { "buffer_size_mb", "Packet buffer space to allocate in megabytes", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "debug", "Enable debugging output to stdout", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "fanout_type", "Fanout loadbalancing method", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "fanout_flag", "Fanout loadbalancing option", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+};
+
 static const int vlan_offset = 2 * ETH_ALEN;
 
 static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *instance)
@@ -600,6 +607,13 @@ static void reset_stats(AFPacket_Context_t *afpc)
     /* Just call PACKET_STATISTICS to clear each instance's stats. */
     for (instance = afpc->instances; instance; instance = instance->next)
         getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len);
+}
+
+static int afpacket_daq_get_variable_descriptions(const DAQ_VariableDesc_t **var_desc_table)
+{
+    *var_desc_table = afpacket_variable_descriptions;
+
+    return sizeof(afpacket_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
 static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t errlen)
@@ -1228,6 +1242,7 @@ const DAQ_Module_t afpacket_daq_module_data =
     .module_version = DAQ_AFPACKET_VERSION,
     .name = "afpacket",
     .type = DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
+    .get_variable_descriptions = afpacket_daq_get_variable_descriptions,
     .initialize = afpacket_daq_initialize,
     .set_filter = afpacket_daq_set_filter,
     .start = afpacket_daq_start,
