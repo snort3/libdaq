@@ -35,18 +35,126 @@ typedef struct _daq_dict_entry
     char *key;
     char *value;
     struct _daq_dict_entry *next;
+} DAQ_DictEntry_t;
+
+typedef struct _daq_dict
+{
+    DAQ_DictEntry_t *entries;
+    DAQ_DictEntry_t *iterator;
 } DAQ_Dict_t;
 
 typedef struct _daq_config
 {
-    char *input;             /* Name of the interface(s) or file to be opened */
+    char *input;            /* Name of the interface(s) or file to be opened */
     int snaplen;            /* Maximum packet capture length */
     unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_Mode mode;          /* Module mode (DAQ_MODE_*) */
     uint32_t flags;         /* Other configuration flags (DAQ_CFG_*) */
-    DAQ_Dict_t *values;     /* Dictionary of arbitrary key[:value] string pairs. */
-    DAQ_Dict_t *curr_variable;    /* Current DAQ variable dictionary iterator position. */
+    DAQ_Dict_t variables;   /* Dictionary of arbitrary key[:value] string pairs. */
 } DAQ_Config_t;
+
+
+/*
+ * DAQ Dictionary Functions
+ */
+
+static int daq_dict_insert_entry(DAQ_Dict_t *dict, const char *key, const char *value)
+{
+    DAQ_DictEntry_t *entry;
+
+    entry = calloc(1, sizeof(DAQ_DictEntry_t));
+    if (!entry)
+        return DAQ_ERROR_NOMEM;
+    entry->key = strdup(key);
+    if (!entry->key)
+    {
+        free(entry);
+        return DAQ_ERROR_NOMEM;
+    }
+    if (value)
+    {
+        entry->value = strdup(value);
+        if (!entry->value)
+        {
+            free(entry->key);
+            free(entry);
+            return DAQ_ERROR_NOMEM;
+        }
+    }
+    entry->next = dict->entries;
+    dict->entries = entry;
+
+    return DAQ_SUCCESS;
+}
+
+static DAQ_DictEntry_t *daq_dict_find_entry(DAQ_Dict_t *dict, const char *key)
+{
+    DAQ_DictEntry_t *entry;
+
+    for (entry = dict->entries; entry; entry = entry->next)
+    {
+        if (!strcmp(entry->key, key))
+            return entry;
+    }
+
+    return NULL;
+}
+
+static void daq_dict_delete_entry(DAQ_Dict_t *dict, const char *key)
+{
+    DAQ_DictEntry_t *entry, *prev = NULL;
+
+    for (entry = dict->entries; entry; entry = entry->next)
+    {
+        if (!strcmp(entry->key, key))
+        {
+            if (prev)
+                prev->next = entry->next;
+            else
+                dict->entries = entry->next;
+            free(entry->key);
+            free(entry->value);
+            free(entry);
+            dict->iterator = NULL;
+            return;
+        }
+        prev = entry;
+    }
+}
+
+static void daq_dict_clear(DAQ_Dict_t *dict)
+{
+    DAQ_DictEntry_t *entry;
+
+    while ((entry = dict->entries))
+    {
+        dict->entries = entry->next;
+        free(entry->key);
+        free(entry->value);
+        free(entry);
+    }
+    dict->iterator = NULL;
+}
+
+static DAQ_DictEntry_t *daq_dict_first_entry(DAQ_Dict_t *dict)
+{
+    dict->iterator = dict->entries;
+
+    return dict->iterator;
+}
+
+static DAQ_DictEntry_t *daq_dict_next_entry(DAQ_Dict_t *dict)
+{
+    if (dict->iterator)
+        dict->iterator = dict->iterator->next;
+
+    return dict->iterator;
+}
+
+
+/*
+ * DAQ Configuration Functions
+ */
 
 DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr)
 {
@@ -167,43 +275,21 @@ DAQ_LINKAGE uint32_t daq_config_get_flags(DAQ_Config_t *cfg)
 
 DAQ_LINKAGE int daq_config_set_variable(DAQ_Config_t *cfg, const char *key, const char *value)
 {
-    DAQ_Dict_t *entry, *new_entry;
+    DAQ_DictEntry_t *entry;
     char *new_value;
 
     if (!cfg || !key)
         return DAQ_ERROR_INVAL;
 
-    for (entry = cfg->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-            break;
-    }
-
+    entry = daq_dict_find_entry(&cfg->variables, key);
     if (!entry)
-    {
-        new_entry = calloc(1, sizeof(struct _daq_dict_entry));
-        if (!new_entry)
-            return DAQ_ERROR_NOMEM;
-        new_entry->key = strdup(key);
-        if (!new_entry->key)
-        {
-            free(new_entry);
-            return DAQ_ERROR_NOMEM;
-        }
-        entry = new_entry;
-        cfg->curr_variable = NULL;
-    }
-    else
-        new_entry = NULL;
+        return daq_dict_insert_entry(&cfg->variables, key, value);
 
     if (value)
     {
         new_value = strdup(value);
         if (!new_value)
-        {
-            free(new_entry);
             return DAQ_ERROR_NOMEM;
-        }
         if (entry->value)
             free(entry->value);
         entry->value = new_value;
@@ -214,66 +300,41 @@ DAQ_LINKAGE int daq_config_set_variable(DAQ_Config_t *cfg, const char *key, cons
         entry->value = NULL;
     }
 
-    if (new_entry)
-    {
-        new_entry->next = cfg->values;
-        cfg->values = new_entry;
-    }
-
-    DEBUG("Set config dictionary entry '%s' => '%s'.\n", entry->key, entry->value);
+    DEBUG("Set config dictionary entry '%s' => '%s'.\n", key, value);
 
     return DAQ_SUCCESS;
 }
 
 DAQ_LINKAGE const char *daq_config_get_variable(DAQ_Config_t *cfg, const char *key)
 {
-    DAQ_Dict_t *entry;
+    DAQ_DictEntry_t *entry;
 
     if (!cfg || !key)
         return NULL;
 
-    for (entry = cfg->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-            return entry->value;
-    }
+    entry = daq_dict_find_entry(&cfg->variables, key);
+    if (!entry)
+        return NULL;
 
-    return NULL;
+    return entry->value;
 }
 
 DAQ_LINKAGE void daq_config_delete_variable(DAQ_Config_t *cfg, const char *key)
 {
-    DAQ_Dict_t *entry, *prev = NULL;
-
     if (!cfg || !key)
         return;
 
-    for (entry = cfg->values; entry; entry = entry->next)
-    {
-        if (!strcmp(entry->key, key))
-        {
-            if (prev)
-                prev->next = entry->next;
-            else
-                cfg->values = entry->next;
-            free(entry->key);
-            free(entry->value);
-            free(entry);
-            cfg->curr_variable = NULL;
-            return;
-        }
-        prev = entry;
-    }
+    daq_dict_delete_entry(&cfg->variables, key);
 }
 
 DAQ_LINKAGE int daq_config_first_variable(DAQ_Config_t *cfg, const char **key, const char **value)
 {
-    DAQ_Dict_t *entry;
+    DAQ_DictEntry_t *entry;
 
     if (!cfg || !key || !value)
         return DAQ_ERROR_INVAL;
 
-    entry = cfg->curr_variable = cfg->values;
+    entry = daq_dict_first_entry(&cfg->variables);
     if (entry)
     {
         *key = entry->key;
@@ -290,12 +351,12 @@ DAQ_LINKAGE int daq_config_first_variable(DAQ_Config_t *cfg, const char **key, c
 
 DAQ_LINKAGE int daq_config_next_variable(DAQ_Config_t *cfg, const char **key, const char **value)
 {
-    DAQ_Dict_t *entry;
+    DAQ_DictEntry_t *entry;
 
-    if (!cfg || !key || !value || !cfg->curr_variable)
+    if (!cfg || !key || !value)
         return DAQ_ERROR_INVAL;
 
-    entry = cfg->curr_variable = cfg->curr_variable->next;
+    entry = daq_dict_next_entry(&cfg->variables);
     if (entry)
     {
         *key = entry->key;
@@ -311,20 +372,10 @@ DAQ_LINKAGE int daq_config_next_variable(DAQ_Config_t *cfg, const char **key, co
 
 DAQ_LINKAGE void daq_config_clear_variables(DAQ_Config_t *cfg)
 {
-    DAQ_Dict_t *entry;
-
     if (!cfg)
         return;
 
-    while (cfg->values)
-    {
-        entry = cfg->values;
-        cfg->values = entry->next;
-        free(entry->key);
-        free(entry->value);
-        free(entry);
-    }
-    cfg->curr_variable = NULL;
+    daq_dict_clear(&cfg->variables);
 }
 
 DAQ_LINKAGE void daq_config_destroy(DAQ_Config_t *cfg)
