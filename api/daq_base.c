@@ -66,8 +66,8 @@
 
 #endif
 
-#include "daq.h"
 #include "daq_api.h"
+#include "daq.h"
 #include "daq_api_internal.h"
 
 #define NAME_SIZE       512
@@ -87,6 +87,7 @@ typedef struct _daq_list_node
 } DAQ_ListNode_t;
 
 static DAQ_ListNode_t *module_list = NULL;
+static DAQ_ListNode_t *module_list_iter = NULL;
 static int num_modules = 0;
 
 static const char *daq_verdict_strings[MAX_DAQ_VERDICT] = {
@@ -427,52 +428,20 @@ DAQ_LINKAGE void daq_print_stats(DAQ_Stats_t *stats, FILE *fp)
     fprintf(fp, "  Flows Ignored:      %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_IGNORE]);
 }
 
-DAQ_LINKAGE int daq_get_module_list(DAQ_Module_Info_t *list[])
+DAQ_LINKAGE const DAQ_Module_t *daq_modules_first(void)
 {
-    DAQ_Module_Info_t *info;
-    DAQ_ListNode_t *node;
-    int idx;
+    if (module_list)
+        module_list_iter = module_list;
 
-    if (!list)
-        return DAQ_ERROR_INVAL;
-
-    info = calloc(num_modules, sizeof(DAQ_Module_Info_t));
-    if (!info)
-        return DAQ_ERROR_NOMEM;
-
-    idx = 0;
-    for (node = module_list; node; node = node->next)
-    {
-        info[idx].name = strdup(node->module->name);
-        if (info[idx].name == NULL)
-        {
-            daq_free_module_list(info, idx);
-            return DAQ_ERROR_NOMEM;
-        }
-        info[idx].version = node->module->module_version;
-        info[idx].type = node->module->type;
-        idx++;
-    }
-
-    *list = info;
-
-    return num_modules;
+    return module_list_iter ? module_list_iter->module : NULL;
 }
 
-DAQ_LINKAGE void daq_free_module_list(DAQ_Module_Info_t *list, int size)
+DAQ_LINKAGE const DAQ_Module_t *daq_modules_next(void)
 {
-    int idx;
+    if (module_list_iter)
+        module_list_iter = module_list_iter->next;
 
-    if (!list || size <= 0)
-        return;
-
-    for (idx = 0; idx < size; idx++)
-    {
-        if (list[idx].name)
-            free(list[idx].name);
-    }
-
-    free(list);
+    return module_list_iter ? module_list_iter->module : NULL;
 }
 
 DAQ_LINKAGE void daq_set_verbosity(int level)

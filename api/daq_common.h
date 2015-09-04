@@ -308,6 +308,15 @@ typedef enum {
 
 typedef struct _daq_config *DAQ_Config_h;
 
+#define DAQ_VAR_DESC_REQUIRES_ARGUMENT  0x01
+#define DAQ_VAR_DESC_FORBIDS_ARGUMENT   0x02
+typedef struct _daq_variable_desc
+{
+    const char *name;
+    const char *description;
+    uint32_t flags;
+} DAQ_VariableDesc_t;
+
 typedef enum {
     DAQ_STATE_UNINITIALIZED,
     DAQ_STATE_INITIALIZED,
@@ -378,8 +387,6 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_CAPA_DECODE_6IN4    0x00008000   /* decodes and tracks flows of IPv6 within IPv4. */
 #define DAQ_CAPA_DECODE_4IN6    0x00010000   /* decodes and tracks flows of IPv4 within IPv6. */
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
-
-typedef struct _daq_module DAQ_Module_t;
 
 /* DAQ Configuration Functions */
 DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);

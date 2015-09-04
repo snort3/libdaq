@@ -324,6 +324,20 @@ DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const D
     return module->query_flow(handle, hdr, query);
 }
 
+DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
+{
+    if (!module)
+        return DAQ_ERROR_NOMOD;
+
+    if (!handle)
+        return DAQ_ERROR_NOCTX;
+
+    if (!module->dp_add_dc)
+        return DAQ_SUCCESS;
+
+    return module->dp_add_dc(handle, hdr, dp_key, packet_data);
+}
+
 DAQ_LINKAGE int daq_msg_receive(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t **msgptr)
 {
     if (!module)
@@ -362,6 +376,7 @@ DAQ_LINKAGE const uint8_t *daq_packet_data_from_msg(const DAQ_Module_t *module, 
     return module->packet_data_from_msg(handle, msg);
 }
 
+
 /*
  * Functions that apply to DAQ modules themselves go here.
  */
@@ -373,6 +388,14 @@ DAQ_LINKAGE const char *daq_get_name(const DAQ_Module_t *module)
     return module->name;
 }
 
+DAQ_LINKAGE uint32_t daq_get_version(const DAQ_Module_t *module)
+{
+    if (!module)
+        return 0;
+
+    return module->module_version;
+}
+
 DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module)
 {
     if (!module)
@@ -381,16 +404,16 @@ DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module)
     return module->type;
 }
 
-DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
+DAQ_LINKAGE int daq_get_variable_descriptions(const DAQ_Module_t *module, const DAQ_VariableDesc_t **var_desc_table)
 {
-    if (!module)
-        return DAQ_ERROR_NOMOD;
+    if (!var_desc_table)
+        return 0;
 
-    if (!handle)
-        return DAQ_ERROR_NOCTX;
+    if (!module || !module->get_variable_descriptions)
+    {
+        *var_desc_table = NULL;
+        return 0;
+    }
 
-    if (!module->dp_add_dc)
-        return DAQ_SUCCESS;
-
-    return module->dp_add_dc(handle, hdr, dp_key, packet_data);
+    return module->get_variable_descriptions(var_desc_table);
 }

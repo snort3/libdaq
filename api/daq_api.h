@@ -24,7 +24,7 @@
 
 #include <daq_common.h>
 
-struct _daq_module
+typedef struct _daq_module
 {
     /* The version of the API this module implements.
        This *must* be the first element in the structure. */
@@ -35,6 +35,9 @@ struct _daq_module
     const char *name;
     /* Various flags describing the module and its capabilities (Inline-capabale, etc.) */
     const uint32_t type;
+    /* Get a pointer to an array describing the DAQ variables accepted by this module.
+        Returns the size of the retrieved array. */
+    int (*get_variable_descriptions) (const DAQ_VariableDesc_t **var_desc_table);
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
     int (*initialize) (const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len);
@@ -92,7 +95,7 @@ struct _daq_module
     int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
     DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
     const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);
-};
+} DAQ_Module_t;
 
 #define DAQ_API_VERSION    0x00010003
 
