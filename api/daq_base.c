@@ -406,28 +406,6 @@ DAQ_LINKAGE void daq_unload_modules(void)
     }
 }
 
-DAQ_LINKAGE void daq_print_stats(DAQ_Stats_t *stats, FILE *fp)
-{
-    if (!stats)
-        return;
-
-    if (!fp)
-        fp = stdout;
-
-    fprintf(fp, "*DAQ Module Statistics*\n");
-    fprintf(fp, "  Hardware Packets Received:  %" PRIu64 "\n", stats->hw_packets_received);
-    fprintf(fp, "  Hardware Packets Dropped:   %" PRIu64 "\n", stats->hw_packets_dropped);
-    fprintf(fp, "  Packets Received:   %" PRIu64 "\n", stats->packets_received);
-    fprintf(fp, "  Packets Filtered:   %" PRIu64 "\n", stats->packets_filtered);
-    fprintf(fp, "  Packets Passed:     %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_PASS]);
-    fprintf(fp, "  Packets Replaced:   %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_REPLACE]);
-    fprintf(fp, "  Packets Blocked:    %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_BLOCK]);
-    fprintf(fp, "  Packets Injected:   %" PRIu64 "\n", stats->packets_injected);
-    fprintf(fp, "  Flows Whitelisted:  %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_WHITELIST]);
-    fprintf(fp, "  Flows Blacklisted:  %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_BLACKLIST]);
-    fprintf(fp, "  Flows Ignored:      %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_IGNORE]);
-}
-
 DAQ_LINKAGE const DAQ_Module_t *daq_modules_first(void)
 {
     if (module_list)

@@ -88,13 +88,13 @@ static void handler(int sig)
     {
         case SIGTERM:
         case SIGINT:
-            daq_breakloop(dm, handle);
+            daq_instance_breakloop(dm, handle);
             notdone = 0;
             break;
         case SIGHUP:
-            daq_hup_prep(dm, handle, &newconfig);
-            daq_hup_apply(dm, handle, newconfig, &oldconfig);
-            daq_hup_post(dm, handle, oldconfig);
+            daq_instance_hup_prep(dm, handle, &newconfig);
+            daq_instance_hup_apply(dm, handle, newconfig, &oldconfig);
+            daq_instance_hup_post(dm, handle, oldconfig);
             break;
     }
 }
@@ -343,11 +343,11 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 reply = forge_icmp_reply(dtp);
                 reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + ntohs(dtp->ip->tot_len);
                 printf("Injecting forged ICMP reply back to source! (%zu bytes)\n", reply_len);
-                rc = daq_inject(dm, handle, dtp->hdr, reply, reply_len, 1);
+                rc = daq_instance_inject(dm, handle, dtp->hdr, reply, reply_len, 1);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
-                    printf("Failed to inject ICMP reply: %s\n", daq_get_error(dm, handle));
+                    printf("Failed to inject ICMP reply: %s\n", daq_instance_get_error(dm, handle));
                 free(reply);
                 return DAQ_VERDICT_BLOCK;
             }
@@ -375,11 +375,11 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             if (dtp->eth)
             {
                 printf("Injecting cloned ICMP packet.\n");
-                rc = daq_inject(dm, handle, dtp->hdr, dtp->packet, dtp->hdr->caplen, 0);
+                rc = daq_instance_inject(dm, handle, dtp->hdr, dtp->packet, dtp->hdr->caplen, 0);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
-                    printf("Failed to inject cloned ICMP packet: %s\n", daq_get_error(dm, handle));
+                    printf("Failed to inject cloned ICMP packet: %s\n", daq_instance_get_error(dm, handle));
                 printf("Blocking the original ICMP packet.\n");
                 return DAQ_VERDICT_BLOCK;
             }
@@ -447,8 +447,8 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     reply = forge_etharp_reply(dtp, my_mac);
     reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(struct ether_arp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
-    if (daq_inject(dm, handle, dtp->hdr, reply, reply_len, 1))
-        printf("Failed to inject ICMP reply: %s\n", daq_get_error(dm, handle));
+    if (daq_instance_inject(dm, handle, dtp->hdr, reply, reply_len, 1))
+        printf("Failed to inject ICMP reply: %s\n", daq_instance_get_error(dm, handle));
     free(reply);
 
     return DAQ_VERDICT_BLOCK;
@@ -682,8 +682,8 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
     DAQTestPacket dtp;
     const uint8_t *data;
 
-    hdr = daq_packet_header_from_msg(dm, handle, msg);
-    data = daq_packet_data_from_msg(dm, handle, msg);
+    hdr = daq_instance_packet_header_from_msg(dm, handle, msg);
+    data = daq_instance_packet_data_from_msg(dm, handle, msg);
 
     packets++;
 
@@ -757,7 +757,7 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
         modify.type = DAQ_MODFLOW_TYPE_OPAQUE;
         modify.length = sizeof(uint32_t);
         modify.value = &packets;
-        daq_modify_flow(dm, handle, hdr, &modify);
+        daq_instance_modify_flow(dm, handle, hdr, &modify);
     }
 
     decode_packet(&dtp, data, hdr);
@@ -814,6 +814,22 @@ static void handle_flow_stats_message(const DAQ_Msg_t *msg)
     printf("  First Packet: %lu seconds, %lu microseconds\n", stats->sof_timestamp.tv_sec, stats->sof_timestamp.tv_usec);
     if (msg->type == DAQ_MSG_TYPE_EOF)
         printf("  Last Packet: %lu seconds, %lu microseconds\n", stats->eof_timestamp.tv_sec, stats->eof_timestamp.tv_usec);
+}
+
+static void print_daq_stats(DAQ_Stats_t *stats)
+{
+    printf("*DAQ Module Statistics*\n");
+    printf("  Hardware Packets Received:  %" PRIu64 "\n", stats->hw_packets_received);
+    printf("  Hardware Packets Dropped:   %" PRIu64 "\n", stats->hw_packets_dropped);
+    printf("  Packets Received:   %" PRIu64 "\n", stats->packets_received);
+    printf("  Packets Filtered:   %" PRIu64 "\n", stats->packets_filtered);
+    printf("  Packets Passed:     %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_PASS]);
+    printf("  Packets Replaced:   %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_REPLACE]);
+    printf("  Packets Blocked:    %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_BLOCK]);
+    printf("  Packets Injected:   %" PRIu64 "\n", stats->packets_injected);
+    printf("  Flows Whitelisted:  %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_WHITELIST]);
+    printf("  Flows Blacklisted:  %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_BLACKLIST]);
+    printf("  Flows Ignored:      %" PRIu64 "\n", stats->verdicts[DAQ_VERDICT_IGNORE]);
 }
 
 int main(int argc, char *argv[])
@@ -1013,10 +1029,10 @@ int main(int argc, char *argv[])
         module = daq_modules_first();
         while (module)
         {
-            printf("\n[%s]\n", daq_get_name(module));
-            printf(" Version: %u\n", daq_get_version(module));
-            printf(" Type: 0x%x\n", daq_get_type(module));
-            num_var_descs = daq_get_variable_descriptions(module, &var_desc_table);
+            printf("\n[%s]\n", daq_module_get_name(module));
+            printf(" Version: %u\n", daq_module_get_version(module));
+            printf(" Type: 0x%x\n", daq_module_get_type(module));
+            num_var_descs = daq_module_get_variable_descs(module, &var_desc_table);
             if (num_var_descs)
             {
                 printf(" Variables:\n");
@@ -1082,13 +1098,13 @@ int main(int argc, char *argv[])
     daq_config_set_mode(config, mode);
     daq_config_set_flag(config, flags);
 
-    if ((rval = daq_initialize(dm, config, &handle, errbuf, sizeof(errbuf))) != 0)
+    if ((rval = daq_instance_initialize(dm, config, &handle, errbuf, sizeof(errbuf))) != 0)
     {
         fprintf(stderr, "Could not initialize DAQ module: (%d: %s)\n", rval, errbuf);
         return -1;
     }
 
-    if (daq_get_capabilities(dm, handle) & DAQ_CAPA_DEVICE_INDEX)
+    if (daq_instance_get_capabilities(dm, handle) & DAQ_CAPA_DEVICE_INDEX)
     {
         printf("Dumping packets with unknown ingress interface.\n");
         dump_unknown_ingress = true;
@@ -1097,19 +1113,19 @@ int main(int argc, char *argv[])
     /* Free the configuration object's memory. */
     daq_config_destroy(config);
 
-    if (filter && (rval = daq_set_filter(dm, handle, filter)) != 0)
+    if (filter && (rval = daq_instance_set_filter(dm, handle, filter)) != 0)
     {
         fprintf(stderr, "Could not set BPF filter for DAQ module! (%d: %s)\n", rval, filter);
         return -1;
     }
 
-    if ((rval = daq_start(dm, handle)) != 0)
+    if ((rval = daq_instance_start(dm, handle)) != 0)
     {
-        fprintf(stderr, "Could not start DAQ module: (%d: %s)\n", rval, daq_get_error(dm, handle));
+        fprintf(stderr, "Could not start DAQ module: (%d: %s)\n", rval, daq_instance_get_error(dm, handle));
         return -1;
     }
 
-    dlt = daq_get_datalink_type(dm, handle);
+    dlt = daq_instance_get_datalink_type(dm, handle);
 
     memset(&action, 0, sizeof(action));
     action.sa_handler = handler;
@@ -1119,7 +1135,7 @@ int main(int argc, char *argv[])
 
     while (notdone && (!cnt || packets < cnt))
     {
-        rval = daq_msg_receive(dm, handle, &msg);
+        rval = daq_instance_msg_receive(dm, handle, &msg);
         //printf("rval = %d, msg = %p\n", rval, msg);
         if (rval < 0)
         {
@@ -1150,19 +1166,19 @@ int main(int argc, char *argv[])
             default:
                 break;
         }
-        daq_msg_finalize(dm, handle, msg, verdict);
+        daq_instance_msg_finalize(dm, handle, msg, verdict);
     }
 
     printf("DAQ receive timed out %u times.\n", timeout_count);
 
-    if ((rval = daq_get_stats(dm, handle, &stats)) != 0)
-        fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_get_error(dm, handle));
+    if ((rval = daq_instance_get_stats(dm, handle, &stats)) != 0)
+        fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_instance_get_error(dm, handle));
     else
-        daq_print_stats(&stats, NULL);
+        print_daq_stats(&stats);
 
-    daq_stop(dm, handle);
+    daq_instance_stop(dm, handle);
 
-    daq_shutdown(dm, handle);
+    daq_instance_shutdown(dm, handle);
 
     return 0;
 }

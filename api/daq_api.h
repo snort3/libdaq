@@ -37,7 +37,7 @@ typedef struct _daq_module
     const uint32_t type;
     /* Get a pointer to an array describing the DAQ variables accepted by this module.
         Returns the size of the retrieved array. */
-    int (*get_variable_descriptions) (const DAQ_VariableDesc_t **var_desc_table);
+    int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
     int (*initialize) (const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len);

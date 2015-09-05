@@ -29,7 +29,7 @@
 /*
  * Functions that apply to instances of DAQ modules go here.
  */
-DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_h config, void **handle, char *errbuf, size_t len)
+DAQ_LINKAGE int daq_instance_initialize(const DAQ_Module_t *module, const DAQ_Config_h config, void **handle, char *errbuf, size_t len)
 {
     DAQ_Mode mode;
 
@@ -65,7 +65,7 @@ DAQ_LINKAGE int daq_initialize(const DAQ_Module_t *module, const DAQ_Config_h co
     return module->initialize(config, handle, errbuf, len);
 }
 
-DAQ_LINKAGE int daq_set_filter(const DAQ_Module_t *module, void *handle, const char *filter)
+DAQ_LINKAGE int daq_instance_set_filter(const DAQ_Module_t *module, void *handle, const char *filter)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -82,7 +82,7 @@ DAQ_LINKAGE int daq_set_filter(const DAQ_Module_t *module, void *handle, const c
     return module->set_filter(handle, filter);
 }
 
-DAQ_LINKAGE int daq_start(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_start(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -99,7 +99,8 @@ DAQ_LINKAGE int daq_start(const DAQ_Module_t *module, void *handle)
     return module->start(handle);
 }
 
-DAQ_LINKAGE int daq_inject(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+DAQ_LINKAGE int daq_instance_inject(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr,
+                                        const uint8_t *packet_data, uint32_t len, int reverse)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -122,7 +123,7 @@ DAQ_LINKAGE int daq_inject(const DAQ_Module_t *module, void *handle, const DAQ_P
     return module->inject(handle, hdr, packet_data, len, reverse);
 }
 
-DAQ_LINKAGE int daq_breakloop(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_breakloop(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -133,7 +134,7 @@ DAQ_LINKAGE int daq_breakloop(const DAQ_Module_t *module, void *handle)
     return module->breakloop(handle);
 }
 
-DAQ_LINKAGE int daq_stop(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_stop(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -150,7 +151,7 @@ DAQ_LINKAGE int daq_stop(const DAQ_Module_t *module, void *handle)
     return module->stop(handle);
 }
 
-DAQ_LINKAGE int daq_shutdown(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_shutdown(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
        return DAQ_ERROR_NOMOD;
@@ -162,7 +163,7 @@ DAQ_LINKAGE int daq_shutdown(const DAQ_Module_t *module, void *handle)
     return DAQ_SUCCESS;
 }
 
-DAQ_LINKAGE DAQ_State daq_check_status(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE DAQ_State daq_instance_check_status(const DAQ_Module_t *module, void *handle)
 {
     if (!module || !handle)
         return DAQ_STATE_UNKNOWN;
@@ -170,7 +171,7 @@ DAQ_LINKAGE DAQ_State daq_check_status(const DAQ_Module_t *module, void *handle)
     return module->check_status(handle);
 }
 
-DAQ_LINKAGE int daq_get_stats(const DAQ_Module_t *module, void *handle, DAQ_Stats_t *stats)
+DAQ_LINKAGE int daq_instance_get_stats(const DAQ_Module_t *module, void *handle, DAQ_Stats_t *stats)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -187,13 +188,13 @@ DAQ_LINKAGE int daq_get_stats(const DAQ_Module_t *module, void *handle, DAQ_Stat
     return module->get_stats(handle, stats);
 }
 
-DAQ_LINKAGE void daq_reset_stats(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE void daq_instance_reset_stats(const DAQ_Module_t *module, void *handle)
 {
     if (module && handle)
         module->reset_stats(handle);
 }
 
-DAQ_LINKAGE int daq_get_snaplen(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_get_snaplen(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -204,7 +205,7 @@ DAQ_LINKAGE int daq_get_snaplen(const DAQ_Module_t *module, void *handle)
     return module->get_snaplen(handle);
 }
 
-DAQ_LINKAGE uint32_t daq_get_capabilities(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE uint32_t daq_instance_get_capabilities(const DAQ_Module_t *module, void *handle)
 {
     if (!module || !handle)
         return 0;
@@ -212,7 +213,7 @@ DAQ_LINKAGE uint32_t daq_get_capabilities(const DAQ_Module_t *module, void *hand
     return module->get_capabilities(handle);
 }
 
-DAQ_LINKAGE int daq_get_datalink_type(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE int daq_instance_get_datalink_type(const DAQ_Module_t *module, void *handle)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -223,7 +224,7 @@ DAQ_LINKAGE int daq_get_datalink_type(const DAQ_Module_t *module, void *handle)
     return module->get_datalink_type(handle);
 }
 
-DAQ_LINKAGE const char *daq_get_error(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE const char *daq_instance_get_error(const DAQ_Module_t *module, void *handle)
 {
     if (!module || !handle)
         return NULL;
@@ -231,7 +232,7 @@ DAQ_LINKAGE const char *daq_get_error(const DAQ_Module_t *module, void *handle)
     return module->get_errbuf(handle);
 }
 
-DAQ_LINKAGE void daq_clear_error(const DAQ_Module_t *module, void *handle)
+DAQ_LINKAGE void daq_instance_clear_error(const DAQ_Module_t *module, void *handle)
 {
     if (!module || !handle)
         return;
@@ -239,7 +240,7 @@ DAQ_LINKAGE void daq_clear_error(const DAQ_Module_t *module, void *handle)
     module->set_errbuf(handle, "");
 }
 
-DAQ_LINKAGE int daq_get_device_index(const DAQ_Module_t *module, void *handle, const char *device)
+DAQ_LINKAGE int daq_instance_get_device_index(const DAQ_Module_t *module, void *handle, const char *device)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -256,7 +257,7 @@ DAQ_LINKAGE int daq_get_device_index(const DAQ_Module_t *module, void *handle, c
     return module->get_device_index(handle, device);
 }
 
-DAQ_LINKAGE int daq_hup_prep(const DAQ_Module_t *module, void *handle, void **new_config)
+DAQ_LINKAGE int daq_instance_hup_prep(const DAQ_Module_t *module, void *handle, void **new_config)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -274,7 +275,7 @@ DAQ_LINKAGE int daq_hup_prep(const DAQ_Module_t *module, void *handle, void **ne
     return module->hup_prep(handle, new_config);
 }
 
-DAQ_LINKAGE int daq_hup_apply(const DAQ_Module_t *module, void *handle, void *new_config, void **old_config)
+DAQ_LINKAGE int daq_instance_hup_apply(const DAQ_Module_t *module, void *handle, void *new_config, void **old_config)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -288,7 +289,7 @@ DAQ_LINKAGE int daq_hup_apply(const DAQ_Module_t *module, void *handle, void *ne
     return module->hup_apply(handle, new_config, old_config);
 }
 
-DAQ_LINKAGE int daq_hup_post(const DAQ_Module_t *module, void *handle, void *old_config)
+DAQ_LINKAGE int daq_instance_hup_post(const DAQ_Module_t *module, void *handle, void *old_config)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -302,7 +303,7 @@ DAQ_LINKAGE int daq_hup_post(const DAQ_Module_t *module, void *handle, void *old
     return module->hup_post(handle, old_config);
 }
 
-DAQ_LINKAGE int daq_modify_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify)
+DAQ_LINKAGE int daq_instance_modify_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -313,7 +314,7 @@ DAQ_LINKAGE int daq_modify_flow(const DAQ_Module_t *module, void *handle, const 
     return module->modify_flow(handle, hdr, modify);
 }
 
-DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query)
+DAQ_LINKAGE int daq_instance_query_flow(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -324,7 +325,8 @@ DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const D
     return module->query_flow(handle, hdr, query);
 }
 
-DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
+DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr,
+                                        DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -338,7 +340,7 @@ DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DA
     return module->dp_add_dc(handle, hdr, dp_key, packet_data);
 }
 
-DAQ_LINKAGE int daq_msg_receive(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t **msgptr)
+DAQ_LINKAGE int daq_instance_msg_receive(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t **msgptr)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -349,7 +351,7 @@ DAQ_LINKAGE int daq_msg_receive(const DAQ_Module_t *module, void *handle, const 
     return module->msg_receive(handle, msgptr);
 }
 
-DAQ_LINKAGE int daq_msg_finalize(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+DAQ_LINKAGE int daq_instance_msg_finalize(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -360,7 +362,7 @@ DAQ_LINKAGE int daq_msg_finalize(const DAQ_Module_t *module, void *handle, const
     return module->msg_finalize(handle, msg, verdict);
 }
 
-DAQ_LINKAGE DAQ_PktHdr_t *daq_packet_header_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
+DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
 {
     if (!module || !handle)
         return NULL;
@@ -368,7 +370,7 @@ DAQ_LINKAGE DAQ_PktHdr_t *daq_packet_header_from_msg(const DAQ_Module_t *module,
     return module->packet_header_from_msg(handle, msg);
 }
 
-DAQ_LINKAGE const uint8_t *daq_packet_data_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
+DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(const DAQ_Module_t *module, void *handle, const DAQ_Msg_t *msg)
 {
     if (!module || !handle)
         return NULL;
@@ -380,7 +382,7 @@ DAQ_LINKAGE const uint8_t *daq_packet_data_from_msg(const DAQ_Module_t *module, 
 /*
  * Functions that apply to DAQ modules themselves go here.
  */
-DAQ_LINKAGE const char *daq_get_name(const DAQ_Module_t *module)
+DAQ_LINKAGE const char *daq_module_get_name(const DAQ_Module_t *module)
 {
     if (!module)
         return NULL;
@@ -388,7 +390,7 @@ DAQ_LINKAGE const char *daq_get_name(const DAQ_Module_t *module)
     return module->name;
 }
 
-DAQ_LINKAGE uint32_t daq_get_version(const DAQ_Module_t *module)
+DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_Module_t *module)
 {
     if (!module)
         return 0;
@@ -396,7 +398,7 @@ DAQ_LINKAGE uint32_t daq_get_version(const DAQ_Module_t *module)
     return module->module_version;
 }
 
-DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module)
+DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_t *module)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -404,16 +406,16 @@ DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module)
     return module->type;
 }
 
-DAQ_LINKAGE int daq_get_variable_descriptions(const DAQ_Module_t *module, const DAQ_VariableDesc_t **var_desc_table)
+DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_Module_t *module, const DAQ_VariableDesc_t **var_desc_table)
 {
     if (!var_desc_table)
         return 0;
 
-    if (!module || !module->get_variable_descriptions)
+    if (!module || !module->get_variable_descs)
     {
         *var_desc_table = NULL;
         return 0;
     }
 
-    return module->get_variable_descriptions(var_desc_table);
+    return module->get_variable_descs(var_desc_table);
 }

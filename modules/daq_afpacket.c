@@ -609,7 +609,7 @@ static void reset_stats(AFPacket_Context_t *afpc)
         getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len);
 }
 
-static int afpacket_daq_get_variable_descriptions(const DAQ_VariableDesc_t **var_desc_table)
+static int afpacket_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 {
     *var_desc_table = afpacket_variable_descriptions;
 
@@ -1242,7 +1242,7 @@ const DAQ_Module_t afpacket_daq_module_data =
     .module_version = DAQ_AFPACKET_VERSION,
     .name = "afpacket",
     .type = DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    .get_variable_descriptions = afpacket_daq_get_variable_descriptions,
+    .get_variable_descs = afpacket_daq_get_variable_descs,
     .initialize = afpacket_daq_initialize,
     .set_filter = afpacket_daq_set_filter,
     .start = afpacket_daq_start,

@@ -112,7 +112,7 @@ static int update_hw_stats(Pcap_Context_t *context)
     return DAQ_SUCCESS;
 }
 
-static int pcap_daq_get_variable_descriptions(const DAQ_VariableDesc_t **var_desc_table)
+static int pcap_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 {
     *var_desc_table = pcap_variable_descriptions;
 
@@ -544,7 +544,7 @@ const DAQ_Module_t pcap_daq_module_data =
     .module_version = DAQ_PCAP_VERSION,
     .name = "pcap",
     .type = DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    .get_variable_descriptions = pcap_daq_get_variable_descriptions,
+    .get_variable_descs = pcap_daq_get_variable_descs,
     .initialize = pcap_daq_initialize,
     .set_filter = pcap_daq_set_filter,
     .start = pcap_daq_start,
