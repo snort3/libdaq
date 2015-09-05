@@ -27,8 +27,6 @@
 
 #define DAQ_VERSION 3
 
-typedef const struct _daq_module *DAQ_Module_h;
-
 /* Functions for loading, handling, and unloading DAQ modules. */
 DAQ_LINKAGE void daq_set_verbosity(int level);
 DAQ_LINKAGE int daq_load_modules(const char *module_dirs[]);
@@ -50,32 +48,32 @@ DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_h module);
 DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_Module_h module, const DAQ_VariableDesc_t **var_desc_table);
 
 /* DAQ Module Instance functions */
-DAQ_LINKAGE int daq_instance_initialize(const DAQ_Module_h module, const DAQ_Config_h config, void **handle, char *errbuf, size_t len);
-DAQ_LINKAGE int daq_instance_set_filter(const DAQ_Module_h module, void *handle, const char *filter);
-DAQ_LINKAGE int daq_instance_start(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_inject(const DAQ_Module_h module, void *handle, const DAQ_PktHdr_t *hdr,
-                                        const uint8_t *packet_data, uint32_t len, int reverse);
-DAQ_LINKAGE int daq_instance_breakloop(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_stop(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_shutdown(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE DAQ_State daq_instance_check_status(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_get_stats(const DAQ_Module_h module, void *handle, DAQ_Stats_t *stats);
-DAQ_LINKAGE void daq_instance_reset_stats(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_get_snaplen(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE uint32_t daq_instance_get_capabilities(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_get_datalink_type(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE const char *daq_instance_get_error(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE void daq_instance_clear_error(const DAQ_Module_h module, void *handle);
-DAQ_LINKAGE int daq_instance_modify_flow(const DAQ_Module_h module, void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
-DAQ_LINKAGE int daq_instance_query_flow(const DAQ_Module_h module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
-DAQ_LINKAGE int daq_instance_hup_prep(const DAQ_Module_h module, void *handle, void **new_config);
-DAQ_LINKAGE int daq_instance_hup_apply(const DAQ_Module_h module, void *handle, void *new_config, void **old_config);
-DAQ_LINKAGE int daq_instance_hup_post(const DAQ_Module_h module, void *handle, void *old_config);
-DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Module_h module, void *handle, const DAQ_PktHdr_t *hdr,
+DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);
+DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
+DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data,
+                                        uint32_t len, int reverse);
+DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_shutdown(DAQ_Instance_h instance);
+DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_get_stats(DAQ_Instance_h instance, DAQ_Stats_t *stats);
+DAQ_LINKAGE void daq_instance_reset_stats(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_get_snaplen(DAQ_Instance_h instance);
+DAQ_LINKAGE uint32_t daq_instance_get_capabilities(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_get_datalink_type(DAQ_Instance_h instance);
+DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_h instance);
+DAQ_LINKAGE void daq_instance_clear_error(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
+DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
+DAQ_LINKAGE int daq_instance_hup_prep(DAQ_Instance_h instance, void **new_config);
+DAQ_LINKAGE int daq_instance_hup_apply(DAQ_Instance_h instance, void *new_config, void **old_config);
+DAQ_LINKAGE int daq_instance_hup_post(DAQ_Instance_h instance, void *old_config);
+DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr,
                                         DAQ_DP_key_t *dp_key, const uint8_t *packet_data);
-DAQ_LINKAGE int daq_instance_msg_receive(const DAQ_Module_h module, void *handle, const DAQ_Msg_t **msgptr);
-DAQ_LINKAGE int daq_instance_msg_finalize(const DAQ_Module_h module, void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
-DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(const DAQ_Module_h module, void *handle, const DAQ_Msg_t *msg);
-DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(const DAQ_Module_h module, void *handle, const DAQ_Msg_t *msg);
+DAQ_LINKAGE int daq_instance_msg_receive(DAQ_Instance_h instance, const DAQ_Msg_t **msgptr);
+DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
+DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
+DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
 
 #endif /* _DAQ_H */

@@ -45,12 +45,13 @@ typedef struct _daq_dict
 
 typedef struct _daq_config
 {
+    const DAQ_Module_t *module;     /* Module that will be instantiated with this configuration */
     char *input;            /* Name of the interface(s) or file to be opened */
     int snaplen;            /* Maximum packet capture length */
     unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_Mode mode;          /* Module mode (DAQ_MODE_*) */
     uint32_t flags;         /* Other configuration flags (DAQ_CFG_*) */
-    DAQ_Dict_t variables;   /* Dictionary of arbitrary key[:value] string pairs. */
+    DAQ_Dict_t variables;   /* Dictionary of arbitrary key[:value] string pairs */
 } DAQ_Config_t;
 
 
@@ -156,20 +157,29 @@ static DAQ_DictEntry_t *daq_dict_next_entry(DAQ_Dict_t *dict)
  * DAQ Configuration Functions
  */
 
-DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr)
+DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr, const DAQ_Module_t *module)
 {
     DAQ_Config_t *cfg;
 
-    if (!cfgptr)
+    if (!cfgptr || !module)
         return DAQ_ERROR_INVAL;
 
     cfg = calloc(1, sizeof(DAQ_Config_t));
     if (!cfg)
         return DAQ_ERROR_NOMEM;
 
+    cfg->module = module;
     *cfgptr = cfg;
 
     return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE const DAQ_Module_t *daq_config_get_module(DAQ_Config_h cfg)
+{
+    if (!cfg)
+        return NULL;
+
+    return cfg->module;
 }
 
 DAQ_LINKAGE int daq_config_set_input(DAQ_Config_t *cfg, const char *input)

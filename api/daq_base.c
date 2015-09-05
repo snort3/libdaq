@@ -66,8 +66,8 @@
 
 #endif
 
-#include "daq_api.h"
 #include "daq.h"
+#include "daq_api.h"
 #include "daq_api_internal.h"
 
 #define NAME_SIZE       512

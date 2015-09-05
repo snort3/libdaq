@@ -81,6 +81,9 @@
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
 #define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
+typedef const struct _daq_module *DAQ_Module_h;
+typedef const struct _daq_instance *DAQ_Instance_h;
+
 typedef enum
 {
     DAQ_MSG_TYPE_PACKET = 1,    /* Packet data */
@@ -389,7 +392,8 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
 
 /* DAQ Configuration Functions */
-DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
+DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr, DAQ_Module_h module);
+DAQ_LINKAGE DAQ_Module_h daq_config_get_module(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_set_input(DAQ_Config_h cfg, const char *input);
 DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_h cfg, int snaplen);
