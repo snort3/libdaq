@@ -154,7 +154,7 @@ typedef struct _daq_pkthdr
 } DAQ_PktHdr_t;
 
 
-/* HA state binary blob descriptor used for DAQ_METAHDR_TYPE_HA_STATE and DAQ_QUERYFLOW_TYPE_HA_STATE. */
+/* HA state binary blob descriptor used for DAQ_MSG_TYPE_HA_STATE and DAQ_QUERYFLOW_TYPE_HA_STATE. */
 typedef struct _daq_ha_state_data
 {
     uint32_t length;
@@ -162,21 +162,7 @@ typedef struct _daq_ha_state_data
 } DAQ_HA_State_Data_t;
 
 
-/*
- * Metapacket callback types and definitions.
- */
-
-#define DAQ_METAHDR_TYPE_SOF        0   /* Start of Flow statistics */
-#define DAQ_METAHDR_TYPE_EOF        1   /* End of Flow statistics */
-#define DAQ_METAHDR_TYPE_VPN_LOGIN  2   /* VPN login info */
-#define DAQ_METAHDR_TYPE_VPN_LOGOUT 3   /* VPN logout info */
-#define DAQ_METAHDR_TYPE_HA_STATE   4   /* HA State blob */
-typedef struct _daq_metahdr
-{
-    int type;               /* Type */
-} DAQ_MetaHdr_t;
-
-/* Flow statistics structure used for DAQ_METAHDR_TYPE_SOF and DAQ_METAHDR_TYPE_EOF. */
+/* Flow statistics structure used for DAQ_MSG_TYPE_TYPE_SOF and DAQ_MSG_TYPE_TYPE_EOF. */
 typedef struct _flow_stats
 {
     int32_t ingressZone;
@@ -200,7 +186,7 @@ typedef struct _flow_stats
     uint8_t protocol;
 } Flow_Stats_t, *Flow_Stats_p;
 
-/* VPN session type used by DAQ_VPN_Login_Info_t for DAQ_METAHDR_TYPE_VPN_LOGIN. */
+/* VPN session type used by DAQ_VPN_Login_Info_t for DAQ_MSG_TYPE_TYPE_VPN_LOGIN. */
 typedef enum {
     NP_IDFW_VPN_SESSION_TYPE_UNKNOWN = 0,
     NP_IDFW_VPN_SESSION_TYPE_RA_IKEV1 = 1,
@@ -212,14 +198,14 @@ typedef enum {
     NP_IDFW_VPN_SESSION_TYPE_MAX,
 } np_idfw_vpn_session_type_t;
 
-/* VPN logout info used for DAQ_VPN_Login_Info_t and DAQ_METAHDR_TYPE_VPN_LOGOUT. */
+/* VPN logout info used for DAQ_VPN_Login_Info_t and DAQ_MSG_TYPE_TYPE_VPN_LOGOUT. */
 typedef struct _daq_vpn_info
 {
     uint8_t ip[16];
     uint32_t id;
 } DAQ_VPN_Info_t, *DAQ_VPN_Info_p;
 
-/* VPN login info used for DAQ_METAHDR_TYPE_VPN_LOGIN. */
+/* VPN login info used for DAQ_MSG_TYPE_TYPE_VPN_LOGIN. */
 #define DAQ_VPN_INFO_MAX_USER_NAME_LEN  256
 typedef struct _daq_vpn_login_info
 {
@@ -283,7 +269,7 @@ typedef struct daq_tcp_opts_t_
 } DAQ_TCP_Opts_t;
 
 
-/* Packet verdicts returned by DAQ_Analysis_Func_t callbacks. */
+/* Packet verdicts passed to daq_msg_finalize(). */
 typedef enum {
     DAQ_VERDICT_PASS,       /* Pass the packet. */
     DAQ_VERDICT_BLOCK,      /* Block the packet. */
@@ -295,9 +281,6 @@ typedef enum {
                                Drop any new packets received on that flow while holding before sending them to Snort. */
     MAX_DAQ_VERDICT
 } DAQ_Verdict;
-
-typedef DAQ_Verdict (*DAQ_Analysis_Func_t)(void *user, const DAQ_PktHdr_t *hdr, const uint8_t *data);
-typedef int (*DAQ_Meta_Func_t)(void *user, const DAQ_MetaHdr_t *hdr, const uint8_t *data);
 
 typedef enum {
     DAQ_MODE_NONE,
