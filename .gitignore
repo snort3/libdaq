@@ -15,6 +15,7 @@
 .libs
 /autom4te.cache
 /aclocal.m4
+/ar-lib
 /compile
 /config.guess
 /config.h

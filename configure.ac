@@ -10,10 +10,13 @@ AM_INIT_AUTOMAKE
 
 # Checks for programs.
 AC_PROG_CC
+AM_PROG_AR
 AC_PROG_LIBTOOL
 
 # Enable visibility if we can
-AC_ENABLE_VISIBILITY()
+gl_VISIBILITY
+AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
+
 # Special compiler flags for ICC, etc.
 AC_SF_COMPILER_SETUP()
 
@@ -29,7 +32,7 @@ if test "$enable_ipv6" != "no"; then
         ],
         [
         if test "$enable_ipv6" != "ifavailable"; then
-            AC_MSG_FAILURE([--enable-ipv6 was given, but getaddrinfo isn't available])
+            AC_MSG_FAILURE([--enable-ipv6 was given, but getaddrinfo is not available])
         fi
         ])
 fi
@@ -291,6 +294,8 @@ AC_SUBST(V_LEX)
 AC_SUBST(V_YACC)
 AC_SUBST(XCCFLAGS)
 AC_SUBST(LIBDL)
+AC_SUBST(AM_CFLAGS)
+AC_SUBST(CFLAGS)
 
 AC_CONFIG_FILES([Makefile
                  api/Makefile
@@ -300,12 +305,29 @@ AC_CONFIG_FILES([Makefile
                  sfbpf/Makefile])
 AC_OUTPUT
 
-echo
-echo "Build AFPacket DAQ module.. : $enable_afpacket_module"
-#echo "Build Dump DAQ module...... : $enable_dump_module"
-#echo "Build IPFW DAQ module...... : $enable_ipfw_module"
-#echo "Build IPQ DAQ module....... : $enable_ipq_module"
-#echo "Build NFQ DAQ module....... : $enable_nfq_module"
-echo "Build PCAP DAQ module...... : $enable_pcap_module"
-#echo "Build netmap DAQ module.... : $enable_netmap_module"
-echo
+AC_MSG_RESULT([
+    $PACKAGE $VERSION
+
+    prefix:         ${prefix}
+    sysconfdir:     ${sysconfdir}
+    libdir:         ${libdir}
+    includedir:     ${includedir}
+
+    cc:             ${CC}
+    cppflags:       ${CPPFLAGS}
+    am_cppflags:    ${AM_CPPFLAGS}
+    am_cxxflags:    ${AM_CXXFLAGS}
+    cflags:         ${CFLAGS}
+    am_cflags:      ${AM_CFLAGS}
+    ldflags:        ${LDFLAGS}
+    am_ldflags:     ${AM_LDFLAGS}
+    libs:           ${LIBS}
+
+    Build AFPacket DAQ module.. : $enable_afpacket_module
+#   Build Dump DAQ module...... : $enable_dump_module
+#   Build IPFW DAQ module...... : $enable_ipfw_module
+#   Build IPQ DAQ module....... : $enable_ipq_module
+#   Build NFQ DAQ module....... : $enable_nfq_module
+    Build PCAP DAQ module...... : $enable_pcap_module
+#   Build netmap DAQ module.... : $enable_netmap_module
+])

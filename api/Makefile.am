@@ -1,7 +1,3 @@
-AUTOMAKE_OPTIONS = foreign
-
-ACLOCAL_AMFLAGS = -I m4
-
 include_HEADERS = daq.h daq_api.h daq_common.h
 
 lib_LTLIBRARIES = libdaq.la libdaq_static.la
