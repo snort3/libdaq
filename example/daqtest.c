@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <daq.h>
@@ -36,23 +37,29 @@ typedef struct _IPv4Addr
     struct in_addr addr;
 } IPv4Addr;
 
+typedef struct _DAQTestModuleConfig
+{
+    struct _DAQTestModuleConfig *next;
+    char *module_name;
+    char *input;
+    char **variables;
+    unsigned int num_variables;
+    int flags;
+    unsigned timeout;
+    int snaplen;
+    DAQ_Mode mode;
+} DAQTestModuleConfig;
+
 typedef struct _DAQTestConfig
 {
     int verbosity;
     const char **module_paths;
     unsigned int num_module_paths;
-    char **variables;
-    unsigned int num_variables;
-    char *input;
-    char *module_name;
+    DAQTestModuleConfig *module_configs;
     char *filter;
-    int flags;
-    unsigned timeout;
-    int snaplen;
     unsigned long packet_limit;
     unsigned long timeout_limit;
     unsigned long delay;
-    DAQ_Mode mode;
     DAQ_Verdict default_verdict;
     PingAction ping_action;
     IPv4Addr *ip_addrs;
@@ -91,6 +98,7 @@ typedef struct _VlanTagHdr
 
 static uint8_t normal_ping_data[IP_MAXPACKET];
 static uint8_t fake_ping_data[IP_MAXPACKET];
+static uint8_t local_mac_addr[ETH_ALEN];
 
 static volatile sig_atomic_t notdone = 1;
 static DAQTestConfig dtc;
@@ -146,6 +154,26 @@ static void usage()
     printf("  -x                Print a hexdump of each packet received\n");
 }
 
+static void print_mac(const uint8_t *addr)
+{
+    printf("%.2hx:%.2hx:%.2hx:%.2hx:%.2hx:%.2hx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+}
+
+static void print_hex_dump(const uint8_t *data, unsigned int len)
+{
+    unsigned int i;
+
+    for (i = 0; i < len; i++)
+    {
+        if (i % 16 == 0)
+            printf("\n");
+        else if (i % 2 == 0)
+            printf(" ");
+        printf("%02x", data[i]);
+    }
+    printf("\n\n");
+}
+
 /*
  * Checksum routine for Internet Protocol family headers (C version) (from ping.c)
  */
@@ -194,6 +222,12 @@ static void initialize_static_data()
         normal_ping_data[i] = c;
         fake_ping_data[i] = 'A';
     }
+
+    srand(time(NULL) + getpid());   /* seed the RNG */
+    for (i = 0; i < sizeof(local_mac_addr); i++)
+        local_mac_addr[i] = (uint8_t) rand();
+    local_mac_addr[0] &= 0xfe;    /* clear multicast bit */
+    local_mac_addr[0] |= 0x02;    /* set local assignment bit (IEEE802) */
 }
 
 static int replace_icmp_data(DAQTestPacket *dtp)
@@ -219,13 +253,7 @@ static int replace_icmp_data(DAQTestPacket *dtp)
     }
 /*
     printf("%d bytes of data:\n", dlen);
-    for (int i = 0; i < dlen; i++)
-    {
-        if ((i % 8) == 0)
-            printf("\n");
-        printf("%.2x ", data[i]);
-    }
-    printf("\n");
+    print_hex_dump(data, dlen);
 */
     if (memcmp(data, normal_ping_data + offset, dlen) == 0)
     {
@@ -249,8 +277,6 @@ static int replace_icmp_data(DAQTestPacket *dtp)
     return modified;
 }
 
-static const uint8_t my_mac[ETH_ALEN] = { 0x00, 0x0c, 0xbd, 0x01, 0x03, 0x62 };
-
 static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
 {
     const uint8_t *request = dtp->packet;
@@ -268,7 +294,7 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
     eth_request = dtp->eth;
     eth_reply = (struct ether_header *) reply;
     memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
-    memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETH_ALEN);
+    memcpy(eth_reply->ether_shost, mac_addr, ETH_ALEN);
     memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
 
     /* Now the ARP header... */
@@ -342,11 +368,6 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
     icmp_reply->checksum = in_cksum((uint16_t *) icmp_reply, ntohs(ip_request->tot_len) - sizeof(struct iphdr));
 
     return reply;
-}
-
-static void print_mac(const uint8_t *addr)
-{
-    printf("%.2hx:%.2hx:%.2hx:%.2hx:%.2hx:%.2hx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 }
 
 static DAQ_Verdict process_ping(DAQTestPacket *dtp)
@@ -465,14 +486,15 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     }
 
     /* Only perform Ethernet ARP spoofing when in ping spoofing mode and passive mode. */
-    if (!ip && (dtc.ping_action != PING_ACTION_SPOOF || dtc.mode != DAQ_MODE_PASSIVE))
+    //if (!ip && (dtc.ping_action != PING_ACTION_SPOOF || dtc.mode != DAQ_MODE_PASSIVE))
+    if (!ip || dtc.ping_action != PING_ACTION_SPOOF)
        return dtc.default_verdict;
 
-    reply = forge_etharp_reply(dtp, my_mac);
+    reply = forge_etharp_reply(dtp, local_mac_addr);
     reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(struct ether_arp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
     if (daq_instance_inject(instance, dtp->hdr, reply, reply_len, 1))
-        printf("Failed to inject ICMP reply: %s\n", daq_instance_get_error(instance));
+        printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(instance));
     free(reply);
 
     return DAQ_VERDICT_BLOCK;
@@ -686,20 +708,6 @@ static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_P
     }
 }
 
-static void dump(const uint8_t *data, unsigned int len)
-{
-    unsigned int i;
-    for (i = 0; i < len; i++)
-    {
-        if (i%16 == 0)
-            printf("\n");
-        else if (i%2 == 0)
-            printf(" ");
-        printf("%02x", data[i]);
-    }
-    printf("\n\n");
-}
-
 static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
 {
     DAQ_PktHdr_t *hdr;
@@ -769,10 +777,10 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
     if (hdr->ingress_index < 0 && dtc.dump_unknown_ingress)
     {
         printf("Dumping packet data for packet with unknown ingress:\n");
-        dump(data, hdr->caplen);
+        print_hex_dump(data, hdr->caplen);
     }
     else if (dtc.dump_packets)
-        dump(data, hdr->caplen);
+        print_hex_dump(data, hdr->caplen);
 
     if (dtc.modify_opaque_value)
     {
@@ -889,8 +897,28 @@ static void print_daq_modules(void)
     printf("\n");
 }
 
+static DAQTestModuleConfig *daqtest_module_config_new(void)
+{
+    DAQTestModuleConfig *dtmc;
+
+    dtmc = calloc(1, sizeof(DAQTestModuleConfig));
+    if (!dtmc)
+    {
+        fprintf(stderr, "Failed to allocate a new DAQTest module configuration!\n\n");
+        return NULL;
+    }
+
+    /* Some default values. */
+    dtmc->snaplen = 1518;
+    dtmc->mode = DAQ_MODE_PASSIVE;
+    dtmc->flags = DAQ_CFG_PROMISC;
+
+    return dtmc;
+}
+
 static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
+    DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
     const char *options = "A:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:x";
     char *endptr;
@@ -898,11 +926,12 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
     /* Clear configuration and initialize to defaults. */
     memset(cfg, 0, sizeof(DAQTestConfig));
-    cfg->snaplen = 1518;
-    cfg->mode = DAQ_MODE_PASSIVE;
     cfg->default_verdict = DAQ_VERDICT_PASS;
     cfg->ping_action = PING_ACTION_PASS;
-    cfg->flags = DAQ_CFG_PROMISC;
+    cfg->module_configs = daqtest_module_config_new();
+    if (!cfg->module_configs)
+        return -1;
+    dtmc = cfg->module_configs;
 
     opterr = 0;
     while ((ch = getopt(argc, argv, options)) != -1)
@@ -937,18 +966,26 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 break;
 
             case 'C':
-                cfg->num_variables++;
-                cfg->variables = realloc(cfg->variables, cfg->num_variables * sizeof(char *));
-                if (!cfg->variables)
+                dtmc->num_variables++;
+                dtmc->variables = realloc(dtmc->variables, dtmc->num_variables * sizeof(char *));
+                if (!dtmc->variables)
                 {
                     fprintf(stderr, "Failed to allocate space for a variable pointer!\n\n");
                     return -1;
                 }
-                cfg->variables[cfg->num_variables - 1] = optarg;
+                dtmc->variables[dtmc->num_variables - 1] = optarg;
                 break;
 
             case 'd':
-                cfg->module_name = optarg;
+                if (dtmc->module_name)
+                {
+                    /* Begin configuring a new module. */
+                    dtmc->next = daqtest_module_config_new();
+                    if (!dtmc->next)
+                        return -1;
+                    dtmc = dtmc->next;
+                }
+                dtmc->module_name = optarg;
                 break;
 
             case 'D':
@@ -970,7 +1007,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 exit(0);
 
             case 'i':
-                cfg->input = optarg;
+                dtmc->input = optarg;
                 break;
 
             case 'l':
@@ -989,12 +1026,12 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 break;
 
             case 'M':
-                for (cfg->mode = DAQ_MODE_PASSIVE; cfg->mode < MAX_DAQ_MODE; cfg->mode++)
+                for (dtmc->mode = DAQ_MODE_PASSIVE; dtmc->mode < MAX_DAQ_MODE; dtmc->mode++)
                 {
-                    if (!strcmp(optarg, daq_mode_string(cfg->mode)))
+                    if (!strcmp(optarg, daq_mode_string(dtmc->mode)))
                         break;
                 }
-                if (cfg->mode == MAX_DAQ_MODE)
+                if (dtmc->mode == MAX_DAQ_MODE)
                 {
                     fprintf(stderr, "Invalid mode: %s!\n", optarg);
                     return -1;
@@ -1031,7 +1068,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 's':
                 errno = 0;
-                cfg->snaplen = strtoul(optarg, &endptr, 10);
+                dtmc->snaplen = strtoul(optarg, &endptr, 10);
                 if (*endptr != '\0' || errno != 0)
                 {
                     fprintf(stderr, "Invalid snap length specified: %s\n\n", optarg);
@@ -1041,7 +1078,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 't':
                 errno = 0;
-                cfg->timeout = strtoul(optarg, &endptr, 10);
+                dtmc->timeout = strtoul(optarg, &endptr, 10);
                 if (*endptr != '\0' || errno != 0)
                 {
                     fprintf(stderr, "Invalid receive timeout specified: %s\n\n", optarg);
@@ -1094,19 +1131,29 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
 static void print_config(DAQTestConfig *cfg)
 {
+    DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
     char addr_str[INET_ADDRSTRLEN];
     unsigned int i;
 
-    printf("Input: %s\n", cfg->input);
-    printf("Module: %s\n", cfg->module_name);
-    printf("Mode: %s\n", daq_mode_string(cfg->mode));
-    printf("Snaplen: %hu\n", cfg->snaplen);
-    printf("Timeout: %ums (Allowance: ", cfg->timeout);
-    if (cfg->timeout_limit)
-        printf("%lu)\n", cfg->timeout_limit);
-    else
-        printf("Unlimited)\n");
+    for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
+    {
+        printf("[%s]\n", dtmc->module_name);
+        printf("  Input: %s\n", dtmc->input);
+        printf("  Mode: %s\n", daq_mode_string(dtmc->mode));
+        printf("  Snaplen: %hu\n", dtmc->snaplen);
+        printf("  Timeout: %ums (Allowance: ", dtmc->timeout);
+        if (cfg->timeout_limit)
+            printf("%lu)\n", cfg->timeout_limit);
+        else
+            printf("Unlimited)\n");
+        if (dtmc->variables)
+        {
+            printf("  Variables:\n");
+            for (i = 0; i < dtmc->num_variables; i++)
+                printf("    %s\n", dtmc->variables[i]);
+        }
+    }
     printf("Packet Count: ");
     if (cfg->packet_limit)
         printf("%lu\n", cfg->packet_limit);
@@ -1123,12 +1170,6 @@ static void print_config(DAQTestConfig *cfg)
             printf("  %s\n", addr_str);
         }
     }
-    if (cfg->variables)
-    {
-        printf("Variables:\n");
-        for (i = 0; i < cfg->num_variables; i++)
-            printf("  %s\n", cfg->variables[i]);
-    }
     if (cfg->delay > 0)
         printf("Delaying packets by %lu milliseconds.\n", cfg->delay);
     if (cfg->modify_opaque_value)
@@ -1140,7 +1181,9 @@ static void print_config(DAQTestConfig *cfg)
 int main(int argc, char *argv[])
 {
     struct sigaction action;
+    DAQTestModuleConfig *dtmc;
     DAQTestConfig *cfg;
+    DAQ_ModuleConfig_h modcfg;
     DAQ_Module_h module;
     DAQ_Config_h config;
     DAQ_Stats_t stats;
@@ -1155,7 +1198,7 @@ int main(int argc, char *argv[])
     if ((rval = parse_command_line(argc, argv, cfg)) != 0)
         return rval;
 
-    if ((!cfg->input || !cfg->module_name) && !cfg->list_and_exit)
+    if ((!cfg->module_configs->input || !cfg->module_configs->module_name) && !cfg->list_and_exit)
     {
         usage();
         return -1;
@@ -1170,43 +1213,53 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    print_config(&dtc);
+    print_config(cfg);
 
-    module = daq_find_module(cfg->module_name);
-    if (!module)
-    {
-        fprintf(stderr, "Could not find requested module: %s!\n", cfg->module_name);
-        return -1;
-    }
-
-    if ((rval = daq_config_new(&config, module)) != DAQ_SUCCESS)
+    if ((rval = daq_config_new(&config)) != DAQ_SUCCESS)
     {
         fprintf(stderr, "Error allocating a new DAQ configuration object! (%d)\n", rval);
         return rval;
     }
 
-    daq_config_set_input(config, cfg->input);
-    daq_config_set_snaplen(config, cfg->snaplen);
-    daq_config_set_timeout(config, cfg->timeout);
-    daq_config_set_mode(config, cfg->mode);
-    daq_config_set_flag(config, cfg->flags);
-
-    for (i = 0; i < cfg->num_variables; i++)
+    for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
     {
-        key = cfg->variables[i];
-        value = strchr(key, '=');
-        if (value)
+        module = daq_find_module(dtmc->module_name);
+        if (!module)
         {
-            *value = '\0';
-            value++;
-            if (*value == '\0')
-                value = NULL;
+            fprintf(stderr, "Could not find requested module: %s!\n", dtmc->module_name);
+            return -1;
         }
-        if ((rval = daq_config_set_variable(config, key, value)) != DAQ_SUCCESS)
+
+        if ((rval = daq_module_config_new(&modcfg, module)) != DAQ_SUCCESS)
         {
-            fprintf(stderr, "Error setting DAQ configuration variable with key '%s' and value '%s'! (%d)", key, value, rval);
+            fprintf(stderr, "Error allocating a new DAQ module configuration object! (%d)\n", rval);
             return rval;
         }
+
+        daq_module_config_set_input(modcfg, dtmc->input);
+        daq_module_config_set_snaplen(modcfg, dtmc->snaplen);
+        daq_module_config_set_timeout(modcfg, dtmc->timeout);
+        daq_module_config_set_mode(modcfg, dtmc->mode);
+        daq_module_config_set_flag(modcfg, dtmc->flags);
+
+        for (i = 0; i < dtmc->num_variables; i++)
+        {
+            key = dtmc->variables[i];
+            value = strchr(key, '=');
+            if (value)
+            {
+                *value = '\0';
+                value++;
+                if (*value == '\0')
+                    value = NULL;
+            }
+            if ((rval = daq_module_config_set_variable(modcfg, key, value)) != DAQ_SUCCESS)
+            {
+                fprintf(stderr, "Error setting DAQ configuration variable with key '%s' and value '%s'! (%d)", key, value, rval);
+                return rval;
+            }
+        }
+        daq_config_push_module_config(config, modcfg);
     }
 
     if ((rval = daq_instance_initialize(config, &instance, errbuf, sizeof(errbuf))) != 0)
@@ -1245,13 +1298,17 @@ int main(int argc, char *argv[])
     sigaction(SIGHUP, &action, NULL);
 
     initialize_static_data();
+    printf("Local MAC Address: ");
+    print_mac(local_mac_addr);
+    printf("\n");
 
     while (notdone && (!cfg->packet_limit || packet_count < cfg->packet_limit))
     {
         rval = daq_instance_msg_receive(instance,  &msg);
         if (rval < 0)
         {
-            if (rval == DAQ_READFILE_EOF && cfg->mode == DAQ_MODE_READ_FILE)
+            //if (rval == DAQ_READFILE_EOF && cfg->mode == DAQ_MODE_READ_FILE)
+            if (rval == DAQ_READFILE_EOF)
                 printf("Read the entire file!\n");
             else
                 fprintf(stderr, "Error acquiring packets! (%d)\n", rval);
