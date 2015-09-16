@@ -40,7 +40,7 @@ typedef struct _daq_module
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
-    int (*initialize) (const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len);
+    int (*initialize) (const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t len);
     /* Set the module's BPF based on the given string */
     int (*set_filter) (void *handle, const char *filter);
     /* Complete device opening and begin queuing packets if they have not been already. */

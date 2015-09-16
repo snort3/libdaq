@@ -39,8 +39,9 @@ typedef struct _daq_instance
  */
 DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, const DAQ_Instance_t **instance_ptr, char *errbuf, size_t len)
 {
+    DAQ_ModuleConfig_h modcfg;
     DAQ_Instance_t *instance;
-    DAQ_Mode mode;
+    int rval;
 
     /* Don't do this. */
     if (!errbuf)
@@ -58,26 +59,31 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, const DAQ_Ins
         return DAQ_ERROR_INVAL;
     }
 
+    modcfg = daq_config_top_module_config(config);
+    if (!modcfg)
+    {
+        snprintf(errbuf, len, "Can't initialize without a module configuration!");
+        return DAQ_ERROR_INVAL;
+    }
+
     instance = calloc(1, sizeof(const DAQ_Instance_t));
     if (!instance)
     {
         snprintf(errbuf, len, "Couldn't allocate a new DAQ instance structure!");
         return DAQ_ERROR_NOMEM;
     }
+    instance->module = daq_module_config_get_module(modcfg);
 
-    mode = daq_config_get_mode(config);
-    instance->module = daq_config_get_module(config);
-    if ((mode == DAQ_MODE_PASSIVE && !(instance->module->type & DAQ_TYPE_INTF_CAPABLE)) ||
-        (mode == DAQ_MODE_INLINE && !(instance->module->type & DAQ_TYPE_INLINE_CAPABLE)) ||
-        (mode == DAQ_MODE_READ_FILE && !(instance->module->type & DAQ_TYPE_FILE_CAPABLE)))
+    rval = instance->module->initialize(modcfg, &instance->context, errbuf, len);
+    if (rval != DAQ_SUCCESS)
     {
-        snprintf(errbuf, len, "The %s DAQ module does not support %s mode!", instance->module->name, daq_mode_string(mode));
-        return DAQ_ERROR_INVAL;
+        free(instance);
+        return rval;
     }
 
     *instance_ptr = instance;
 
-    return instance->module->initialize(config, &instance->context, errbuf, len);
+    return DAQ_SUCCESS;
 }
 
 DAQ_LINKAGE int daq_instance_set_filter(const DAQ_Instance_t *instance, const char *filter)
