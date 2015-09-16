@@ -119,7 +119,7 @@ static int pcap_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(pcap_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int pcap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t len)
+static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t len)
 {
     Pcap_Context_t *context;
     const char *varKey, *varValue;
@@ -131,35 +131,35 @@ static int pcap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char 
         return DAQ_ERROR_NOMEM;
     }
 
-    context->snaplen = daq_config_get_snaplen(config);
-    context->promisc_flag = (daq_config_get_flags(config) & DAQ_CFG_PROMISC);
-    context->timeout = daq_config_get_timeout(config);
+    context->snaplen = daq_module_config_get_snaplen(config);
+    context->promisc_flag = (daq_module_config_get_flags(config) & DAQ_CFG_PROMISC);
+    context->timeout = daq_module_config_get_timeout(config);
 
     /* Retrieve the requested buffer size (default = 0) */
-    daq_config_first_variable(config, &varKey, &varValue);
+    daq_module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "buffer_size"))
             context->buffer_size = strtol(varValue, NULL, 10);
 
-        daq_config_next_variable(config, &varKey, &varValue);
+        daq_module_config_next_variable(config, &varKey, &varValue);
     }
 
-    context->mode = daq_config_get_mode(config);
+    context->mode = daq_module_config_get_mode(config);
     if (context->mode == DAQ_MODE_READ_FILE)
     {
-        context->fp = fopen(daq_config_get_input(config), "rb");
+        context->fp = fopen(daq_module_config_get_input(config), "rb");
         if (!context->fp)
         {
             snprintf(errbuf, len, "%s: Couldn't open file '%s' for reading: %s", __FUNCTION__,
-                    daq_config_get_input(config), strerror(errno));
+                    daq_module_config_get_input(config), strerror(errno));
             free(context);
             return DAQ_ERROR_NOMEM;
         }
     }
     else
     {
-        context->device = strdup(daq_config_get_input(config));
+        context->device = strdup(daq_module_config_get_input(config));
         if (!context->device)
         {
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
