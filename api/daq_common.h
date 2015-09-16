@@ -290,8 +290,6 @@ typedef enum {
     MAX_DAQ_MODE
 } DAQ_Mode;
 
-#define DAQ_CFG_PROMISC     0x01
-
 typedef struct _daq_module_config *DAQ_ModuleConfig_h;
 typedef struct _daq_config *DAQ_Config_h;
 
@@ -386,8 +384,6 @@ DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_h modcfg, unsigne
 DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_h modcfg, DAQ_Mode mode);
 DAQ_LINKAGE DAQ_Mode daq_module_config_get_mode(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_flag(DAQ_ModuleConfig_h modcfg, uint32_t flag);
-DAQ_LINKAGE uint32_t daq_module_config_get_flags(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_variable(DAQ_ModuleConfig_h modcfg, const char *key, const char *value);
 DAQ_LINKAGE const char *daq_module_config_get_variable(DAQ_ModuleConfig_h modcfg, const char *key);
 DAQ_LINKAGE void daq_module_config_delete_variable(DAQ_ModuleConfig_h modcfg, const char *key);

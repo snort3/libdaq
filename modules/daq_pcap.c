@@ -56,9 +56,9 @@ typedef struct _pcap_context
     pcap_t *handle;
     FILE *fp;
     char errbuf[PCAP_ERRBUF_SIZE];
-    int promisc_flag;
     int timeout;
     int buffer_size;
+    int no_promisc;
     uint32_t netmask;
     DAQ_Mode mode;
     DAQ_Stats_t stats;
@@ -78,6 +78,7 @@ static void pcap_daq_reset_stats(void *handle);
 
 static DAQ_VariableDesc_t pcap_variable_descriptions[] = {
     { "buffer_size", "Packet buffer space to allocate in bytes", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "no_promiscuous", "Disables opening the interface in promiscuous mode", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static int update_hw_stats(Pcap_Context_t *context)
@@ -132,7 +133,6 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     }
 
     context->snaplen = daq_module_config_get_snaplen(config);
-    context->promisc_flag = (daq_module_config_get_flags(config) & DAQ_CFG_PROMISC);
     context->timeout = daq_module_config_get_timeout(config);
 
     /* Retrieve the requested buffer size (default = 0) */
@@ -141,6 +141,8 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     {
         if (!strcmp(varKey, "buffer_size"))
             context->buffer_size = strtol(varValue, NULL, 10);
+        else if (!strcmp(varKey, "no_promiscuous"))
+            context->no_promisc = 1;
 
         daq_module_config_next_variable(config, &varKey, &varValue);
     }
@@ -254,7 +256,7 @@ static int pcap_daq_start(void *handle)
             return DAQ_ERROR;
         if ((status = pcap_set_snaplen(context->handle, context->snaplen)) < 0)
             goto fail;
-        if ((status = pcap_set_promisc(context->handle, context->promisc_flag ? 1 : 0)) < 0)
+        if ((status = pcap_set_promisc(context->handle, context->no_promisc ? 0 : 1)) < 0)
             goto fail;
         if ((status = pcap_set_timeout(context->handle, context->timeout)) < 0)
             goto fail;

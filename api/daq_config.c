@@ -51,7 +51,6 @@ typedef struct _daq_module_config
     int snaplen;            /* Maximum packet capture length */
     unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_Mode mode;          /* Module mode (DAQ_MODE_*) */
-    uint32_t flags;         /* Other configuration flags (DAQ_CFG_*) */
     DAQ_Dict_t variables;   /* Dictionary of arbitrary key[:value] string pairs */
 } DAQ_ModuleConfig_t;
 
@@ -275,24 +274,6 @@ DAQ_LINKAGE DAQ_Mode daq_module_config_get_mode(DAQ_ModuleConfig_t *modcfg)
         return modcfg->mode;
 
     return DAQ_MODE_NONE;
-}
-
-DAQ_LINKAGE int daq_module_config_set_flag(DAQ_ModuleConfig_t *modcfg, uint32_t flag)
-{
-    if (!modcfg)
-        return DAQ_ERROR_INVAL;
-
-    modcfg->flags |= flag;
-
-    return DAQ_SUCCESS;
-}
-
-DAQ_LINKAGE uint32_t daq_module_config_get_flags(DAQ_ModuleConfig_t *modcfg)
-{
-    if (modcfg)
-        return modcfg->flags;
-
-    return 0;
 }
 
 DAQ_LINKAGE int daq_module_config_set_variable(DAQ_ModuleConfig_t *modcfg, const char *key, const char *value)

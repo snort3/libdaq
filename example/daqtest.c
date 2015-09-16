@@ -44,7 +44,6 @@ typedef struct _DAQTestModuleConfig
     char *input;
     char **variables;
     unsigned int num_variables;
-    int flags;
     unsigned timeout;
     int snaplen;
     DAQ_Mode mode;
@@ -911,7 +910,6 @@ static DAQTestModuleConfig *daqtest_module_config_new(void)
     /* Some default values. */
     dtmc->snaplen = 1518;
     dtmc->mode = DAQ_MODE_PASSIVE;
-    dtmc->flags = DAQ_CFG_PROMISC;
 
     return dtmc;
 }
@@ -1240,7 +1238,6 @@ int main(int argc, char *argv[])
         daq_module_config_set_snaplen(modcfg, dtmc->snaplen);
         daq_module_config_set_timeout(modcfg, dtmc->timeout);
         daq_module_config_set_mode(modcfg, dtmc->mode);
-        daq_module_config_set_flag(modcfg, dtmc->flags);
 
         for (i = 0; i < dtmc->num_variables; i++)
         {
