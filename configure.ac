@@ -109,7 +109,7 @@ DEFAULT_ENABLE=yes
 
 # Modules configuration
 AC_ARG_ENABLE(bundled-modules,
-              AC_HELP_STRING([--disable-bundled-modules],[don't build any of the bundled DAQ modules by default]),
+              AC_HELP_STRING([--disable-bundled-modules],[do not build any of the bundled DAQ modules by default]),
               [], [disable_bundled_modules=no])
 
 if test "$disable_bundled_modules" = no; then
@@ -120,7 +120,7 @@ fi
 
 # AFPacket Module
 AC_ARG_ENABLE(afpacket-module,
-              AC_HELP_STRING([--disable-afpacket-module],[don't build the bundled AFPacket module]),
+              AC_HELP_STRING([--disable-afpacket-module],[do not build the bundled AFPacket module]),
               [enable_afpacket_module="$enableval"], [enable_afpacket_module="$DEFAULT_ENABLE"])
 if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
@@ -132,16 +132,16 @@ fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
 
 # Dump Module
-#AC_ARG_ENABLE(dump-module,
-#              AC_HELP_STRING([--disable-dump-module],[don't build the bundled Dump module]),
-#              [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
-#if test "$enable_dump_module" = yes; then
-#    AC_CHECK_HEADER([pcap.h], [], [enable_dump_module=no])
-#    AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_dump_module="no"],[])
-#    if test "$enable_dump_module" = yes; then
-#        STATIC_LIBS="${STATIC_LIBS} -lpcap"
-#    fi
-#fi
+AC_ARG_ENABLE(dump-module,
+              AC_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
+              [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
+if test "$enable_dump_module" = yes; then
+    AC_CHECK_HEADER([pcap.h], [], [enable_dump_module=no])
+    AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_dump_module="no"],[])
+    if test "$enable_dump_module" = yes; then
+        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+    fi
+fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
 # IPFW Module
@@ -324,7 +324,7 @@ AC_MSG_RESULT([
     libs:           ${LIBS}
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
-#   Build Dump DAQ module...... : $enable_dump_module
+    Build Dump DAQ module...... : $enable_dump_module
 #   Build IPFW DAQ module...... : $enable_ipfw_module
 #   Build IPQ DAQ module....... : $enable_ipq_module
 #   Build NFQ DAQ module....... : $enable_nfq_module

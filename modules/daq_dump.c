@@ -29,203 +29,140 @@
 #include "daq.h"
 #include "daq_api.h"
 
-#define DAQ_MOD_VERSION 3
-
-#define DAQ_NAME "dump"
-#define DAQ_TYPE (DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | \
-                  DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE)
+#define DAQ_DUMP_VERSION 3
 
 #define DAQ_DUMP_FILE "inline-out.pcap"
 
-typedef struct {
-    // delegate most stuff to daq_pcap
-    DAQ_Module_t* module;
-    void* handle;
+typedef struct
+{
+    // delegate most stuff to the wrapped module
+    const DAQ_Module_t *wrapped_module;
+    void *wrapped_context;
 
     // but write all output packets here
-    pcap_dumper_t* dump;
-    char* name;
-
-    // by linking in with these
-    DAQ_Analysis_Func_t callback;
-    void* user;
+    pcap_dumper_t *dump;
+    char *output_filename;
 
     DAQ_Stats_t stats;
-} DumpImpl;
+} DumpContext;
 
-static int dump_daq_stop(void*);
+static DAQ_VariableDesc_t dump_variable_descriptions[] = {
+    { "outfile", "PCAP filename to output transmitted packets to", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+};
 
-static int daq_dump_get_vars (
-    DumpImpl* impl, DAQ_Config_t* cfg, char* errBuf, size_t errMax
-) {
-    const char* s = NULL;
-    DAQ_Dict* entry;
+static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
+{
+    *var_desc_table = dump_variable_descriptions;
 
-    for ( entry = cfg->values; entry; entry = entry->next)
-    {
-        if ( !strcmp(entry->key, "load-mode") )
-        {
-            s = entry->value;
-        }
-        else if ( !strcmp(entry->key, "file") )
-        {
-            impl->name = strdup(entry->value);
-        }
-    }
-    if ( !s )
-        return 1;
-
-    if ( !strcasecmp(s, "read-file") )
-    {
-        cfg->mode = DAQ_MODE_READ_FILE;
-        return 1;
-    }
-    else if ( !strcasecmp(s, "passive") )
-    {
-        cfg->mode = DAQ_MODE_PASSIVE;
-        return 1;
-    }
-    else if ( !strcasecmp(s, "inline") )
-    {
-        cfg->mode = DAQ_MODE_INLINE;
-        return 1;
-    }
-    snprintf(errBuf, errMax, "invalid load-mode (%s)", s);
-    return 0;
+    return sizeof(dump_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-//-------------------------------------------------------------------------
-// constructor / destructor
-
-static int dump_daq_initialize (
-    const DAQ_Config_t* cfg, void** handle, char* errBuf, size_t errMax)
+static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errBuf, size_t errMax)
 {
-    DumpImpl* impl;
-    impl = calloc(1, sizeof(*impl));
-    DAQ_Module_t* mod = (DAQ_Module_t*)cfg->extra;
-    DAQ_Config_t sub_cfg = *cfg;
-    int err;
+    DAQ_ModuleConfig_h subconfig;
+    DumpContext *dc;
+    const char *varKey, *varValue;
+    int rval;
 
-    if ( !impl )
+    subconfig = daq_module_config_get_next(config);
+    if (!subconfig)
     {
-        snprintf(errBuf, errMax,
-            "%s: Couldn't allocate memory for the DAQ context",
-            __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: No submodule configuration provided", __FUNCTION__);
+        return DAQ_ERROR_INVAL;
+    }
+
+    dc = calloc(1, sizeof(DumpContext));
+    if (!dc)
+    {
+        snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the DAQ context", __FUNCTION__);
         return DAQ_ERROR_NOMEM;
     }
-    if ( !mod || !(mod->type & DAQ_TYPE_FILE_CAPABLE) )
+
+    daq_module_config_first_variable(config, &varKey, &varValue);
+    while (varKey)
     {
-        snprintf(errBuf, errMax, "%s: no file capable daq provided", __FUNCTION__);
-        free(impl);
-        return DAQ_ERROR;
+        if (!strcmp(varKey, "outfile"))
+        {
+            dc->output_filename = strdup(varValue);
+            if (!dc->output_filename)
+            {
+                snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the output filename", __FUNCTION__);
+                free(dc);
+                return DAQ_ERROR_NOMEM;
+            }
+        }
+        daq_module_config_next_variable(config, &varKey, &varValue);
     }
 
-    if ( !daq_dump_get_vars(impl, &sub_cfg, errBuf, errMax) )
+    dc->wrapped_module = daq_module_config_get_module(subconfig);
+    rval = dc->wrapped_module->initialize(subconfig, &dc->wrapped_context, errBuf, errMax);
+    if (rval != DAQ_SUCCESS)
     {
-        free(impl);
-        return DAQ_ERROR;
+        if (dc->output_filename)
+            free(dc->output_filename);
+        free(dc);
+        return rval;
     }
-    err = mod->initialize(&sub_cfg, &impl->handle, errBuf, errMax);
 
-    if ( err )
-    {
-        free(impl);
-        return err;
-    }
-    impl->module = mod;
-    *handle = impl;
+    *ctxt_ptr = dc;
 
     return DAQ_SUCCESS;
 }
 
-static void dump_daq_shutdown (void* handle)
+static void dump_daq_shutdown (void *handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    impl->module->shutdown(impl->handle);
-    if ( impl->name )
-        free(impl->name);
-    free(impl);
+    DumpContext *dc = (DumpContext *) handle;
+
+    dc->wrapped_module->shutdown(dc->wrapped_context);
+    if (dc->output_filename)
+        free(dc->output_filename);
+    free(dc);
 }
 
-//-------------------------------------------------------------------------
-// packet processing functions:
-// forward all but blocks, retries and blacklists:
-static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
-
-static DAQ_Verdict daq_dump_capture (
-    void* user, const DAQ_PktHdr_t* hdr, const uint8_t* pkt)
+static int dump_daq_inject (void *handle, const DAQ_PktHdr_t* hdr, const uint8_t* data, uint32_t len, int reverse)
 {
-    DumpImpl* impl = (DumpImpl*)user;
-    DAQ_Verdict verdict = impl->callback(impl->user, hdr, pkt);
-
-    if ( verdict >= MAX_DAQ_VERDICT )
-        verdict = DAQ_VERDICT_BLOCK;
-
-    impl->stats.verdicts[verdict]++;
-
-    if ( s_fwd[verdict] )
-        pcap_dump((u_char*)impl->dump, (struct pcap_pkthdr*)hdr, pkt);
-
-    return verdict;
-}
-
-static int dump_daq_acquire (
-    void* handle, int cnt, DAQ_Analysis_Func_t callback, DAQ_Meta_Func_t metaback, void* user)
-{
-    DumpImpl* impl = (DumpImpl*)handle;
-    impl->callback = callback;
-    impl->user = user;
-    return impl->module->acquire(impl->handle, cnt, daq_dump_capture, metaback, impl);
-}
-
-static int dump_daq_inject (
-    void* handle, const DAQ_PktHdr_t* hdr, const uint8_t* data, uint32_t len,
-    int reverse)
-{
-    DumpImpl* impl = (DumpImpl*)handle;
+    DumpContext *dc = (DumpContext*)handle;
 
     // copy the original header to get the same
     // timestamps but overwrite the lengths
     DAQ_PktHdr_t h = *hdr;
 
     h.pktlen = h.caplen = len;
-    pcap_dump((u_char*)impl->dump, (struct pcap_pkthdr*)&h, data);
+    pcap_dump((u_char*)dc->dump, (struct pcap_pkthdr*)&h, data);
 
-    if ( ferror(pcap_dump_file(impl->dump)) )
+    if ( ferror(pcap_dump_file(dc->dump)) )
     {
-        impl->module->set_errbuf(impl->handle, "inject can't write to dump file");
+        dc->wrapped_module->set_errbuf(dc->wrapped_context, "inject can't write to dump file");
         return DAQ_ERROR;
     }
-    impl->stats.packets_injected++;
+    dc->stats.packets_injected++;
     return DAQ_SUCCESS;
 }
 
 //-------------------------------------------------------------------------
 
-static int dump_daq_start (void* handle)
+static int dump_daq_start(void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    const char* name = impl->name ? impl->name : DAQ_DUMP_FILE;
-    pcap_t* pcap;
-    int dlt;
-    int snap;
+    DumpContext *dc = (DumpContext*)handle;
+    const char *name = dc->output_filename ? dc->output_filename : DAQ_DUMP_FILE;
+    pcap_t *pcap;
+    int dlt, snaplen, rval;
 
-    int ret = impl->module->start(impl->handle);
+    rval = dc->wrapped_module->start(dc->wrapped_context);
+    if (rval != DAQ_SUCCESS)
+        return rval;
 
-    if ( ret )
-        return ret;
+    dlt = dc->wrapped_module->get_datalink_type(dc->wrapped_context);
+    snaplen = dc->wrapped_module->get_snaplen(dc->wrapped_context);
 
-    dlt = impl->module->get_datalink_type(impl->handle);
-    snap = impl->module->get_snaplen(impl->handle);
+    pcap = pcap_open_dead(dlt, snaplen);
 
-    pcap = pcap_open_dead(dlt, snap);
+    dc->dump = pcap ? pcap_dump_open(pcap, name) : NULL;
 
-    impl->dump = pcap ? pcap_dump_open(pcap, name) : NULL;
-
-    if ( !impl->dump )
+    if (!dc->dump)
     {
-        impl->module->stop(impl->handle);
-        impl->module->set_errbuf(impl->handle, "can't open dump file");
+        dc->wrapped_module->stop(dc->wrapped_context);
+        dc->wrapped_module->set_errbuf(dc->wrapped_context, "can't open dump file");
         return DAQ_ERROR;
     }
     pcap_close(pcap);
@@ -234,16 +171,16 @@ static int dump_daq_start (void* handle)
 
 static int dump_daq_stop (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    int err = impl->module->stop(impl->handle);
+    DumpContext *dc = (DumpContext*)handle;
+    int err = dc->wrapped_module->stop(dc->wrapped_context);
 
     if ( err )
         return err;
 
-    if ( impl->dump )
+    if ( dc->dump )
     {
-        pcap_dump_close(impl->dump);
-        impl->dump = NULL;
+        pcap_dump_close(dc->dump);
+        dc->dump = NULL;
     }
 
     return DAQ_SUCCESS;
@@ -254,78 +191,125 @@ static int dump_daq_stop (void* handle)
 
 static int dump_daq_set_filter (void* handle, const char* filter)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->set_filter(impl->handle, filter);
+    DumpContext *dc = (DumpContext*)handle;
+    return dc->wrapped_module->set_filter(dc->wrapped_context, filter);
 }
 
 static int dump_daq_breakloop (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->breakloop(impl->handle);
+    DumpContext *dc = (DumpContext*)handle;
+    return dc->wrapped_module->breakloop(dc->wrapped_context);
 }
 
 static DAQ_State dump_daq_check_status (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->check_status(impl->handle);
+    DumpContext *dc = (DumpContext*)handle;
+    return dc->wrapped_module->check_status(dc->wrapped_context);
 }
 
 static int dump_daq_get_stats (void* handle, DAQ_Stats_t* stats)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    int ret = impl->module->get_stats(impl->handle, stats);
+    DumpContext *dc = (DumpContext*)handle;
+    int ret = dc->wrapped_module->get_stats(dc->wrapped_context, stats);
     int i;
 
     for ( i = 0; i < MAX_DAQ_VERDICT; i++ )
-        stats->verdicts[i] = impl->stats.verdicts[i];
+        stats->verdicts[i] = dc->stats.verdicts[i];
 
-    stats->packets_injected = impl->stats.packets_injected;
+    stats->packets_injected = dc->stats.packets_injected;
     return ret;
 }
 
 static void dump_daq_reset_stats (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    impl->module->reset_stats(impl->handle);
-    memset(&impl->stats, 0, sizeof(impl->stats));
+    DumpContext *dc = (DumpContext*)handle;
+    dc->wrapped_module->reset_stats(dc->wrapped_context);
+    memset(&dc->stats, 0, sizeof(dc->stats));
 }
 
 static int dump_daq_get_snaplen (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->get_snaplen(impl->handle);
+    DumpContext *dc = (DumpContext*)handle;
+    return dc->wrapped_module->get_snaplen(dc->wrapped_context);
 }
 
 static uint32_t dump_daq_get_capabilities (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    uint32_t caps = impl->module->get_capabilities(impl->handle);
+    DumpContext *dc = (DumpContext*)handle;
+    uint32_t caps = dc->wrapped_module->get_capabilities(dc->wrapped_context);
     caps |= DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT;
     return caps;
 }
 
 static int dump_daq_get_datalink_type (void *handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->get_datalink_type(impl->handle);
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->get_datalink_type(dc->wrapped_context);
 }
 
 static const char* dump_daq_get_errbuf (void* handle)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->get_errbuf(impl->handle);
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->get_errbuf(dc->wrapped_context);
 }
 
 static void dump_daq_set_errbuf (void* handle, const char* s)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    impl->module->set_errbuf(impl->handle, s ? s : "");
+    DumpContext *dc = (DumpContext *) handle;
+
+    dc->wrapped_module->set_errbuf(dc->wrapped_context, s ? s : "");
 }
 
-static int dump_daq_get_device_index(void* handle, const char* device)
+static int dump_daq_get_device_index(void *handle, const char *device)
 {
-    DumpImpl* impl = (DumpImpl*)handle;
-    return impl->module->get_device_index(impl->handle, device);
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->get_device_index(dc->wrapped_context, device);
+}
+
+static int dump_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
+{
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->msg_receive(dc->wrapped_context, msgptr);
+}
+
+static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
+
+static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+{
+    DumpContext *dc = (DumpContext *) handle;
+
+    dc->stats.verdicts[verdict]++;
+    if (msg->type == DAQ_MSG_TYPE_PACKET && s_fwd[verdict])
+    {
+        struct pcap_pkthdr pcap_hdr;
+        DAQ_PktHdr_t *hdr = dc->wrapped_module->packet_header_from_msg(dc->wrapped_context, msg);
+        const uint8_t *data = dc->wrapped_module->packet_data_from_msg(dc->wrapped_context, msg);
+
+        pcap_hdr.ts = hdr->ts;
+        pcap_hdr.caplen = hdr->caplen;
+        pcap_hdr.len = hdr->pktlen;
+        pcap_dump((u_char *) dc->dump, &pcap_hdr, data);
+    }
+
+    return dc->wrapped_module->msg_finalize(dc->wrapped_context, msg, verdict);
+}
+
+static DAQ_PktHdr_t *dump_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
+{
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->packet_header_from_msg(dc->wrapped_context, msg);
+}
+
+static const uint8_t *dump_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
+{
+    DumpContext *dc = (DumpContext *) handle;
+
+    return dc->wrapped_module->packet_data_from_msg(dc->wrapped_context, msg);
 }
 
 //-------------------------------------------------------------------------
@@ -337,13 +321,13 @@ DAQ_Module_t dump_daq_module_data =
 #endif
 {
     .api_version = DAQ_API_VERSION,
-    .module_version = DAQ_MOD_VERSION,
-    .name = DAQ_NAME,
-    .type = DAQ_TYPE,
+    .module_version = DAQ_DUMP_VERSION,
+    .name = "dump",
+    .type = DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
+    .get_variable_descs = dump_daq_get_variable_descs,
     .initialize = dump_daq_initialize,
     .set_filter = dump_daq_set_filter,
     .start = dump_daq_start,
-    .acquire = dump_daq_acquire,
     .inject = dump_daq_inject,
     .breakloop = dump_daq_breakloop,
     .stop = dump_daq_stop,
@@ -362,5 +346,9 @@ DAQ_Module_t dump_daq_module_data =
     .hup_apply = NULL,
     .hup_post = NULL,
     .dp_add_dc = NULL,
+    .msg_receive = dump_daq_msg_receive,
+    .msg_finalize = dump_daq_msg_finalize,
+    .packet_header_from_msg = dump_daq_packet_header_from_msg,
+    .packet_data_from_msg = dump_daq_packet_data_from_msg
 };
 
