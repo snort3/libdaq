@@ -23,6 +23,8 @@
 #include "config.h"
 #endif
 
+#define _GNU_SOURCE
+
 #include <errno.h>
 #include <limits.h>
 #include <linux/if_ether.h>
@@ -445,7 +447,8 @@ static int mmap_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
         return DAQ_ERROR;
     }
     instance->rx_ring.start = instance->buffer;
-    instance->tx_ring.start = (uint8_t *) instance->buffer + instance->tx_ring.size;
+    if (instance->tx_ring.size)
+        instance->tx_ring.start = (uint8_t *) instance->buffer + instance->rx_ring.size;
 
     return DAQ_SUCCESS;
 }
@@ -616,7 +619,7 @@ static int afpacket_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_t
     return sizeof(afpacket_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, char *errbuf, size_t errlen)
+static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t errlen)
 {
     AFPacket_Context_t *afpc;
     AFPacketInstance *instance;
@@ -636,7 +639,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
         goto err;
     }
 
-    afpc->device = strdup(daq_config_get_input(config));
+    afpc->device = strdup(daq_module_config_get_input(config));
     if (!afpc->device)
     {
         snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
@@ -644,12 +647,12 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
         goto err;
     }
 
-    afpc->snaplen = daq_config_get_snaplen(config);
-    afpc->timeout = (daq_config_get_timeout(config) > 0) ? (int) daq_config_get_timeout(config) : -1;
+    afpc->snaplen = daq_module_config_get_snaplen(config);
+    afpc->timeout = (daq_module_config_get_timeout(config) > 0) ? (int) daq_module_config_get_timeout(config) : -1;
 
     dev = afpc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') ||
-            (daq_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
+            (daq_module_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -679,7 +682,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
             instance->next = afpc->instances;
             afpc->instances = instance;
             num_intfs++;
-            if (daq_config_get_mode(config) != DAQ_MODE_PASSIVE)
+            if (daq_module_config_get_mode(config) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
                 {
@@ -703,7 +706,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
     }
 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (daq_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
+    if (!afpc->instances || (daq_module_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -713,7 +716,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
      * Determine the dimensions of the kernel RX ring(s) to request.
      */
     /* 1. Find the total desired packet buffer memory for all instances. */
-    daq_config_first_variable(config, &varKey, &varValue);
+    daq_module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "buffer_size_mb"))
@@ -770,7 +773,7 @@ static int afpacket_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, c
         }
 #endif /* PACKET_FANOUT */
 
-        daq_config_next_variable(config, &varKey, &varValue);
+        daq_module_config_next_variable(config, &varKey, &varValue);
     }
 
     /* Fall back to the environment variable. */
@@ -853,46 +856,70 @@ static int afpacket_daq_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
-    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_PASS */
-    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLOCK */
-    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_REPLACE */
-    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_WHITELIST */
-    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLACKLIST */
-    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_IGNORE */
-    DAQ_VERDICT_BLOCK       /* DAQ_VERDICT_RETRY */
-};
+static inline int afpacket_transmit_packet(AFPacketInstance *egress, const uint8_t *packet_data, unsigned int len)
+{
+    if (egress)
+    {
+        if (egress->tx_ring.size)
+        {
+            AFPacketEntry *entry;
+
+            entry = egress->tx_ring.cursor;
+            if (entry->hdr.h2->tp_status != TP_STATUS_AVAILABLE)
+                return DAQ_ERROR_AGAIN;
+            memcpy(entry->hdr.raw + TPACKET_ALIGN(egress->tp_hdrlen), packet_data, len);
+            entry->hdr.h2->tp_len = len;
+            entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
+            if (send(egress->fd, NULL, 0, 0) < 0)
+                return DAQ_ERROR;
+            egress->tx_ring.cursor = entry->next;
+        }
+        else
+        {
+            struct sockaddr_ll *sll;
+            const struct ethhdr *eth;
+
+            eth = (const struct ethhdr *) packet_data;
+            sll = &egress->sll;
+            sll->sll_protocol = eth->h_proto;
+
+            if (sendto(egress->fd, packet_data, len, 0, (struct sockaddr *) sll, sizeof(*sll)) < 0)
+                return DAQ_ERROR;
+        }
+    }
+
+    return DAQ_SUCCESS;
+}
 
 static int afpacket_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    AFPacketInstance *instance;
-    AFPacketEntry *entry;
+    AFPacketInstance *egress;
+    int rval;
 
     /* Find the instance that the packet was received on. */
-    for (instance = afpc->instances; instance; instance = instance->next)
+    for (egress = afpc->instances; egress; egress = egress->next)
     {
-        if (instance->index == hdr->ingress_index)
+        if (egress->index == hdr->ingress_index)
             break;
     }
 
-    if (!instance || (!reverse && !(instance = instance->peer)))
-        return DAQ_ERROR;
-
-    entry = instance->tx_ring.cursor;
-    if (entry->hdr.h2->tp_status == TP_STATUS_AVAILABLE)
+    if (!egress || (!reverse && !(egress = egress->peer)))
     {
-        memcpy(entry->hdr.raw + TPACKET_ALIGN(instance->tp_hdrlen), packet_data, len);
-        entry->hdr.h2->tp_len = len;
-        entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
-        instance->tx_ring.cursor = entry->next;
-        if (send(instance->fd, NULL, 0, 0) < 0)
-        {
-            DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
-            return DAQ_ERROR;
-        }
-        afpc->stats.packets_injected++;
+        DPE(afpc->errbuf, "%s: Could not determine which instance to inject the packet out of!", __FUNCTION__);
+        return DAQ_ERROR;
     }
+
+    if ((rval = afpacket_transmit_packet(egress, packet_data, len)) != DAQ_SUCCESS)
+    {
+        if (rval == DAQ_ERROR_AGAIN)
+            DPE(afpc->errbuf, "%s: Could not send packet because the TX ring is full.", __FUNCTION__);
+        else
+            DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
+        return rval;
+    }
+
+    afpc->stats.packets_injected++;
 
     return DAQ_SUCCESS;
 }
@@ -1067,27 +1094,6 @@ static inline int afpacket_wait_for_packet(AFPacket_Context_t *afpc)
     return 1;
 }
 
-static inline int afpacket_transmit_packet(AFPacket_Context_t *afpc, AFPacketPktDesc *desc)
-{
-    AFPacketInstance *peer;
-    AFPacketEntry *entry;
-
-    peer = desc->instance->peer;
-    if (peer)
-    {
-        entry = peer->tx_ring.cursor;
-        if (entry->hdr.h2->tp_status != TP_STATUS_AVAILABLE)
-            return -1;
-        memcpy(entry->hdr.raw + TPACKET_ALIGN(peer->tp_hdrlen), desc->data, desc->length);
-        entry->hdr.h2->tp_len = desc->length;
-        entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
-        send(peer->fd, NULL, 0, 0);
-        peer->tx_ring.cursor = entry->next;
-    }
-
-    return DAQ_SUCCESS;
-}
-
 static inline void afpacket_free_packet(AFPacket_Context_t *afpc, AFPacketPktDesc *desc)
 {
     desc->entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
@@ -1153,21 +1159,21 @@ static int afpacket_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
             tp_snaplen += VLAN_TAG_LEN;
             tp_len += VLAN_TAG_LEN;
         }
-        /* Set up the packet descriptor. */
-        afpc->curr_packet.instance = instance;
-        afpc->curr_packet.entry = entry;
-        afpc->curr_packet.data = data;
-        afpc->curr_packet.length = tp_snaplen;
         /* Check to see if this hits the BPF.  If it does, dispose of it and
             move on to the next packet (transmitting in the inline scenario). */
         if (afpc->fcode.bf_insns && sfbpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
         {
             afpc->stats.packets_filtered++;
-            afpacket_transmit_packet(afpc, &afpc->curr_packet);
+            afpacket_transmit_packet(instance->peer, data, tp_snaplen);
             afpacket_free_packet(afpc, &afpc->curr_packet);
             continue;
         }
-        /* Set up the header in the DAQ Packet Message and return it. */
+        /* Set up the packet descriptor. */
+        afpc->curr_packet.instance = instance;
+        afpc->curr_packet.entry = entry;
+        afpc->curr_packet.data = data;
+        afpc->curr_packet.length = tp_snaplen;
+        /* Then, set up the DAQ packet header. */
         pkthdr = &afpc->curr_packet.pkthdr;
         pkthdr->ts.tv_sec = tp_sec;
         pkthdr->ts.tv_usec = tp_usec;
@@ -1181,6 +1187,7 @@ static int afpacket_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
         pkthdr->opaque = 0;
         pkthdr->priv_ptr = NULL;
         pkthdr->address_space_id = 0;
+        /* Finally, set up the DAQ message descriptor and return it. */
         afpc->curr_msg.type = DAQ_MSG_TYPE_PACKET;
         afpc->curr_msg.msg = &afpc->curr_packet;
         *msgptr = &afpc->curr_msg;
@@ -1190,6 +1197,16 @@ static int afpacket_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
 
     return DAQ_SUCCESS;
 }
+
+static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_PASS */
+    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLOCK */
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_REPLACE */
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_WHITELIST */
+    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLACKLIST */
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_IGNORE */
+    DAQ_VERDICT_BLOCK       /* DAQ_VERDICT_RETRY */
+};
 
 static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
@@ -1206,7 +1223,7 @@ static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Ver
     afpc->stats.verdicts[verdict]++;
     verdict = verdict_translation_table[verdict];
     if (verdict == DAQ_VERDICT_PASS)
-        afpacket_transmit_packet(afpc, desc);
+        afpacket_transmit_packet(desc->instance->peer, desc->data, desc->length);
     afpacket_free_packet(afpc, desc);
 
     return DAQ_SUCCESS;
@@ -1263,6 +1280,7 @@ const DAQ_Module_t afpacket_daq_module_data =
     .hup_prep = NULL,
     .hup_apply = NULL,
     .hup_post = NULL,
+    .dp_add_dc = NULL,
     .msg_receive = afpacket_daq_msg_receive,
     .msg_finalize = afpacket_daq_msg_finalize,
     .packet_header_from_msg = afpacket_daq_packet_header_from_msg,
