@@ -11,9 +11,9 @@
 *.so.*
 
 # Autotools stuff
-.deps
-.libs
-/autom4te.cache
+.deps/
+.libs/
+/autom4te.cache/
 /aclocal.m4
 /ar-lib
 /compile
@@ -39,6 +39,19 @@
 Makefile
 Makefile.in
 
+# Coverage artifacts
+*.gcda
+*.gcno
+daq-*-coverage/
+daq-*-coverage.info
+
+# Unit test artifacts
+/test-driver
+/test/*_test
+/test/*_test.log
+/test/*_test.trs
+/test/test-suite.log
+
 # Locally generated artifacts
 modules/daq-modules-config
 sfbpf/sf_grammar.c
@@ -46,3 +59,6 @@ sfbpf/sf_scanner.c
 sfbpf/sf_scanner.h
 sfbpf/tokdefs.h
 example/daqtest
+
+# Other things
+*.swp
