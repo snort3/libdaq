@@ -21,7 +21,7 @@
 
 #include "daq_static_modules.h"
 
-const DAQ_Module_t *static_modules[] =
+const DAQ_ModuleAPI_t *static_modules[] =
 {
 #ifdef BUILD_AFPACKET_MODULE
     &afpacket_daq_module_data,

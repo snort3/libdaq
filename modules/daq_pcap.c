@@ -81,6 +81,8 @@ static DAQ_VariableDesc_t pcap_variable_descriptions[] = {
     { "no_promiscuous", "Disables opening the interface in promiscuous mode", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
+static DAQ_BaseAPI_t daq_base_api;
+
 static int update_hw_stats(Pcap_Context_t *context)
 {
     struct pcap_stat ps;
@@ -113,6 +115,16 @@ static int update_hw_stats(Pcap_Context_t *context)
     return DAQ_SUCCESS;
 }
 
+static int pcap_daq_prepare(const DAQ_BaseAPI_t *base_api)
+{
+    if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
+        return DAQ_ERROR;
+
+    daq_base_api = *base_api;
+
+    return DAQ_SUCCESS;
+}
+
 static int pcap_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 {
     *var_desc_table = pcap_variable_descriptions;
@@ -132,11 +144,11 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         return DAQ_ERROR_NOMEM;
     }
 
-    context->snaplen = daq_module_config_get_snaplen(config);
-    context->timeout = daq_module_config_get_timeout(config);
+    context->snaplen = daq_base_api.module_config_get_snaplen(config);
+    context->timeout = daq_base_api.module_config_get_timeout(config);
 
     /* Retrieve the requested buffer size (default = 0) */
-    daq_module_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "buffer_size"))
@@ -144,24 +156,24 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         else if (!strcmp(varKey, "no_promiscuous"))
             context->no_promisc = 1;
 
-        daq_module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
 
-    context->mode = daq_module_config_get_mode(config);
+    context->mode = daq_base_api.module_config_get_mode(config);
     if (context->mode == DAQ_MODE_READ_FILE)
     {
-        context->fp = fopen(daq_module_config_get_input(config), "rb");
+        context->fp = fopen(daq_base_api.module_config_get_input(config), "rb");
         if (!context->fp)
         {
             snprintf(errbuf, len, "%s: Couldn't open file '%s' for reading: %s", __FUNCTION__,
-                    daq_module_config_get_input(config), strerror(errno));
+                    daq_base_api.module_config_get_input(config), strerror(errno));
             free(context);
             return DAQ_ERROR_NOMEM;
         }
     }
     else
     {
-        context->device = strdup(daq_module_config_get_input(config));
+        context->device = strdup(daq_base_api.module_config_get_input(config));
         if (!context->device)
         {
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
@@ -536,69 +548,42 @@ static const uint8_t *pcap_daq_packet_data_from_msg(void *handle, const DAQ_Msg_
 }
 
 #ifdef BUILDING_SO
-DAQ_SO_PUBLIC const DAQ_Module_t DAQ_MODULE_DATA =
+DAQ_SO_PUBLIC const DAQ_ModuleAPI_t DAQ_MODULE_DATA =
 #else
-const DAQ_Module_t pcap_daq_module_data =
+const DAQ_ModuleAPI_t pcap_daq_module_data =
 #endif
 {
-#ifndef WIN32
-    .api_version = DAQ_API_VERSION,
-    .module_version = DAQ_PCAP_VERSION,
-    .name = "pcap",
-    .type = DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    .get_variable_descs = pcap_daq_get_variable_descs,
-    .initialize = pcap_daq_initialize,
-    .set_filter = pcap_daq_set_filter,
-    .start = pcap_daq_start,
-    .inject = pcap_daq_inject,
-    .breakloop = pcap_daq_breakloop,
-    .stop = pcap_daq_stop,
-    .shutdown = pcap_daq_shutdown,
-    .check_status = pcap_daq_check_status,
-    .get_stats = pcap_daq_get_stats,
-    .reset_stats = pcap_daq_reset_stats,
-    .get_snaplen = pcap_daq_get_snaplen,
-    .get_capabilities = pcap_daq_get_capabilities,
-    .get_datalink_type = pcap_daq_get_datalink_type,
-    .get_errbuf = pcap_daq_get_errbuf,
-    .set_errbuf = pcap_daq_set_errbuf,
-    .get_device_index = pcap_daq_get_device_index,
-    .modify_flow = NULL,
-    .hup_prep = NULL,
-    .hup_apply = NULL,
-    .hup_post = NULL,
-    .msg_receive = pcap_daq_msg_receive,
-    .msg_finalize = pcap_daq_msg_finalize,
-    .packet_header_from_msg = pcap_daq_packet_header_from_msg,
-    .packet_data_from_msg = pcap_daq_packet_data_from_msg,
-#else
-    DAQ_API_VERSION,
-    DAQ_PCAP_VERSION,
-    "pcap",
-    DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    pcap_daq_initialize,
-    pcap_daq_set_filter,
-    pcap_daq_start,
-    pcap_daq_inject,
-    pcap_daq_breakloop,
-    pcap_daq_stop,
-    pcap_daq_shutdown,
-    pcap_daq_check_status,
-    pcap_daq_get_stats,
-    pcap_daq_reset_stats,
-    pcap_daq_get_snaplen,
-    pcap_daq_get_capabilities,
-    pcap_daq_get_datalink_type,
-    pcap_daq_get_errbuf,
-    pcap_daq_set_errbuf,
-    pcap_daq_get_device_index,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    pcap_daq_msg_receive,
-    pcap_daq_msg_finalize,
-    pcap_daq_packet_header_from_msg,
-    pcap_daq_packet_data_from_msg,
-#endif
+    /* .api_version = */ DAQ_MODULE_API_VERSION,
+    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
+    /* .module_version = */ DAQ_PCAP_VERSION,
+    /* .name = */ "pcap",
+    /* .type = */ DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
+    /* .prepare = */ pcap_daq_prepare,
+    /* .get_variable_descs = */ pcap_daq_get_variable_descs,
+    /* .initialize = */ pcap_daq_initialize,
+    /* .set_filter = */ pcap_daq_set_filter,
+    /* .start = */ pcap_daq_start,
+    /* .inject = */ pcap_daq_inject,
+    /* .breakloop = */ pcap_daq_breakloop,
+    /* .stop = */ pcap_daq_stop,
+    /* .shutdown = */ pcap_daq_shutdown,
+    /* .check_status = */ pcap_daq_check_status,
+    /* .get_stats = */ pcap_daq_get_stats,
+    /* .reset_stats = */ pcap_daq_reset_stats,
+    /* .get_snaplen = */ pcap_daq_get_snaplen,
+    /* .get_capabilities = */ pcap_daq_get_capabilities,
+    /* .get_datalink_type = */ pcap_daq_get_datalink_type,
+    /* .get_errbuf = */ pcap_daq_get_errbuf,
+    /* .set_errbuf = */ pcap_daq_set_errbuf,
+    /* .get_device_index = */ pcap_daq_get_device_index,
+    /* .modify_flow = */ NULL,
+    /* .hup_prep = */ NULL,
+    /* .hup_apply = */ NULL,
+    /* .hup_post = */ NULL,
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL,
+    /* .msg_receive = */ pcap_daq_msg_receive,
+    /* .msg_finalize = */ pcap_daq_msg_finalize,
+    /* .packet_header_from_msg = */ pcap_daq_packet_header_from_msg,
+    /* .packet_data_from_msg = */ pcap_daq_packet_data_from_msg,
 };

@@ -81,7 +81,7 @@
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
 #define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
-typedef const struct _daq_module *DAQ_Module_h;
+typedef const struct _daq_module_api *DAQ_Module_h;
 typedef const struct _daq_instance *DAQ_Instance_h;
 
 typedef enum
@@ -372,33 +372,5 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_CAPA_DECODE_6IN4    0x00008000   /* decodes and tracks flows of IPv6 within IPv4. */
 #define DAQ_CAPA_DECODE_4IN6    0x00010000   /* decodes and tracks flows of IPv4 within IPv6. */
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
-
-/* DAQ Module Configuration Functions */
-DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_h *modcfgptr, DAQ_Module_h module);
-DAQ_LINKAGE DAQ_Module_h daq_module_config_get_module(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_input(DAQ_ModuleConfig_h modcfg, const char *input);
-DAQ_LINKAGE const char *daq_module_config_get_input(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_snaplen(DAQ_ModuleConfig_h modcfg, int snaplen);
-DAQ_LINKAGE int daq_module_config_get_snaplen(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_h modcfg, unsigned timeout);
-DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_h modcfg, DAQ_Mode mode);
-DAQ_LINKAGE DAQ_Mode daq_module_config_get_mode(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_variable(DAQ_ModuleConfig_h modcfg, const char *key, const char *value);
-DAQ_LINKAGE const char *daq_module_config_get_variable(DAQ_ModuleConfig_h modcfg, const char *key);
-DAQ_LINKAGE void daq_module_config_delete_variable(DAQ_ModuleConfig_h modcfg, const char *key);
-DAQ_LINKAGE int daq_module_config_first_variable(DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
-DAQ_LINKAGE int daq_module_config_next_variable(DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
-DAQ_LINKAGE void daq_module_config_clear_variables(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE DAQ_ModuleConfig_h daq_module_config_get_next(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE void daq_module_config_destroy(DAQ_ModuleConfig_h modcfg);
-
-/* DAQ Configuration Functions */
-DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
-DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_h cfg, DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_pop_module_config(DAQ_Config_h cfg);
-DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_top_module_config(DAQ_Config_h cfg);
-DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_next_module_config(DAQ_Config_h cfg);
-DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 #endif /* _DAQ_COMMON_H */

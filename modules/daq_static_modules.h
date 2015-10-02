@@ -22,23 +22,23 @@
 #include <daq_api.h>
 
 #ifdef BUILD_AFPACKET_MODULE
-extern const DAQ_Module_t afpacket_daq_module_data;
+extern const DAQ_ModuleAPI_t afpacket_daq_module_data;
 #endif
 #ifdef BUILD_DUMP_MODULE
-extern const DAQ_Module_t dump_daq_module_data;
+extern const DAQ_ModuleAPI_t dump_daq_module_data;
 #endif
 #ifdef BUILD_IPFW_MODULE
-extern const DAQ_Module_t ipfw_daq_module_data;
+extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
 #endif
 #ifdef BUILD_IPQ_MODULE
-extern const DAQ_Module_t ipq_daq_module_data;
+extern const DAQ_ModuleAPI_t ipq_daq_module_data;
 #endif
 #ifdef BUILD_NFQ_MODULE
-extern const DAQ_Module_t nfq_daq_module_data;
+extern const DAQ_ModuleAPI_t nfq_daq_module_data;
 #endif
 #ifdef BUILD_PCAP_MODULE
-extern const DAQ_Module_t pcap_daq_module_data;
+extern const DAQ_ModuleAPI_t pcap_daq_module_data;
 #endif
 #ifdef BUILD_NETMAP_MODULE
-extern const DAQ_Module_t netmap_daq_module_data;
+extern const DAQ_ModuleAPI_t netmap_daq_module_data;
 #endif

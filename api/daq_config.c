@@ -46,7 +46,7 @@ typedef struct _daq_dict
 typedef struct _daq_module_config
 {
     struct _daq_module_config *next;
-    const DAQ_Module_t *module;     /* Module that will be instantiated with this configuration */
+    const DAQ_ModuleAPI_t *module;     /* Module that will be instantiated with this configuration */
     char *input;            /* Name of the interface(s) or file to be opened */
     int snaplen;            /* Maximum packet capture length */
     unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
@@ -107,7 +107,7 @@ static DAQ_DictEntry_t *daq_dict_find_entry(DAQ_Dict_t *dict, const char *key)
     return NULL;
 }
 
-static void daq_dict_delete_entry(DAQ_Dict_t *dict, const char *key)
+static int daq_dict_delete_entry(DAQ_Dict_t *dict, const char *key)
 {
     DAQ_DictEntry_t *entry, *prev = NULL;
 
@@ -123,10 +123,12 @@ static void daq_dict_delete_entry(DAQ_Dict_t *dict, const char *key)
             free(entry->value);
             free(entry);
             dict->iterator = NULL;
-            return;
+            return 1;
         }
         prev = entry;
     }
+
+    return 0;
 }
 
 static void daq_dict_clear(DAQ_Dict_t *dict)
@@ -163,7 +165,7 @@ static DAQ_DictEntry_t *daq_dict_next_entry(DAQ_Dict_t *dict)
  * DAQ Module Configuration Functions
  */
 
-DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_t **modcfgptr, const DAQ_Module_t *module)
+DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_t **modcfgptr, const DAQ_ModuleAPI_t *module)
 {
     DAQ_ModuleConfig_t *modcfg;
 
@@ -180,7 +182,7 @@ DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_t **modcfgptr, const DAQ_
     return DAQ_SUCCESS;
 }
 
-DAQ_LINKAGE const DAQ_Module_t *daq_module_config_get_module(DAQ_ModuleConfig_t *modcfg)
+DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_module_config_get_module(DAQ_ModuleConfig_t *modcfg)
 {
     if (!modcfg)
         return NULL;
@@ -325,12 +327,15 @@ DAQ_LINKAGE const char *daq_module_config_get_variable(DAQ_ModuleConfig_t *modcf
     return entry->value;
 }
 
-DAQ_LINKAGE void daq_module_config_delete_variable(DAQ_ModuleConfig_t *modcfg, const char *key)
+DAQ_LINKAGE int daq_module_config_delete_variable(DAQ_ModuleConfig_t *modcfg, const char *key)
 {
     if (!modcfg || !key)
-        return;
+        return DAQ_ERROR_INVAL;
 
-    daq_dict_delete_entry(&modcfg->variables, key);
+    if (daq_dict_delete_entry(&modcfg->variables, key))
+        return DAQ_SUCCESS;
+
+    return DAQ_ERROR;
 }
 
 DAQ_LINKAGE int daq_module_config_first_variable(DAQ_ModuleConfig_t *modcfg, const char **key, const char **value)

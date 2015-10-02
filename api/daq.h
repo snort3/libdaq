@@ -29,6 +29,7 @@
 
 /* Functions for loading, handling, and unloading DAQ modules. */
 DAQ_LINKAGE void daq_set_verbosity(int level);
+DAQ_LINKAGE int daq_get_verbosity(void);
 DAQ_LINKAGE int daq_load_modules(const char *module_dirs[]);
 DAQ_LINKAGE DAQ_Module_h daq_find_module(const char *name);
 DAQ_LINKAGE DAQ_Module_h daq_modules_first(void);
@@ -46,6 +47,34 @@ DAQ_LINKAGE const char *daq_module_get_name(const DAQ_Module_h module);
 DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_Module_h module);
 DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_h module);
 DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_Module_h module, const DAQ_VariableDesc_t **var_desc_table);
+
+/* DAQ Module Configuration Functions */
+DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_h *modcfgptr, DAQ_Module_h module);
+DAQ_LINKAGE DAQ_Module_h daq_module_config_get_module(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_input(DAQ_ModuleConfig_h modcfg, const char *input);
+DAQ_LINKAGE const char *daq_module_config_get_input(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_snaplen(DAQ_ModuleConfig_h modcfg, int snaplen);
+DAQ_LINKAGE int daq_module_config_get_snaplen(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_h modcfg, unsigned timeout);
+DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_h modcfg, DAQ_Mode mode);
+DAQ_LINKAGE DAQ_Mode daq_module_config_get_mode(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_variable(DAQ_ModuleConfig_h modcfg, const char *key, const char *value);
+DAQ_LINKAGE const char *daq_module_config_get_variable(DAQ_ModuleConfig_h modcfg, const char *key);
+DAQ_LINKAGE int daq_module_config_delete_variable(DAQ_ModuleConfig_h modcfg, const char *key);
+DAQ_LINKAGE int daq_module_config_first_variable(DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+DAQ_LINKAGE int daq_module_config_next_variable(DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+DAQ_LINKAGE void daq_module_config_clear_variables(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_module_config_get_next(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE void daq_module_config_destroy(DAQ_ModuleConfig_h modcfg);
+
+/* DAQ Configuration Functions */
+DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
+DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_h cfg, DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_pop_module_config(DAQ_Config_h cfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_top_module_config(DAQ_Config_h cfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_next_module_config(DAQ_Config_h cfg);
+DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 /* DAQ Module Instance functions */
 DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);

@@ -30,7 +30,7 @@
 
 typedef struct _daq_instance
 {
-    const DAQ_Module_t *module;
+    const DAQ_ModuleAPI_t *module;
     void *context;
 } DAQ_Instance_t;
 
@@ -90,6 +90,9 @@ DAQ_LINKAGE int daq_instance_set_filter(const DAQ_Instance_t *instance, const ch
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
+
+    if (!instance->module->set_filter)
+        return DAQ_ERROR_NOTSUP;
 
     if (!filter)
     {
@@ -357,7 +360,7 @@ DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(const DAQ_Instance_
 /*
  * Functions that apply to DAQ modules themselves go here.
  */
-DAQ_LINKAGE const char *daq_module_get_name(const DAQ_Module_t *module)
+DAQ_LINKAGE const char *daq_module_get_name(const DAQ_ModuleAPI_t *module)
 {
     if (!module)
         return NULL;
@@ -365,7 +368,7 @@ DAQ_LINKAGE const char *daq_module_get_name(const DAQ_Module_t *module)
     return module->name;
 }
 
-DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_Module_t *module)
+DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_ModuleAPI_t *module)
 {
     if (!module)
         return 0;
@@ -373,7 +376,7 @@ DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_Module_t *module)
     return module->module_version;
 }
 
-DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_t *module)
+DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_ModuleAPI_t *module)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -381,7 +384,7 @@ DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_t *module)
     return module->type;
 }
 
-DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_Module_t *module, const DAQ_VariableDesc_t **var_desc_table)
+DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_ModuleAPI_t *module, const DAQ_VariableDesc_t **var_desc_table)
 {
     if (!var_desc_table)
         return 0;

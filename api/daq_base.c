@@ -73,7 +73,7 @@
 #define NAME_SIZE       512
 
 #ifdef STATIC_MODULE_LIST
-extern const DAQ_Module_t *static_modules[];
+extern const DAQ_ModuleAPI_t *static_modules[];
 extern const int num_static_modules;
 #endif
 
@@ -81,7 +81,7 @@ int daq_verbosity = 0;
 
 typedef struct _daq_list_node
 {
-    const DAQ_Module_t *module;
+    const DAQ_ModuleAPI_t *module;
     void *dl_handle;
     struct _daq_list_node *next;
 } DAQ_ListNode_t;
@@ -139,7 +139,7 @@ DAQ_LINKAGE const char *daq_state_string(DAQ_State state)
     return daq_state_strings[state];
 }
 
-DAQ_LINKAGE const DAQ_Module_t *daq_find_module(const char *name)
+DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_find_module(const char *name)
 {
     DAQ_ListNode_t *node;
 
@@ -152,22 +152,34 @@ DAQ_LINKAGE const DAQ_Module_t *daq_find_module(const char *name)
     return NULL;
 }
 
-static int register_module(const DAQ_Module_t *dm, void *dl_handle)
+static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
 {
     DAQ_ListNode_t *node;
+    DAQ_BaseAPI_t base_api;
+    int rval;
 
     /* Check to make sure the module's API version matches ours. */
-    if (dm->api_version != DAQ_API_VERSION)
+    if (dm->api_version != DAQ_MODULE_API_VERSION)
     {
         fprintf(stderr, "%s: Module API version (0x%x) differs from expected version (0x%x)\n",
-                dm->name, dm->api_version, DAQ_API_VERSION);
+                dm->name, dm->api_version, DAQ_MODULE_API_VERSION);
         return DAQ_ERROR;
     }
 
-    /* Check to make sure that ALL of the function pointers are populated. */
-    if (!dm->initialize || !dm->set_filter || !dm->start || !dm->inject || !dm->breakloop ||
+    /* Extra sanity check to make sure the module's API structure size matches. */
+    if (dm->api_size != sizeof(DAQ_ModuleAPI_t))
+    {
+        fprintf(stderr, "%s: Module API structure size (%u) differs from the expected size (%zu)\n",
+                dm->name, dm->api_version, sizeof(DAQ_ModuleAPI_t));
+        return DAQ_ERROR;
+    }
+
+    /* Check to make sure that all of the required function pointers are populated. */
+    if (!dm->prepare || !dm->initialize || !dm->start || !dm->inject || !dm->breakloop ||
         !dm->stop || !dm->shutdown || !dm->check_status || !dm->get_stats || !dm->reset_stats ||
-        !dm->get_snaplen || !dm->get_capabilities || !dm->get_errbuf || !dm->set_errbuf || !dm->get_device_index)
+        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type || !dm->get_errbuf ||
+        !dm->set_errbuf || !dm->get_device_index || !dm->msg_receive || !dm->msg_finalize ||
+        !dm->packet_header_from_msg || !dm->packet_data_from_msg)
     {
         fprintf(stderr, "%s: Module definition is missing function pointer(s)!\n", dm->name);
         return DAQ_ERROR;
@@ -204,6 +216,23 @@ static int register_module(const DAQ_Module_t *dm, void *dl_handle)
         num_modules++;
     }
 
+    /* Prepare the DAQ module for future use. */
+    base_api.api_version = DAQ_BASE_API_VERSION;
+    base_api.api_size = sizeof(DAQ_BaseAPI_t);
+    base_api.module_config_get_input = daq_module_config_get_input;
+    base_api.module_config_get_snaplen = daq_module_config_get_snaplen;
+    base_api.module_config_get_timeout = daq_module_config_get_timeout;
+    base_api.module_config_get_mode = daq_module_config_get_mode;
+    base_api.module_config_get_variable = daq_module_config_get_variable;
+    base_api.module_config_first_variable = daq_module_config_first_variable;
+    base_api.module_config_next_variable = daq_module_config_next_variable;
+    base_api.module_config_get_next = daq_module_config_get_next;
+    if ((rval = dm->prepare(&base_api)) != DAQ_SUCCESS)
+    {
+        fprintf(stderr, "%s: Error preparing module for use! (%d)\n", dm->name, rval);
+        return rval;
+    }
+
     DEBUG("Registered daq module: %s\n", dm->name);
     node->module = dm;
     node->dl_handle = dl_handle;
@@ -213,7 +242,7 @@ static int register_module(const DAQ_Module_t *dm, void *dl_handle)
 
 static int daq_load_module(const char *filename)
 {
-    const DAQ_Module_t *dm;
+    const DAQ_ModuleAPI_t *dm;
     struct stat fs;
     void *dl_handle;
     int rval;
@@ -233,7 +262,7 @@ static int daq_load_module(const char *filename)
         return DAQ_ERROR;
     }
 
-    if ((dm = (const DAQ_Module_t*)dlsym(dl_handle, "DAQ_MODULE_DATA")) == NULL)
+    if ((dm = (const DAQ_ModuleAPI_t*)dlsym(dl_handle, "DAQ_MODULE_DATA")) == NULL)
     {
         fprintf(stderr, "%s: %s: %s\n", filename, dlsym_func_name, dlerror());
         dlclose(dl_handle);
@@ -254,7 +283,7 @@ static int daq_load_module(const char *filename)
 #ifdef STATIC_MODULE_LIST
 static void load_static_modules(void)
 {
-    const DAQ_Module_t *dm;
+    const DAQ_ModuleAPI_t *dm;
     int i;
 
     DEBUG("Static modules: %d\n", num_static_modules);
@@ -406,7 +435,7 @@ DAQ_LINKAGE void daq_unload_modules(void)
     }
 }
 
-DAQ_LINKAGE const DAQ_Module_t *daq_modules_first(void)
+DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_modules_first(void)
 {
     if (module_list)
         module_list_iter = module_list;
@@ -414,7 +443,7 @@ DAQ_LINKAGE const DAQ_Module_t *daq_modules_first(void)
     return module_list_iter ? module_list_iter->module : NULL;
 }
 
-DAQ_LINKAGE const DAQ_Module_t *daq_modules_next(void)
+DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_modules_next(void)
 {
     if (module_list_iter)
         module_list_iter = module_list_iter->next;
@@ -426,4 +455,9 @@ DAQ_LINKAGE void daq_set_verbosity(int level)
 {
     daq_verbosity = level;
     DEBUG("DAQ verbosity level is set to %d.\n", daq_verbosity);
+}
+
+DAQ_LINKAGE int daq_get_verbosity(void)
+{
+    return daq_verbosity;
 }

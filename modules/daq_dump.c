@@ -36,7 +36,7 @@
 typedef struct
 {
     // delegate most stuff to the wrapped module
-    const DAQ_Module_t *wrapped_module;
+    const DAQ_ModuleAPI_t *wrapped_module;
     void *wrapped_context;
 
     // but write all output packets here
@@ -49,6 +49,19 @@ typedef struct
 static DAQ_VariableDesc_t dump_variable_descriptions[] = {
     { "outfile", "PCAP filename to output transmitted packets to", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
 };
+
+DAQ_BaseAPI_t daq_base_api;
+
+
+static int dump_daq_prepare(const DAQ_BaseAPI_t *base_api)
+{
+    if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
+        return DAQ_ERROR;
+
+    daq_base_api = *base_api;
+
+    return DAQ_SUCCESS;
+}
 
 static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 {
@@ -64,7 +77,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     const char *varKey, *varValue;
     int rval;
 
-    subconfig = daq_module_config_get_next(config);
+    subconfig = daq_base_api.module_config_get_next(config);
     if (!subconfig)
     {
         snprintf(errBuf, errMax, "%s: No submodule configuration provided", __FUNCTION__);
@@ -78,7 +91,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         return DAQ_ERROR_NOMEM;
     }
 
-    daq_module_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "outfile"))
@@ -91,10 +104,10 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
                 return DAQ_ERROR_NOMEM;
             }
         }
-        daq_module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
 
-    dc->wrapped_module = daq_module_config_get_module(subconfig);
+    dc->wrapped_module = daq_base_api.module_config_get_module(subconfig);
     rval = dc->wrapped_module->initialize(subconfig, &dc->wrapped_context, errBuf, errMax);
     if (rval != DAQ_SUCCESS)
     {
@@ -315,40 +328,43 @@ static const uint8_t *dump_daq_packet_data_from_msg(void *handle, const DAQ_Msg_
 //-------------------------------------------------------------------------
 
 #ifdef BUILDING_SO
-DAQ_SO_PUBLIC DAQ_Module_t DAQ_MODULE_DATA =
+DAQ_SO_PUBLIC DAQ_ModuleAPI_t DAQ_MODULE_DATA =
 #else
-DAQ_Module_t dump_daq_module_data =
+DAQ_ModuleAPI_t dump_daq_module_data =
 #endif
 {
-    .api_version = DAQ_API_VERSION,
-    .module_version = DAQ_DUMP_VERSION,
-    .name = "dump",
-    .type = DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
-    .get_variable_descs = dump_daq_get_variable_descs,
-    .initialize = dump_daq_initialize,
-    .set_filter = dump_daq_set_filter,
-    .start = dump_daq_start,
-    .inject = dump_daq_inject,
-    .breakloop = dump_daq_breakloop,
-    .stop = dump_daq_stop,
-    .shutdown = dump_daq_shutdown,
-    .check_status = dump_daq_check_status,
-    .get_stats = dump_daq_get_stats,
-    .reset_stats = dump_daq_reset_stats,
-    .get_snaplen = dump_daq_get_snaplen,
-    .get_capabilities = dump_daq_get_capabilities,
-    .get_datalink_type = dump_daq_get_datalink_type,
-    .get_errbuf = dump_daq_get_errbuf,
-    .set_errbuf = dump_daq_set_errbuf,
-    .get_device_index = dump_daq_get_device_index,
-    .modify_flow = NULL,
-    .hup_prep = NULL,
-    .hup_apply = NULL,
-    .hup_post = NULL,
-    .dp_add_dc = NULL,
-    .msg_receive = dump_daq_msg_receive,
-    .msg_finalize = dump_daq_msg_finalize,
-    .packet_header_from_msg = dump_daq_packet_header_from_msg,
-    .packet_data_from_msg = dump_daq_packet_data_from_msg
+    /* .api_version = */ DAQ_MODULE_API_VERSION,
+    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
+    /* .module_version = */ DAQ_DUMP_VERSION,
+    /* .name = */ "dump",
+    /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
+    /* .prepare = */ dump_daq_prepare,
+    /* .get_variable_descs = */ dump_daq_get_variable_descs,
+    /* .initialize = */ dump_daq_initialize,
+    /* .set_filter = */ dump_daq_set_filter,
+    /* .start = */ dump_daq_start,
+    /* .inject = */ dump_daq_inject,
+    /* .breakloop = */ dump_daq_breakloop,
+    /* .stop = */ dump_daq_stop,
+    /* .shutdown = */ dump_daq_shutdown,
+    /* .check_status = */ dump_daq_check_status,
+    /* .get_stats = */ dump_daq_get_stats,
+    /* .reset_stats = */ dump_daq_reset_stats,
+    /* .get_snaplen = */ dump_daq_get_snaplen,
+    /* .get_capabilities = */ dump_daq_get_capabilities,
+    /* .get_datalink_type = */ dump_daq_get_datalink_type,
+    /* .get_errbuf = */ dump_daq_get_errbuf,
+    /* .set_errbuf = */ dump_daq_set_errbuf,
+    /* .get_device_index = */ dump_daq_get_device_index,
+    /* .modify_flow = */ NULL,
+    /* .hup_prep = */ NULL,
+    /* .hup_apply = */ NULL,
+    /* .hup_post = */ NULL,
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL,
+    /* .msg_receive = */ dump_daq_msg_receive,
+    /* .msg_finalize = */ dump_daq_msg_finalize,
+    /* .packet_header_from_msg = */ dump_daq_packet_header_from_msg,
+    /* .packet_data_from_msg = */ dump_daq_packet_data_from_msg
 };
 

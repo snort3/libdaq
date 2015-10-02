@@ -144,6 +144,7 @@ static DAQ_VariableDesc_t afpacket_variable_descriptions[] = {
 };
 
 static const int vlan_offset = 2 * ETH_ALEN;
+static DAQ_BaseAPI_t daq_base_api;
 
 static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
@@ -612,6 +613,16 @@ static void reset_stats(AFPacket_Context_t *afpc)
         getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len);
 }
 
+static int afpacket_daq_prepare(const DAQ_BaseAPI_t *base_api)
+{
+    if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
+        return DAQ_ERROR;
+
+    daq_base_api = *base_api;
+
+    return DAQ_SUCCESS;
+}
+
 static int afpacket_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 {
     *var_desc_table = afpacket_variable_descriptions;
@@ -639,7 +650,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
         goto err;
     }
 
-    afpc->device = strdup(daq_module_config_get_input(config));
+    afpc->device = strdup(daq_base_api.module_config_get_input(config));
     if (!afpc->device)
     {
         snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
@@ -647,12 +658,12 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
         goto err;
     }
 
-    afpc->snaplen = daq_module_config_get_snaplen(config);
-    afpc->timeout = (daq_module_config_get_timeout(config) > 0) ? (int) daq_module_config_get_timeout(config) : -1;
+    afpc->snaplen = daq_base_api.module_config_get_snaplen(config);
+    afpc->timeout = (daq_base_api.module_config_get_timeout(config) > 0) ? (int) daq_base_api.module_config_get_timeout(config) : -1;
 
     dev = afpc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') ||
-            (daq_module_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
+            (daq_base_api.module_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -682,7 +693,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
             instance->next = afpc->instances;
             afpc->instances = instance;
             num_intfs++;
-            if (daq_module_config_get_mode(config) != DAQ_MODE_PASSIVE)
+            if (daq_base_api.module_config_get_mode(config) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
                 {
@@ -706,7 +717,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
     }
 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (daq_module_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
+    if (!afpc->instances || (daq_base_api.module_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
         snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
         goto err;
@@ -716,7 +727,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
      * Determine the dimensions of the kernel RX ring(s) to request.
      */
     /* 1. Find the total desired packet buffer memory for all instances. */
-    daq_module_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "buffer_size_mb"))
@@ -773,7 +784,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
         }
 #endif /* PACKET_FANOUT */
 
-        daq_module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
 
     /* Fall back to the environment variable. */
@@ -1250,39 +1261,42 @@ static const uint8_t *afpacket_daq_packet_data_from_msg(void *handle, const DAQ_
 }
 
 #ifdef BUILDING_SO
-DAQ_SO_PUBLIC const DAQ_Module_t DAQ_MODULE_DATA =
+DAQ_SO_PUBLIC const DAQ_ModuleAPI_t DAQ_MODULE_DATA =
 #else
-const DAQ_Module_t afpacket_daq_module_data =
+const DAQ_ModuleAPI_t afpacket_daq_module_data =
 #endif
 {
-    .api_version = DAQ_API_VERSION,
-    .module_version = DAQ_AFPACKET_VERSION,
-    .name = "afpacket",
-    .type = DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    .get_variable_descs = afpacket_daq_get_variable_descs,
-    .initialize = afpacket_daq_initialize,
-    .set_filter = afpacket_daq_set_filter,
-    .start = afpacket_daq_start,
-    .inject = afpacket_daq_inject,
-    .breakloop = afpacket_daq_breakloop,
-    .stop = afpacket_daq_stop,
-    .shutdown = afpacket_daq_shutdown,
-    .check_status = afpacket_daq_check_status,
-    .get_stats = afpacket_daq_get_stats,
-    .reset_stats = afpacket_daq_reset_stats,
-    .get_snaplen = afpacket_daq_get_snaplen,
-    .get_capabilities = afpacket_daq_get_capabilities,
-    .get_datalink_type = afpacket_daq_get_datalink_type,
-    .get_errbuf = afpacket_daq_get_errbuf,
-    .set_errbuf = afpacket_daq_set_errbuf,
-    .get_device_index = afpacket_daq_get_device_index,
-    .modify_flow = NULL,
-    .hup_prep = NULL,
-    .hup_apply = NULL,
-    .hup_post = NULL,
-    .dp_add_dc = NULL,
-    .msg_receive = afpacket_daq_msg_receive,
-    .msg_finalize = afpacket_daq_msg_finalize,
-    .packet_header_from_msg = afpacket_daq_packet_header_from_msg,
-    .packet_data_from_msg = afpacket_daq_packet_data_from_msg
+    /* .api_version = */ DAQ_MODULE_API_VERSION,
+    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
+    /* .module_version = */ DAQ_AFPACKET_VERSION,
+    /* .name = */ "afpacket",
+    /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
+    /* .prepare = */ afpacket_daq_prepare,
+    /* .get_variable_descs = */ afpacket_daq_get_variable_descs,
+    /* .initialize = */ afpacket_daq_initialize,
+    /* .set_filter = */ afpacket_daq_set_filter,
+    /* .start = */ afpacket_daq_start,
+    /* .inject = */ afpacket_daq_inject,
+    /* .breakloop = */ afpacket_daq_breakloop,
+    /* .stop = */ afpacket_daq_stop,
+    /* .shutdown = */ afpacket_daq_shutdown,
+    /* .check_status = */ afpacket_daq_check_status,
+    /* .get_stats = */ afpacket_daq_get_stats,
+    /* .reset_stats = */ afpacket_daq_reset_stats,
+    /* .get_snaplen = */ afpacket_daq_get_snaplen,
+    /* .get_capabilities = */ afpacket_daq_get_capabilities,
+    /* .get_datalink_type = */ afpacket_daq_get_datalink_type,
+    /* .get_errbuf = */ afpacket_daq_get_errbuf,
+    /* .set_errbuf = */ afpacket_daq_set_errbuf,
+    /* .get_device_index = */ afpacket_daq_get_device_index,
+    /* .modify_flow = */ NULL,
+    /* .hup_prep = */ NULL,
+    /* .hup_apply = */ NULL,
+    /* .hup_post = */ NULL,
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL,
+    /* .msg_receive = */ afpacket_daq_msg_receive,
+    /* .msg_finalize = */ afpacket_daq_msg_finalize,
+    /* .packet_header_from_msg = */ afpacket_daq_packet_header_from_msg,
+    /* .packet_data_from_msg = */ afpacket_daq_packet_data_from_msg
 };

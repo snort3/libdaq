@@ -24,17 +24,41 @@
 
 #include <daq_common.h>
 
-typedef struct _daq_module
+#define DAQ_BASE_API_VERSION    0x00010001
+
+typedef struct _daq_base_api
 {
-    /* The version of the API this module implements.
-       This *must* be the first element in the structure. */
+    /* Sanity/Version checking */
+    uint32_t api_version;
+    uint32_t api_size;
+    /* Instance configuration accessors */
+    DAQ_Module_h (*module_config_get_module) (DAQ_ModuleConfig_h modcfg);
+    const char *(*module_config_get_input) (DAQ_ModuleConfig_h modcfg);
+    int (*module_config_get_snaplen) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*module_config_get_timeout) (DAQ_ModuleConfig_h modcfg);
+    DAQ_Mode (*module_config_get_mode) (DAQ_ModuleConfig_h modcfg);
+    const char *(*module_config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
+    int (*module_config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+    int (*module_config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+    DAQ_ModuleConfig_h (*module_config_get_next) (DAQ_ModuleConfig_h modcfg);
+} DAQ_BaseAPI_t;
+
+#define DAQ_MODULE_API_VERSION    0x00010004
+
+typedef struct _daq_module_api
+{
+    /* The version of the API this module implements. */
     const uint32_t api_version;
+    /* The size of this structure (for sanity checking). */
+    const uint32_t api_size;
     /* The version of the DAQ module itself - can be completely arbitrary. */
     const uint32_t module_version;
     /* The name of the module (sfpacket, xvnim, pcap, etc.) */
     const char *name;
     /* Various flags describing the module and its capabilities (Inline-capabale, etc.) */
     const uint32_t type;
+    /* The function the module loader *must* call first to prepare the module for any other function calls. */
+    int (*prepare) (const DAQ_BaseAPI_t *base_api);
     /* Get a pointer to an array describing the DAQ variables accepted by this module.
         Returns the size of the retrieved array. */
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
@@ -95,13 +119,11 @@ typedef struct _daq_module
     int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
     DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
     const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);
-} DAQ_Module_t;
-
-#define DAQ_API_VERSION    0x00010003
+} DAQ_ModuleAPI_t;
 
 #define DAQ_ERRBUF_SIZE 256
-/* This is a convenience macro for safely printing to DAQ error buffers.  It must be called on a known-size character array. */
 
+/* This is a convenience macro for safely printing to DAQ error buffers.  It must be called on a known-size character array. */
 #ifdef WIN32
 inline void DPE(char *var, char *fmt, ...)
 {
