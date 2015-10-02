@@ -1,0 +1,21 @@
+check_PROGRAMS = api_base_test api_config_test
+TESTS = api_base_test api_config_test
+
+api_base_test_SOURCES = api_base_test.c mock_stdio.c
+api_base_test_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS) $(CMOCKA_CFLAGS) -I${top_srcdir}/api
+api_base_test_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	$(CODE_COVERAGE_LDFLAGS) \
+	-Wl,--wrap,printf \
+	-Wl,--wrap,__printf_chk \
+	-Wl,--wrap,fprintf \
+	-Wl,--wrap,__fprintf_chk
+api_base_test_LDADD = ${top_builddir}/api/libdaq_static.la $(LIBDL) $(CMOCKA_LIBS)
+
+api_config_test_SOURCES = api_config_test.c
+api_config_test_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS) $(CMOCKA_CFLAGS) -I${top_srcdir}/api
+api_config_test_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	$(CODE_COVERAGE_LDFLAGS) \
+	-static-libtool-libs
+api_config_test_LDADD = ${top_builddir}/api/libdaq.la $(LIBDL) $(CMOCKA_LIBS)

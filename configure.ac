@@ -12,6 +12,7 @@ AM_INIT_AUTOMAKE
 AC_PROG_CC
 AM_PROG_AR
 AC_PROG_LIBTOOL
+AC_PROG_SED
 
 # Enable visibility if we can
 gl_VISIBILITY
@@ -19,6 +20,12 @@ AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
 
 # Special compiler flags for ICC, etc.
 AC_SF_COMPILER_SETUP()
+
+# Set up code coverage
+AX_CODE_COVERAGE
+
+# Check for cmocka
+AM_CHECK_CMOCKA
 
 # IPv6 configuration
 AC_ARG_ENABLE(ipv6, 
@@ -297,12 +304,17 @@ AC_SUBST(LIBDL)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(CFLAGS)
 
+if test "${CODE_COVERAGE_ENABLED}" = yes ; then
+    CFLAGS=`echo $CFLAGS | ${SED} 's/-O\w//g'`
+fi
+
 AC_CONFIG_FILES([Makefile
                  api/Makefile
                  example/Makefile
                  modules/Makefile
                  modules/daq-modules-config
-                 sfbpf/Makefile])
+                 sfbpf/Makefile
+                 test/Makefile])
 AC_OUTPUT
 
 AC_MSG_RESULT([
@@ -322,6 +334,10 @@ AC_MSG_RESULT([
     ldflags:        ${LDFLAGS}
     am_ldflags:     ${AM_LDFLAGS}
     libs:           ${LIBS}
+
+    code_coverage_enabled:  ${CODE_COVERAGE_ENABLED}
+    code_coverage_ldflags:  ${CODE_COVERAGE_LDFLAGS}
+    code_coverage_cflags:   ${CODE_COVERAGE_CFLAGS}
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
     Build Dump DAQ module...... : $enable_dump_module
