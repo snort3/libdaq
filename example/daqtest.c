@@ -95,6 +95,10 @@ typedef struct _VlanTagHdr
 } VlanTagHdr;
 
 
+#ifdef USE_STATIC_MODULES
+extern DAQ_Module_h static_modules[];
+#endif
+
 static uint8_t normal_ping_data[IP_MAXPACKET];
 static uint8_t fake_ping_data[IP_MAXPACKET];
 static uint8_t local_mac_addr[ETH_ALEN];
@@ -1203,7 +1207,10 @@ int main(int argc, char *argv[])
     }
 
     daq_set_verbosity(cfg->verbosity);
-    daq_load_modules(cfg->module_paths);
+#ifdef USE_STATIC_MODULES
+    daq_load_static_modules(static_modules);
+#endif
+    daq_load_dynamic_modules(cfg->module_paths);
 
     if (cfg->list_and_exit)
     {
