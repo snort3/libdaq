@@ -30,7 +30,8 @@
 /* Functions for loading, handling, and unloading DAQ modules. */
 DAQ_LINKAGE void daq_set_verbosity(int level);
 DAQ_LINKAGE int daq_get_verbosity(void);
-DAQ_LINKAGE int daq_load_modules(const char *module_dirs[]);
+DAQ_LINKAGE int daq_load_static_modules(DAQ_Module_h *modules);
+DAQ_LINKAGE int daq_load_dynamic_modules(const char *module_dirs[]);
 DAQ_LINKAGE DAQ_Module_h daq_find_module(const char *name);
 DAQ_LINKAGE DAQ_Module_h daq_modules_first(void);
 DAQ_LINKAGE DAQ_Module_h daq_modules_next(void);
@@ -43,10 +44,10 @@ DAQ_LINKAGE const char *daq_state_string(DAQ_State state);
 DAQ_LINKAGE const char *daq_verdict_string(DAQ_Verdict verdict);
 
 /* DAQ Module functions. */
-DAQ_LINKAGE const char *daq_module_get_name(const DAQ_Module_h module);
-DAQ_LINKAGE uint32_t daq_module_get_version(const DAQ_Module_h module);
-DAQ_LINKAGE uint32_t daq_module_get_type(const DAQ_Module_h module);
-DAQ_LINKAGE int daq_module_get_variable_descs(const DAQ_Module_h module, const DAQ_VariableDesc_t **var_desc_table);
+DAQ_LINKAGE const char *daq_module_get_name(DAQ_Module_h module);
+DAQ_LINKAGE uint32_t daq_module_get_version(DAQ_Module_h module);
+DAQ_LINKAGE uint32_t daq_module_get_type(DAQ_Module_h module);
+DAQ_LINKAGE int daq_module_get_variable_descs(DAQ_Module_h module, const DAQ_VariableDesc_t **var_desc_table);
 
 /* DAQ Module Configuration Functions */
 DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_h *modcfgptr, DAQ_Module_h module);

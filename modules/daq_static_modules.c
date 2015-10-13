@@ -44,5 +44,5 @@ const DAQ_ModuleAPI_t *static_modules[] =
 #ifdef BUILD_NETMAP_MODULE
     &netmap_daq_module_data,
 #endif
+    NULL
 };
-const int num_static_modules = sizeof(static_modules) / sizeof(static_modules[0]);

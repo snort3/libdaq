@@ -72,11 +72,6 @@
 
 #define NAME_SIZE       512
 
-#ifdef STATIC_MODULE_LIST
-extern const DAQ_ModuleAPI_t *static_modules[];
-extern const int num_static_modules;
-#endif
-
 int daq_verbosity = 0;
 
 typedef struct _daq_list_node
@@ -142,6 +137,9 @@ DAQ_LINKAGE const char *daq_state_string(DAQ_State state)
 DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_find_module(const char *name)
 {
     DAQ_ListNode_t *node;
+
+    if (!name)
+        return NULL;
 
     for (node = module_list; node; node = node->next)
     {
@@ -240,7 +238,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     return DAQ_SUCCESS;
 }
 
-static int daq_load_module(const char *filename)
+static int daq_load_dynamic_module(const char *filename)
 {
     const DAQ_ModuleAPI_t *dm;
     struct stat fs;
@@ -280,23 +278,22 @@ static int daq_load_module(const char *filename)
     return DAQ_SUCCESS;
 }
 
-#ifdef STATIC_MODULE_LIST
-static void load_static_modules(void)
+DAQ_LINKAGE int daq_load_static_modules(const DAQ_ModuleAPI_t **modules)
 {
-    const DAQ_ModuleAPI_t *dm;
-    int i;
+    const DAQ_ModuleAPI_t *dm, **dmptr;
+    int i = 0;
 
-    DEBUG("Static modules: %d\n", num_static_modules);
-    for (i = 0; i < num_static_modules; i++)
+    for (dmptr = modules; dmptr && (dm = *dmptr) != NULL; dmptr++)
     {
-        dm = static_modules[i];
         if (register_module(dm, NULL) != DAQ_SUCCESS)
             fprintf(stderr, "%s (%d): Failed to register static DAQ module.\n", dm->name, i);
+        i++;
     }
+    DEBUG("Static modules: %d\n", i);
+    return i;
 }
-#endif
 
-DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
+DAQ_LINKAGE int daq_load_dynamic_modules(const char *directory_list[])
 {
     static const char *extension = MODULE_EXT;
 #ifndef WIN32
@@ -305,10 +302,6 @@ DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
     struct dirent *de;
     char *p;
     int ret;
-
-#ifdef STATIC_MODULE_LIST
-    load_static_modules();
-#endif
 
     for (; directory_list && *directory_list; directory_list++)
     {
@@ -322,16 +315,14 @@ DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
 
         DEBUG("Loading modules in: %s\n", *directory_list);
 
-        while((de = readdir(dirp)) != NULL)
+        while ((de = readdir(dirp)) != NULL)
         {
-            if (de->d_name == NULL)
-                continue;
             p = strrchr(de->d_name, '.');
             if (!p || strcmp(p, extension))
                 continue;
             snprintf(dirpath, sizeof(dirpath), "%s/%s", *directory_list, de->d_name);
 
-            ret = daq_load_module(dirpath);
+            ret = daq_load_dynamic_module(dirpath);
             if (ret == DAQ_SUCCESS)
             {
                 DEBUG("Found module %s\n", de->d_name);
@@ -357,10 +348,6 @@ DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
     int pathLen = 0;
     const char *directory;
     int useDrive = 0;
-
-#ifdef STATIC_MODULE_LIST
-    load_static_modules();
-#endif
 
     for (; directory_list && *directory_list; directory_list++)
     {
@@ -405,7 +392,7 @@ DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
             else
                 _makepath(dyn_lib_name, NULL, directory, FindFileData.cFileName, NULL);
 
-            daq_load_module(dyn_lib_name);
+            daq_load_dynamic_module(dyn_lib_name);
 
             if (!FindNextFile(fSearch, &FindFileData))
             {
