@@ -8,13 +8,25 @@
 
 static char stdout_mock_buffer[4096];
 static int stdout_mock_buffer_pos = 0;
+static bool capture_stdout = false;
 static char stderr_mock_buffer[4096];
 static int stderr_mock_buffer_pos = 0;
+static bool capture_stderr = false;
+
+static bool debug_capture;
 
 int __wrap_printf(const char *format, ...) CMOCKA_PRINTF_ATTRIBUTE(1, 2);
 int __wrap___printf_chk(int flag, const char *format, ...) CMOCKA_PRINTF_ATTRIBUTE(2, 3);
 int __wrap_fprintf(FILE* const file, const char *format, ...) CMOCKA_PRINTF_ATTRIBUTE(2, 3);
 int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...) CMOCKA_PRINTF_ATTRIBUTE(3, 4);
+
+/* Function declaration to make the compiler happy. */
+int __real_printf(const char *fmt, ...) __attribute__ ((weak)) CMOCKA_PRINTF_ATTRIBUTE(1, 2);
+
+void mock_stdio_set_debug_capture(bool debug)
+{
+    debug_capture = debug;
+}
 
 const char *mock_stdio_get_stdout(void)
 {
@@ -25,6 +37,12 @@ void mock_stdio_reset_stdout(void)
 {
     stdout_mock_buffer[0] = '\0';
     stdout_mock_buffer_pos = 0;
+}
+
+void mock_stdio_set_capture_stdout(bool capture)
+{
+    mock_stdio_reset_stdout();
+    capture_stdout = capture;
 }
 
 const char *mock_stdio_get_stderr(void)
@@ -38,6 +56,12 @@ void mock_stdio_reset_stderr(void)
     stderr_mock_buffer_pos = 0;
 }
 
+void mock_stdio_set_capture_stderr(bool capture)
+{
+    mock_stdio_reset_stderr();
+    capture_stderr = capture;
+}
+
 /* A mock printf function that captures standard output. */
 int __wrap_printf(const char *format, ...)
 {
@@ -45,11 +69,21 @@ int __wrap_printf(const char *format, ...)
     int ret;
 
     va_start(args, format);
-    ret = vsnprintf(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
-    if (ret >= (int) sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos)
-        stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
-    else if (ret > 0)
-        stdout_mock_buffer_pos += ret;
+    if (capture_stdout)
+    {
+        ret = vsnprintf(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
+        if (ret >= (int) sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos)
+            stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
+        else if (ret > 0)
+            stdout_mock_buffer_pos += ret;
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+        }
+    }
+    else
+        ret = vprintf(format, args);
     va_end(args);
     return ret;
 }
@@ -61,12 +95,22 @@ int __wrap___printf_chk(int flag, const char *format, ...)
     int ret;
 
     va_start(args, format);
-    ret = __vsnprintf_chk(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos,
-            flag, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
-    if (ret >= (int) sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos)
-        stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
-    else if (ret > 0)
-        stdout_mock_buffer_pos += ret;
+    if (capture_stdout)
+    {
+        ret = __vsnprintf_chk(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos,
+                flag, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
+        if (ret >= (int) sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos)
+            stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
+        else if (ret > 0)
+            stdout_mock_buffer_pos += ret;
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+        }
+    }
+    else
+        ret = __vprintf_chk(flag, format, args);
     va_end(args);
     return ret;
 }
@@ -79,29 +123,31 @@ int __wrap_fprintf(FILE* const file, const char *format, ...)
     int ret;
 
     va_start(args, format);
-    if (file == stdout)
+    if (file == stdout && capture_stdout)
     {
         ret = vsnprintf(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
         if (ret >= (int) sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos)
             stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
         else if (ret > 0)
             stdout_mock_buffer_pos += ret;
-/*
-        __real_fprintf(stdout, "%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
-*/
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+        }
     }
-    else if (file == stderr)
+    else if (file == stderr && capture_stderr)
     {
         ret = vsnprintf(stderr_mock_buffer + stderr_mock_buffer_pos, sizeof(stderr_mock_buffer) - stderr_mock_buffer_pos, format, args);
         if (ret >= (int) sizeof(stderr_mock_buffer) - stderr_mock_buffer_pos)
             stderr_mock_buffer_pos = sizeof(stderr_mock_buffer);
         else if (ret > 0)
             stderr_mock_buffer_pos += ret;
-/*
-        __real_fprintf(stdout, "%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
-                __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
-*/
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
+        }
     }
     else
         ret = vfprintf(file, format, args);
@@ -116,7 +162,7 @@ int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...)
     int ret;
 
     va_start(args, format);
-    if (file == stdout)
+    if (file == stdout && capture_stdout)
     {
         ret = __vsnprintf_chk(stdout_mock_buffer + stdout_mock_buffer_pos, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos,
                 flag, sizeof(stdout_mock_buffer) - stdout_mock_buffer_pos, format, args);
@@ -124,12 +170,13 @@ int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...)
             stdout_mock_buffer_pos = sizeof(stdout_mock_buffer);
         else if (ret > 0)
             stdout_mock_buffer_pos += ret;
-/*
-        __real_fprintf(stdout, "%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
-*/
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+        }
     }
-    else if (file == stderr)
+    else if (file == stderr && capture_stderr)
     {
         ret = __vsnprintf_chk(stderr_mock_buffer + stderr_mock_buffer_pos, sizeof(stderr_mock_buffer) - stderr_mock_buffer_pos,
                 flag, sizeof(stderr_mock_buffer) - stderr_mock_buffer_pos, format, args);
@@ -137,10 +184,11 @@ int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...)
             stderr_mock_buffer_pos = sizeof(stderr_mock_buffer);
         else if (ret > 0)
             stderr_mock_buffer_pos += ret;
-/*
-        __real_fprintf(stdout, "%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
-                __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
-*/
+        if (debug_capture)
+        {
+            __real_printf("%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
+                    __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
+        }
     }
     else
         ret = __vfprintf_chk(file, flag, format, args);
