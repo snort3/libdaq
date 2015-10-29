@@ -15,6 +15,7 @@ api_base_test_LDFLAGS = \
 	-Wl,--wrap,readdir \
 	-Wl,--wrap,closedir \
 	-Wl,--wrap,stat \
+	-Wl,--wrap,__xstat \
 	-Wl,--wrap,dlopen \
 	-Wl,--wrap,dlsym \
 	-Wl,--wrap,dlclose

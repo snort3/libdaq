@@ -28,6 +28,8 @@ static void test_sfbpf_filters(void **state)
     {
         rval = sfbpf_compile(65535, DLT_EN10MB, &fcode, *filter_string, 1, 0);
         assert_int_equal(rval, 0);
+        rval = sfbpf_validate(fcode.bf_insns, fcode.bf_len);
+        assert_int_not_equal(rval, 0);
     }
 }
 

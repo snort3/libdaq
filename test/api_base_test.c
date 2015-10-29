@@ -403,12 +403,25 @@ int __wrap_closedir(DIR *dirp)
     return 0;
 }
 
+#ifdef __USE_EXTERN_INLINES
+
+int __wrap___xstat(int ver, const char *pathname, struct stat *buf)
+{
+    check_expected_ptr(pathname);
+    buf->st_mode = S_IFREG;
+    return mock();
+}
+
+#else
+
 int __wrap_stat(const char *pathname, struct stat *buf)
 {
     check_expected_ptr(pathname);
     buf->st_mode = S_IFREG;
     return mock();
 }
+
+#endif /* __USE_EXTERN_INLINES */
 
 void *__wrap_dlopen(const char *filename, int flags)
 {
@@ -485,8 +498,13 @@ static void test_daq_load_modules(void **state)
 
     expect_value(__wrap_readdir, dirp, 0xdeadbeef);
     will_return(__wrap_readdir, &deadbeef_dir_entry);
+#ifdef __USE_EXTERN_INLINES
+    expect_string(__wrap___xstat, pathname, MODULE_PATH "/" BAD_MODULE_NAME ".so");
+    will_return(__wrap___xstat, 0);
+#else
     expect_string(__wrap_stat, pathname, MODULE_PATH "/" BAD_MODULE_NAME ".so");
     will_return(__wrap_stat, 0);
+#endif
     expect_string(__wrap_dlopen, filename, MODULE_PATH "/" BAD_MODULE_NAME ".so");
     expect_value(__wrap_dlopen, flags, RTLD_NOW);
     will_return(__wrap_dlopen, 0xdeadbeef);
