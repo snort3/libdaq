@@ -59,6 +59,7 @@ sfbpf/sf_scanner.c
 sfbpf/sf_scanner.h
 sfbpf/tokdefs.h
 example/daqtest
+example/daqtest-static
 
 # Other things
 *.swp
