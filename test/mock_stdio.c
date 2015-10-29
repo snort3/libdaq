@@ -79,7 +79,7 @@ int __wrap_printf(const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+                    __func__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
         }
     }
     else
@@ -106,7 +106,7 @@ int __wrap___printf_chk(int flag, const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+                    __func__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
         }
     }
     else
@@ -133,7 +133,7 @@ int __wrap_fprintf(FILE* const file, const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+                    __func__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
         }
     }
     else if (file == stderr && capture_stderr)
@@ -146,7 +146,7 @@ int __wrap_fprintf(FILE* const file, const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
+                    __func__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
         }
     }
     else
@@ -173,7 +173,7 @@ int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stdout buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
+                    __func__, ret, stdout_mock_buffer_pos, stdout_mock_buffer);
         }
     }
     else if (file == stderr && capture_stderr)
@@ -187,7 +187,7 @@ int __wrap___fprintf_chk(FILE* const file, int flag, const char *format, ...)
         if (debug_capture)
         {
             __real_printf("%s: Update stderr buffer (ret = %d, pos = %d): '%s'\n",
-                    __FUNCTION__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
+                    __func__, ret, stderr_mock_buffer_pos, stderr_mock_buffer);
         }
     }
     else

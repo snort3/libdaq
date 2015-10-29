@@ -87,7 +87,7 @@ static int ipfw_daq_get_setup (IpfwImpl *impl, const DAQ_Config_h config, char *
     {
         if (!varValue || !*varValue)
         {
-            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __FUNCTION__, varKey);
+            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __func__, varKey);
             return DAQ_ERROR;
         }
         else if (!strcmp(varKey, "port"))
@@ -97,13 +97,13 @@ static int ipfw_daq_get_setup (IpfwImpl *impl, const DAQ_Config_h config, char *
 
             if (*endptr != '\0' || impl->port <= 0 || impl->port > 65535)
             {
-                snprintf(errBuf, errMax, "%s: bad port (%s)\n", __FUNCTION__, varValue);
+                snprintf(errBuf, errMax, "%s: bad port (%s)\n", __func__, varValue);
                 return DAQ_ERROR;
             }
         }
         else
         {
-            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __FUNCTION__, varKey, varValue);
+            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __func__, varKey, varValue);
                 return DAQ_ERROR;
         }
         daq_config_next_variable(config, &varKey, &varValue);
@@ -129,7 +129,7 @@ static int ipfw_daq_initialize(const DAQ_Config_h config, void **handle, char* e
 
     if (!impl)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw context!", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw context!", __func__);
         return DAQ_ERROR_NOMEM;
     }
 
@@ -142,7 +142,7 @@ static int ipfw_daq_initialize(const DAQ_Config_h config, void **handle, char* e
 
     if (!impl->buf)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw buffer!", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipfw buffer!", __func__);
         ipfw_daq_shutdown(impl);
         return DAQ_ERROR_NOMEM;
     }
@@ -202,14 +202,14 @@ static int ipfw_daq_start (void* handle)
     if ( (impl->sock = socket(impl->proto, SOCK_RAW, IPPROTO_DIVERT)) == -1 )
     {
         DPE(impl->error, "%s: can't create divert socket (%s)\n",
-            __FUNCTION__, strerror(errno));
+            __func__, strerror(errno));
         return DAQ_ERROR;
     }
 
     if ( bind(impl->sock, (struct sockaddr *)&impl->sin, sizeof(impl->sin)) == -1 )
     {
         DPE(impl->error, "%s: can't bind divert socket (%s)\n",
-            __FUNCTION__, strerror(errno));
+            __func__, strerror(errno));
         return DAQ_ERROR;
     }
 
@@ -239,7 +239,7 @@ static int ipfw_daq_forward (
     if ( status == -1 )
     {
         DPE(impl->error, "%s: can't sendto divert socket (%s)\n",
-            __FUNCTION__, strerror(errno));
+            __func__, strerror(errno));
         return DAQ_ERROR;
     }
     return DAQ_SUCCESS;
@@ -307,7 +307,7 @@ static int ipfw_daq_acquire (
             if ( errno == EINTR )
                 break;
             DPE(impl->error, "%s: can't select divert socket (%s)\n",
-                __FUNCTION__, strerror(errno));
+                __func__, strerror(errno));
             return DAQ_ERROR;
         }
 
@@ -325,7 +325,7 @@ static int ipfw_daq_acquire (
                 if (errno != EINTR)
                 {
                     DPE(impl->error, "%s: can't readfrom divert socket (%s)\n",
-                        __FUNCTION__, strerror(errno));
+                        __func__, strerror(errno));
                     return DAQ_ERROR;
                 }
             }

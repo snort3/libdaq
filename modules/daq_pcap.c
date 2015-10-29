@@ -140,7 +140,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     context = calloc(1, sizeof(Pcap_Context_t));
     if (!context)
     {
-        snprintf(errbuf, len, "%s: Couldn't allocate memory for the new PCAP context!", __FUNCTION__);
+        snprintf(errbuf, len, "%s: Couldn't allocate memory for the new PCAP context!", __func__);
         return DAQ_ERROR_NOMEM;
     }
 
@@ -165,7 +165,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         context->fp = fopen(daq_base_api.module_config_get_input(config), "rb");
         if (!context->fp)
         {
-            snprintf(errbuf, len, "%s: Couldn't open file '%s' for reading: %s", __FUNCTION__,
+            snprintf(errbuf, len, "%s: Couldn't open file '%s' for reading: %s", __func__,
                     daq_base_api.module_config_get_input(config), strerror(errno));
             free(context);
             return DAQ_ERROR_NOMEM;
@@ -176,7 +176,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         context->device = strdup(daq_base_api.module_config_get_input(config));
         if (!context->device)
         {
-            snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
+            snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __func__);
             free(context);
             return DAQ_ERROR_NOMEM;
         }
@@ -195,14 +195,14 @@ static int pcap_daq_install_filter(Pcap_Context_t *context, const char *filter)
 
     if (pcap_compile(context->handle, &fcode, (char *)filter, 1, context->netmask) < 0)
     {
-        DPE(context->errbuf, "%s: pcap_compile: %s", __FUNCTION__, pcap_geterr(context->handle));
+        DPE(context->errbuf, "%s: pcap_compile: %s", __func__, pcap_geterr(context->handle));
         return DAQ_ERROR;
     }
 
     if (pcap_setfilter(context->handle, &fcode) < 0)
     {
         pcap_freecode(&fcode);
-        DPE(context->errbuf, "%s: pcap_setfilter: %s", __FUNCTION__, pcap_geterr(context->handle));
+        DPE(context->errbuf, "%s: pcap_setfilter: %s", __func__, pcap_geterr(context->handle));
         return DAQ_ERROR;
     }
 
@@ -229,12 +229,12 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
         dead_handle = pcap_open_dead(DLT_EN10MB, context->snaplen);
         if (!dead_handle)
         {
-            DPE(context->errbuf, "%s: Could not allocate a dead PCAP handle!", __FUNCTION__);
+            DPE(context->errbuf, "%s: Could not allocate a dead PCAP handle!", __func__);
             return DAQ_ERROR_NOMEM;
         }
         if (pcap_compile(dead_handle, &fcode, (char *)filter, 1, context->netmask) < 0)
         {
-            DPE(context->errbuf, "%s: pcap_compile: %s", __FUNCTION__, pcap_geterr(dead_handle));
+            DPE(context->errbuf, "%s: pcap_compile: %s", __func__, pcap_geterr(dead_handle));
             return DAQ_ERROR;
         }
         pcap_freecode(&fcode);
@@ -246,7 +246,7 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
         context->filter_string = strdup(filter);
         if (!context->filter_string)
         {
-            DPE(context->errbuf, "%s: Could not allocate space to store a copy of the filter string!", __FUNCTION__);
+            DPE(context->errbuf, "%s: Could not allocate space to store a copy of the filter string!", __func__);
             return DAQ_ERROR_NOMEM;
         }
     }

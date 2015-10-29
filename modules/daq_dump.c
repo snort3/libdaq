@@ -80,14 +80,14 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     subconfig = daq_base_api.module_config_get_next(config);
     if (!subconfig)
     {
-        snprintf(errBuf, errMax, "%s: No submodule configuration provided", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: No submodule configuration provided", __func__);
         return DAQ_ERROR_INVAL;
     }
 
     dc = calloc(1, sizeof(DumpContext));
     if (!dc)
     {
-        snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the DAQ context", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the DAQ context", __func__);
         return DAQ_ERROR_NOMEM;
     }
 
@@ -99,7 +99,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
             dc->output_filename = strdup(varValue);
             if (!dc->output_filename)
             {
-                snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the output filename", __FUNCTION__);
+                snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the output filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }

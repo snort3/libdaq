@@ -99,7 +99,7 @@ static int ipq_daq_get_setup(IpqImpl *impl, const DAQ_Config_h config, char *err
     {
         if (!varValue || *varValue == '\0')
         {
-            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __FUNCTION__, varKey);
+            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __func__, varKey);
             return DAQ_ERROR;
         }
         else if (!strcmp(varKey, "proto"))
@@ -107,7 +107,7 @@ static int ipq_daq_get_setup(IpqImpl *impl, const DAQ_Config_h config, char *err
             impl->proto = ipq_daq_get_proto(varValue);
             if (!impl->proto)
             {
-                snprintf(errBuf, errMax, "%s: bad proto (%s)\n", __FUNCTION__, varValue);
+                snprintf(errBuf, errMax, "%s: bad proto (%s)\n", __func__, varValue);
                 return DAQ_ERROR;
             }
         }
@@ -116,13 +116,13 @@ static int ipq_daq_get_setup(IpqImpl *impl, const DAQ_Config_h config, char *err
             impl->device = strdup(varValue);
             if (!impl->device)
             {
-                snprintf(errBuf, errMax, "%s: can't allocate memory for device (%s)\n", __FUNCTION__, varValue);
+                snprintf(errBuf, errMax, "%s: can't allocate memory for device (%s)\n", __func__, varValue);
                 return DAQ_ERROR;
             }
         }
         else
         {
-            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __FUNCTION__, varKey, varValue);
+            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n", __func__, varKey, varValue);
                 return DAQ_ERROR;
         }
         daq_config_next_variable(config, &varKey, &varValue);
@@ -152,7 +152,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
 
     if (!impl)
     {
-        snprintf(errBuf, errMax, "%s: failed to allocate the ipq context!", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: failed to allocate the ipq context!", __func__);
         return DAQ_ERROR_NOMEM;
     }
 
@@ -167,7 +167,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
     if ( !impl->buf )
     {
         snprintf(errBuf, errMax, "%s: failed to allocate the ipq buffer!",
-            __FUNCTION__);
+            __func__);
         ipq_daq_shutdown(impl);
         return DAQ_ERROR_NOMEM;
     }
@@ -179,7 +179,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
     if ( !impl->ipqh )
     {
         snprintf(errBuf, errMax, "%s: ipq_create_handle error %s\n",
-            __FUNCTION__, ipq_errstr());
+            __func__, ipq_errstr());
         ipq_daq_shutdown(impl);
         return DAQ_ERROR;
     }
@@ -191,7 +191,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
     if ( status < 0 )
     {
         snprintf(errBuf, errMax, "%s: ipq_set_mode error %s\n",
-            __FUNCTION__, ipq_errstr());
+            __func__, ipq_errstr());
         ipq_daq_shutdown(impl);
         return DAQ_ERROR;
     }
@@ -202,7 +202,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
         if ( !impl->link )
         {
             snprintf(errBuf, errMax, "%s: can't open %s!\n",
-                __FUNCTION__, impl->device);
+                __func__, impl->device);
             ipq_daq_shutdown(impl);
             return DAQ_ERROR;
         }
@@ -213,7 +213,7 @@ static int ipq_daq_initialize(const DAQ_Config_h config, void **handle, char *er
 
         if ( !impl->net )
         {
-            snprintf(errBuf, errMax, "%s: can't open ip!\n", __FUNCTION__);
+            snprintf(errBuf, errMax, "%s: can't open ip!\n", __func__);
             ipq_daq_shutdown(impl);
             return DAQ_ERROR;
         }
@@ -303,7 +303,7 @@ static int ipq_daq_acquire (
             if ( status < 0 )
             {
                 DPE(impl->error, "%s: ipq_read=%d error %s",
-                    __FUNCTION__, status, ipq_errstr());
+                    __func__, status, ipq_errstr());
                 return DAQ_ERROR;
             }
             return 0;
@@ -363,7 +363,7 @@ static int ipq_daq_acquire (
             if ( status < 0 )
             {
                 DPE(impl->error, "%s: ipq_set_verdict=%d error %s",
-                    __FUNCTION__, status, ipq_errstr());
+                    __func__, status, ipq_errstr());
                 return DAQ_ERROR;
             }
             n++;
@@ -373,7 +373,7 @@ static int ipq_daq_acquire (
             // NLMSG_ERROR is supposed to be the only other valid type
             status = ipq_get_msgerr(impl->buf);
             DPE(impl->error, "%s: ipq_message_type=%d error=%d %s",
-                __FUNCTION__, ipqt, status, ipq_errstr());
+                __func__, ipqt, status, ipq_errstr());
             // ipq_message_type=2 error=1 Timeout
             // keep looping upon timeout or other errors
         }
@@ -399,7 +399,7 @@ static int ipq_daq_inject (
     if ( (uint32_t)sent != len )
     {
         DPE(impl->error, "%s: failed to send",
-            __FUNCTION__);
+            __func__);
         return DAQ_ERROR;
     }
     impl->stats.packets_injected++;
@@ -417,7 +417,7 @@ static int ipq_daq_set_filter (void* handle, const char* filter)
     if (sfbpf_compile(impl->snaplen, dlt, &fcode, filter, 1, 0) < 0)
     {
         DPE(impl->error, "%s: failed to compile '%s'",
-            __FUNCTION__, filter);
+            __func__, filter);
         return DAQ_ERROR;
     }
 
