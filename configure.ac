@@ -35,12 +35,12 @@ AC_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if g
 if test "$enable_ipv6" != "no"; then
     AC_CHECK_FUNC(getaddrinfo,
         [
-        AC_DEFINE(INET6,1,[System IPv6 support])
+            AC_DEFINE(INET6,1,[System IPv6 support])
         ],
         [
-        if test "$enable_ipv6" != "ifavailable"; then
-            AC_MSG_FAILURE([--enable-ipv6 was given, but getaddrinfo is not available])
-        fi
+            if test "$enable_ipv6" != "ifavailable"; then
+                AC_MSG_FAILURE([--enable-ipv6 was given, but getaddrinfo is not available])
+            fi
         ])
 fi
 
@@ -57,7 +57,7 @@ if test "$V_LEX" = lex ; then
         fi)
     if test $sf_cv_capable_lex = insufficient ; then
         AC_MSG_ERROR(
-        [Your operating system's lex is insufficient to compile
+        [The lex on your operating system is insufficient to compile
          libsfbpf. You should install both bison and flex.
          flex is a lex replacement that has many advantages,
          including being able to compile libsfbpf.  For more
@@ -77,11 +77,11 @@ AC_ARG_WITH(libpcap_libraries,
             [with_pcap_libraries="$withval"], [with_pcap_libraries="no"])
 
 if test "x$with_pcap_includes" != "xno"; then
-    CPPFLAGS="${CPPFLAGS} -I${with_pcap_includes}"
+    PCAP_CPPFLAGS="-I${with_pcap_includes}"
 fi
 
 if test "x$with_pcap_libraries" != "xno"; then
-    LDFLAGS="${LDFLAGS} -L${with_pcap_libraries}"
+    PCAP_LDFLAGS="-L${with_pcap_libraries}"
 fi
 
 AC_ARG_WITH(dnet_includes,
@@ -93,13 +93,13 @@ AC_ARG_WITH(dnet_libraries,
             [with_dnet_libraries="$withval"], [with_dnet_libraries="no"])
 
 if test "x$with_dnet_includes" != "xno"; then
-    CPPFLAGS="${CPPFLAGS} -I${with_dnet_includes}"
+    DNET_CPPFLAGS="-I${with_dnet_includes}"
 else
-    CPPFLAGS="${CPPFLAGS} `dnet-config --cflags 2>/dev/null`"
+    DNET_CPPFLAGS="`dnet-config --cflags 2>/dev/null`"
 fi
 
 if test "x$with_dnet_libraries" != "xno"; then
-    DNET_LDPATH="-L${with_dnet_libraries}"
+    DNET_LDFLAGS="-L${with_dnet_libraries}"
 else
     DNET_LDFLAGS="`dnet-config --libs 2>/dev/null`"
 fi
@@ -109,7 +109,7 @@ AC_ARG_WITH(netmap_includes,
             [with_netmap_includes="$withval"], [with_netmap_includes="no"])
 
 if test "x$with_netmap_includes" != "xno"; then
-    CPPFLAGS="${CPPFLAGS} -I${with_netmap_includes}"
+    NETMAP_CPPFLAGS="-I${with_netmap_includes}"
 fi
 
 DEFAULT_ENABLE=yes
@@ -143,17 +143,23 @@ AC_ARG_ENABLE(dump-module,
               AC_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
               [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
 if test "$enable_dump_module" = yes; then
+    save_CPPFLAGS="$CPPFLAGS"
+    save_LDFLAGS="$LDFLAGS"
+    CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
+    LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
     AC_CHECK_HEADER([pcap.h], [], [enable_dump_module=no])
     AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_dump_module="no"],[])
     if test "$enable_dump_module" = yes; then
         STATIC_LIBS="${STATIC_LIBS} -lpcap"
     fi
+    CPPFLAGS="$save_CPPFLAGS"
+    LDFLAGS="$save_LDFLAGS"
 fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
 # IPFW Module
 #AC_ARG_ENABLE(ipfw-module,
-#              AC_HELP_STRING([--disable-ipfw-module],[don't build the bundled IPFW module]),
+#              AC_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
 #              [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
 #if test "$enable_ipfw_module" = yes; then
 #    STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
@@ -162,7 +168,7 @@ AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
 # IPQ Module
 #AC_ARG_ENABLE(ipq-module,
-#              AC_HELP_STRING([--disable-ipq-module],[don't build the bundled IPQ module]),
+#              AC_HELP_STRING([--disable-ipq-module],[do not build the bundled IPQ module]),
 #              [enable_ipq_module="$enableval"], [enable_ipq_module="$DEFAULT_ENABLE"])
 #if test "$enable_ipq_module" = yes; then
 #    AC_CHECK_HEADERS([netinet/in.h libipq.h], [], [enable_ipq_module=no])
@@ -178,7 +184,7 @@ AM_CONDITIONAL([BUILD_IPQ_MODULE], [test "$enable_ipq_module" = yes])
 
 # NFQ Module
 #AC_ARG_ENABLE(nfq-module,
-#              AC_HELP_STRING([--disable-nfq-module],[don't build the bundled NFQ module]),
+#              AC_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
 #              [enable_nfq_module="$enableval"], [enable_nfq_module="$DEFAULT_ENABLE"])
 #if test "$enable_nfq_module" = yes; then
 #    AC_CHECK_HEADERS([netinet/in.h libnetfilter_queue/libnetfilter_queue.h], [], [enable_nfq_module=no])
@@ -194,20 +200,26 @@ AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
 
 # PCAP Module
 AC_ARG_ENABLE(pcap-module,
-              AC_HELP_STRING([--disable-pcap-module],[don't build the bundled PCAP module]),
+              AC_HELP_STRING([--disable-pcap-module],[do not build the bundled PCAP module]),
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
+    save_CPPFLAGS="$CPPFLAGS"
+    save_LDFLAGS="$LDFLAGS"
+    CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
+    LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
     AC_CHECK_HEADER([pcap.h], [], [enable_pcap_module=no])
     AC_CHECK_PCAP_VER("1.0.0")
     if test "$enable_pcap_module" = yes; then
         STATIC_LIBS="${STATIC_LIBS} -lpcap"
     fi
+    CPPFLAGS="$save_CPPFLAGS"
+    LDFLAGS="$save_LDFLAGS"
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 
 # netmap Module
 #AC_ARG_ENABLE(netmap-module,
-#              AC_HELP_STRING([--disable-netmap-module],[don't build the bundled netmap module]),
+#              AC_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
 #              [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
 #if test "$enable_netmap_module" = yes; then
 #    AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
@@ -239,7 +251,7 @@ if test "$enable_ipq_module" = yes -o "$enable_nfq_module" = yes ; then
         exit
     fi
 
-    DNET_FOO="${DNET_LDPATH} ${DNET_LDFLAGS}"
+    DNET_FOO="${DNET_LDFLAGS}"
 
     AC_CHECK_LIB(dnet, eth_set, ,[DNET="no"], [${DNET_FOO}])
     AC_CHECK_LIB(dumbnet, eth_set, ,[DUMBNET="no"], [${DNET_FOO}])
@@ -303,6 +315,8 @@ AC_SUBST(XCCFLAGS)
 AC_SUBST(LIBDL)
 AC_SUBST(AM_CFLAGS)
 AC_SUBST(CFLAGS)
+AC_SUBST(PCAP_CPPFLAGS)
+AC_SUBST(PCAP_LDFLAGS)
 
 if test "${CODE_COVERAGE_ENABLED}" = yes ; then
     CFLAGS=`echo $CFLAGS | ${SED} 's/-O\w//g'`

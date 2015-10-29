@@ -6,7 +6,8 @@ lib_LTLIBRARIES = libdaq_static_modules.la
 libdaq_static_modules_la_SOURCES = \
 daq_static_modules.c \
 daq_static_modules.h
-libdaq_static_modules_la_CFLAGS =
+libdaq_static_modules_la_CFLAGS = $(AM_CFLAGS)
+libdaq_static_modules_la_CPPFLAGS = $(AM_CPPFLAGS)
 libdaq_static_modules_la_LDFLAGS = -static -avoid-version
 libdaq_static_modules_la_LIBADD =
 
@@ -26,24 +27,28 @@ if BUILD_PCAP_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += daq_pcap.la
     daq_pcap_la_SOURCES = daq_pcap.c
+    daq_pcap_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
     daq_pcap_la_CFLAGS = $(AM_CFLAGS) -DBUILDING_SO
-    daq_pcap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @XCCFLAGS@
+    daq_pcap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @XCCFLAGS@ $(PCAP_LDFLAGS)
     daq_pcap_la_LIBADD = -lpcap
 endif
     libdaq_static_modules_la_SOURCES += daq_pcap.c
     libdaq_static_modules_la_CFLAGS += -DBUILD_PCAP_MODULE
+    libdaq_static_modules_la_CPPFLAGS += $(PCAP_CPPFLAGS)
 endif
 
 if BUILD_DUMP_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += daq_dump.la
     daq_dump_la_SOURCES = daq_dump.c
+    daq_dump_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
     daq_dump_la_CFLAGS = $(AM_CFLAGS) -DBUILDING_SO
-    daq_dump_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @XCCFLAGS@
+    daq_dump_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @XCCFLAGS@ $(PCAP_LDFLAGS)
     daq_dump_la_LIBADD = -lpcap
 endif
     libdaq_static_modules_la_SOURCES += daq_dump.c
     libdaq_static_modules_la_CFLAGS += -DBUILD_DUMP_MODULE
+    libdaq_static_modules_la_CPPFLAGS += $(PCAP_CPPFLAGS)
 endif
 
 if BUILD_IPFW_MODULE
