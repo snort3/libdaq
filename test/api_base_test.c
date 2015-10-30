@@ -3,6 +3,7 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include <cmocka.h>
@@ -10,6 +11,8 @@
 #include "daq.h"
 #include "daq_api.h"
 #include "mock_stdio.h"
+
+#include "daq_test_module.h"
 
 #define TEST1_MODULE_NAME       "Test"
 #define TEST1_MODULE_VERSION    1
@@ -23,302 +26,6 @@
 #define TEST4_MODULE_API_SIZE   (sizeof(DAQ_ModuleAPI_t) - 1)
 #define TEST5_MODULE_NAME       "MissingFunctionsTest"
 #define TEST5_MODULE_VERSION    1
-#define TEST_MODULE_TYPE        (DAQ_TYPE_FILE_CAPABLE|DAQ_TYPE_INTF_CAPABLE|DAQ_TYPE_INLINE_CAPABLE|DAQ_TYPE_MULTI_INSTANCE|DAQ_TYPE_NO_UNPRIV|DAQ_TYPE_WRAPPER)
-
-static int daq_test_prepare(const DAQ_BaseAPI_t *base_api)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t len)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_start(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_breakloop(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_stop(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-void daq_test_shutdown(void *handle)
-{
-}
-
-DAQ_State daq_test_check_status(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_get_stats(void *handle, DAQ_Stats_t *stats)
-{
-    return DAQ_SUCCESS;
-}
-
-void daq_test_reset_stats(void *handle)
-{
-}
-
-static int daq_test_get_snaplen(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-uint32_t daq_test_get_capabilities(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_get_datalink_type(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-const char *daq_test_get_errbuf(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
-void daq_test_set_errbuf(void *handle, const char *string)
-{
-}
-
-static int daq_test_get_device_index(void *handle, const char *device)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
-{
-    return DAQ_SUCCESS;
-}
-
-DAQ_PktHdr_t *daq_test_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    return NULL;
-}
-
-const uint8_t *daq_test_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    return NULL;
-}
-
-
-static DAQ_ModuleAPI_t test1_module =
-{
-    /* .api_version = */ DAQ_MODULE_API_VERSION,
-    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
-    /* .module_version = */ TEST1_MODULE_VERSION,
-    /* .name = */ TEST1_MODULE_NAME,
-    /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ daq_test_prepare,
-    /* .get_variable_descs = */ NULL,
-    /* .initialize = */ daq_test_initialize,
-    /* .set_filter = */ NULL,
-    /* .start = */ daq_test_start,
-    /* .inject = */ daq_test_inject,
-    /* .breakloop = */ daq_test_breakloop,
-    /* .stop = */ daq_test_stop,
-    /* .shutdown = */ daq_test_shutdown,
-    /* .check_status = */ daq_test_check_status,
-    /* .get_stats = */ daq_test_get_stats,
-    /* .reset_stats = */ daq_test_reset_stats,
-    /* .get_snaplen = */ daq_test_get_snaplen,
-    /* .get_capabilities = */ daq_test_get_capabilities,
-    /* .get_datalink_type = */ daq_test_get_datalink_type,
-    /* .get_errbuf = */ daq_test_get_errbuf,
-    /* .set_errbuf = */ daq_test_set_errbuf,
-    /* .get_device_index = */ daq_test_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL,
-    /* .query_flow = */ NULL,
-    /* .msg_receive = */ daq_test_msg_receive,
-    /* .msg_finalize = */ daq_test_msg_finalize,
-    /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
-    /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
-};
-
-static DAQ_ModuleAPI_t test2_module =
-{
-    /* .api_version = */ DAQ_MODULE_API_VERSION,
-    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
-    /* .module_version = */ TEST2_MODULE_VERSION,
-    /* .name = */ TEST2_MODULE_NAME,
-    /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ daq_test_prepare,
-    /* .get_variable_descs = */ NULL,
-    /* .initialize = */ daq_test_initialize,
-    /* .set_filter = */ NULL,
-    /* .start = */ daq_test_start,
-    /* .inject = */ daq_test_inject,
-    /* .breakloop = */ daq_test_breakloop,
-    /* .stop = */ daq_test_stop,
-    /* .shutdown = */ daq_test_shutdown,
-    /* .check_status = */ daq_test_check_status,
-    /* .get_stats = */ daq_test_get_stats,
-    /* .reset_stats = */ daq_test_reset_stats,
-    /* .get_snaplen = */ daq_test_get_snaplen,
-    /* .get_capabilities = */ daq_test_get_capabilities,
-    /* .get_datalink_type = */ daq_test_get_datalink_type,
-    /* .get_errbuf = */ daq_test_get_errbuf,
-    /* .set_errbuf = */ daq_test_set_errbuf,
-    /* .get_device_index = */ daq_test_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL,
-    /* .query_flow = */ NULL,
-    /* .msg_receive = */ daq_test_msg_receive,
-    /* .msg_finalize = */ daq_test_msg_finalize,
-    /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
-    /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
-};
-
-static DAQ_ModuleAPI_t test3_module =
-{
-    /* .api_version = */ TEST3_MODULE_API_VERSION,
-    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
-    /* .module_version = */ TEST3_MODULE_VERSION,
-    /* .name = */ TEST3_MODULE_NAME,
-    /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ daq_test_prepare,
-    /* .get_variable_descs = */ NULL,
-    /* .initialize = */ daq_test_initialize,
-    /* .set_filter = */ NULL,
-    /* .start = */ daq_test_start,
-    /* .inject = */ daq_test_inject,
-    /* .breakloop = */ daq_test_breakloop,
-    /* .stop = */ daq_test_stop,
-    /* .shutdown = */ daq_test_shutdown,
-    /* .check_status = */ daq_test_check_status,
-    /* .get_stats = */ daq_test_get_stats,
-    /* .reset_stats = */ daq_test_reset_stats,
-    /* .get_snaplen = */ daq_test_get_snaplen,
-    /* .get_capabilities = */ daq_test_get_capabilities,
-    /* .get_datalink_type = */ daq_test_get_datalink_type,
-    /* .get_errbuf = */ daq_test_get_errbuf,
-    /* .set_errbuf = */ daq_test_set_errbuf,
-    /* .get_device_index = */ daq_test_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL,
-    /* .query_flow = */ NULL,
-    /* .msg_receive = */ daq_test_msg_receive,
-    /* .msg_finalize = */ daq_test_msg_finalize,
-    /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
-    /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
-};
-
-static DAQ_ModuleAPI_t test4_module =
-{
-    /* .api_version = */ DAQ_MODULE_API_VERSION,
-    /* .api_size = */ TEST4_MODULE_API_SIZE,
-    /* .module_version = */ TEST4_MODULE_VERSION,
-    /* .name = */ TEST4_MODULE_NAME,
-    /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ daq_test_prepare,
-    /* .get_variable_descs = */ NULL,
-    /* .initialize = */ daq_test_initialize,
-    /* .set_filter = */ NULL,
-    /* .start = */ daq_test_start,
-    /* .inject = */ daq_test_inject,
-    /* .breakloop = */ daq_test_breakloop,
-    /* .stop = */ daq_test_stop,
-    /* .shutdown = */ daq_test_shutdown,
-    /* .check_status = */ daq_test_check_status,
-    /* .get_stats = */ daq_test_get_stats,
-    /* .reset_stats = */ daq_test_reset_stats,
-    /* .get_snaplen = */ daq_test_get_snaplen,
-    /* .get_capabilities = */ daq_test_get_capabilities,
-    /* .get_datalink_type = */ daq_test_get_datalink_type,
-    /* .get_errbuf = */ daq_test_get_errbuf,
-    /* .set_errbuf = */ daq_test_set_errbuf,
-    /* .get_device_index = */ daq_test_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL,
-    /* .query_flow = */ NULL,
-    /* .msg_receive = */ daq_test_msg_receive,
-    /* .msg_finalize = */ daq_test_msg_finalize,
-    /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
-    /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
-};
-
-static DAQ_ModuleAPI_t test5_module =
-{
-    /* .api_version = */ DAQ_MODULE_API_VERSION,
-    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
-    /* .module_version = */ TEST5_MODULE_VERSION,
-    /* .name = */ TEST5_MODULE_NAME,
-    /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ NULL,
-    /* .get_variable_descs = */ NULL,
-    /* .initialize = */ NULL,
-    /* .set_filter = */ NULL,
-    /* .start = */ NULL,
-    /* .inject = */ NULL,
-    /* .breakloop = */ NULL,
-    /* .stop = */ NULL,
-    /* .shutdown = */ NULL,
-    /* .check_status = */ NULL,
-    /* .get_stats = */ NULL,
-    /* .reset_stats = */ NULL,
-    /* .get_snaplen = */ NULL,
-    /* .get_capabilities = */ NULL,
-    /* .get_datalink_type = */ NULL,
-    /* .get_errbuf = */ NULL,
-    /* .set_errbuf = */ NULL,
-    /* .get_device_index = */ NULL,
-    /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL,
-    /* .query_flow = */ NULL,
-    /* .msg_receive = */ NULL,
-    /* .msg_finalize = */ NULL,
-    /* .packet_header_from_msg = */ NULL,
-    /* .packet_data_from_msg = */ NULL,
-};
-
-
-static const DAQ_ModuleAPI_t *static_modules[] =
-{
-    &test1_module,
-    &test2_module,
-    &test3_module,
-    &test4_module,
-    &test5_module,
-    NULL
-};
-static const int num_static_modules = sizeof(static_modules) / sizeof(static_modules[0]) - 1;
 
 static void test_verbosity(void **state)
 {
@@ -453,9 +160,9 @@ static struct dirent deadbeef_dir_entry =
 {
     .d_name = BAD_MODULE_NAME ".so"
 };
-static void test_daq_load_modules(void **state)
+
+static void test_non_existent_dynamic_path(void **state)
 {
-    DAQ_Module_h module;
     int rval;
 
     const char *bad_directory_list[] = {
@@ -463,6 +170,7 @@ static void test_daq_load_modules(void **state)
         "",
         NULL
     };
+
     mock_stdio_set_capture_stderr(true);
     expect_string(__wrap_opendir, name, MODULE_PATH);
     will_return(__wrap_opendir, NULL);
@@ -470,6 +178,56 @@ static void test_daq_load_modules(void **state)
     assert_int_equal(rval, DAQ_SUCCESS);
     assert_string_equal(mock_stdio_get_stderr(), BAD_MODULE_PATH_STRING);
     mock_stdio_set_capture_stderr(false);
+}
+
+static void test_daq_load_modules(void **state)
+{
+    DAQ_Module_h module;
+    int rval;
+
+    const char *bad_directory_list[] = {
+        MODULE_PATH,
+        NULL
+    };
+
+    DAQ_ModuleAPI_t test1_module, test2_module, test3_module, test4_module, test5_module;
+
+    const DAQ_ModuleAPI_t *static_modules[] =
+    {
+        &test1_module,
+        &test1_module,
+        &test2_module,
+        &test3_module,
+        &test4_module,
+        &test5_module,
+        NULL
+    };
+    const int num_static_modules = sizeof(static_modules) / sizeof(static_modules[0]) - 1;
+
+    memcpy(&test1_module, &test_module, sizeof(DAQ_ModuleAPI_t));
+    *(uint32_t *) &test1_module.module_version = TEST1_MODULE_VERSION;
+    test1_module.name = TEST1_MODULE_NAME;
+
+    memcpy(&test2_module, &test_module, sizeof(DAQ_ModuleAPI_t));
+    *(uint32_t *) &test2_module.module_version = TEST2_MODULE_VERSION;
+    test2_module.name = TEST2_MODULE_NAME;
+
+    memcpy(&test3_module, &test_module, sizeof(DAQ_ModuleAPI_t));
+    *(uint32_t *) &test3_module.api_version = TEST3_MODULE_API_VERSION;
+    *(uint32_t *) &test3_module.module_version = TEST3_MODULE_VERSION;
+    test3_module.name = TEST3_MODULE_NAME;
+
+    memcpy(&test4_module, &test_module, sizeof(DAQ_ModuleAPI_t));
+    *(uint32_t *) &test4_module.api_size = TEST4_MODULE_API_SIZE;
+    *(uint32_t *) &test4_module.module_version = TEST4_MODULE_VERSION;
+    test4_module.name = TEST4_MODULE_NAME;
+
+    memset(&test5_module, 0, sizeof(DAQ_ModuleAPI_t));
+    *(uint32_t *) &test5_module.api_version = DAQ_MODULE_API_VERSION;
+    *(uint32_t *) &test5_module.api_size = sizeof(DAQ_ModuleAPI_t);
+    *(uint32_t *) &test5_module.module_version = TEST5_MODULE_VERSION;
+    test5_module.name = TEST5_MODULE_NAME;
+    *(uint32_t *) &test5_module.type = TEST_MODULE_TYPE;
 
     rval = daq_load_static_modules(static_modules);
     assert_int_equal(rval, num_static_modules);
@@ -540,6 +298,7 @@ int main(void)
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_verbosity),
         cmocka_unit_test(test_string_translation),
+        cmocka_unit_test(test_non_existent_dynamic_path),
         cmocka_unit_test(test_daq_load_modules),
     };
 
