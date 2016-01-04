@@ -425,7 +425,7 @@ static int mmap_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
         return DAQ_ERROR;
     }
     instance->rx_ring.start = instance->buffer;
-    instance->tx_ring.start = (uint8_t *) instance->buffer + instance->tx_ring.size;
+    instance->tx_ring.start = (uint8_t *) instance->buffer + instance->rx_ring.size;
 
     return DAQ_SUCCESS;
 }
@@ -1024,14 +1024,33 @@ static int afpacket_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint
     if (!instance || (!reverse && !(instance = instance->peer)))
         return DAQ_ERROR;
 
-    entry = instance->tx_ring.cursor;
-    if (entry->hdr.h2->tp_status == TP_STATUS_AVAILABLE)
+    if (instance->tx_ring.entries)
     {
-        memcpy(entry->hdr.raw + TPACKET_ALIGN(instance->tp_hdrlen), packet_data, len);
-        entry->hdr.h2->tp_len = len;
-        entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
-        instance->tx_ring.cursor = entry->next;
-        if (send(instance->fd, NULL, 0, 0) < 0)
+        entry = instance->tx_ring.cursor;
+        if (entry->hdr.h2->tp_status == TP_STATUS_AVAILABLE)
+        {
+            memcpy(entry->hdr.raw + TPACKET_ALIGN(instance->tp_hdrlen), packet_data, len);
+            entry->hdr.h2->tp_len = len;
+            entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
+            instance->tx_ring.cursor = entry->next;
+            if (send(instance->fd, NULL, 0, 0) < 0)
+            {
+                DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
+                return DAQ_ERROR;
+            }
+            afpc->stats.packets_injected++;
+        }
+    }
+    else
+    {
+        const struct ethhdr *eth;
+        struct sockaddr_ll *sll;
+
+        eth = (const struct ethhdr *)packet_data;
+        sll = &instance->sll;
+        sll->sll_protocol = eth->h_proto;
+
+        if (sendto(instance->fd, packet_data, len, 0, (struct sockaddr *) sll, sizeof(*sll)) < 0)
         {
             DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
             return DAQ_ERROR;
