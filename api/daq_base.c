@@ -479,7 +479,7 @@ DAQ_LINKAGE void daq_free_module_list(DAQ_Module_Info_t *list, int size)
 {
     int idx;
 
-    if (!list || size <= 0)
+    if (!list || size < 0)
         return;
 
     for (idx = 0; idx < size; idx++)
@@ -515,7 +515,8 @@ DAQ_LINKAGE const char *daq_config_get_value(DAQ_Config_t *config, const char *k
 
 DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, const char *value)
 {
-    DAQ_Dict *entry;
+    DAQ_Dict *entry, *new_entry;
+    char *new_value;
 
     if (!config || !key)
         return;
@@ -528,34 +529,53 @@ DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, con
 
     if (!entry)
     {
-        entry = calloc(1, sizeof(struct _daq_dict_entry));
-        if (!entry)
+        new_entry = calloc(1, sizeof(struct _daq_dict_entry));
+        if (!new_entry)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry!\n",
                     __FUNCTION__, (unsigned long) sizeof(struct _daq_dict_entry));
             return;
         }
-        entry->key = strdup(key);
-        if (!entry->key)
+        new_entry->key = strdup(key);
+        if (!new_entry->key)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry key!\n",
                     __FUNCTION__, (unsigned long) (strlen(key) + 1));
+            free(new_entry);
             return;
         }
-        entry->next = config->values;
-        config->values = entry;
+        entry = new_entry;
     }
-    free(entry->value);
+    else
+        new_entry = NULL;
+
     if (value)
     {
-        entry->value = strdup(value);
-        if (!entry->value)
+        new_value = strdup(value);
+        if (!new_value)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry value!\n",
                     __FUNCTION__, (unsigned long) (strlen(value) + 1));
+            if (new_entry)
+                free(new_entry);
             return;
         }
+        if (entry->value)
+            free(entry->value);
+        entry->value = new_value;
     }
+    else if (entry->value)
+    {
+        free(entry->value);
+        entry->value = NULL;
+    }
+
+    if (new_entry)
+    {
+        new_entry->next = config->values;
+        config->values = new_entry;
+    }
+
     DEBUG("Set config dictionary entry '%s' => '%s'.\n", entry->key, entry->value);
 }
 
