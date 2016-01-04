@@ -137,14 +137,14 @@ static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *i
 
     if (bind(instance->fd, (struct sockaddr *) &sll, sizeof(sll)) == -1)
     {
-        DPE(afpc->errbuf, "%s: bind(%s): %s\n", __FUNCTION__, instance->name, strerror(errno));
+        DPE(afpc->errbuf, "%s: bind(%s): %s\n", __func__, instance->name, strerror(errno));
         return DAQ_ERROR;
     }
 
     /* Any pending errors, e.g., network is down? */
     if (getsockopt(instance->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) || err)
     {
-        DPE(afpc->errbuf, "%s: getsockopt: %s", __FUNCTION__, err ? strerror(err) : strerror(errno));
+        DPE(afpc->errbuf, "%s: getsockopt: %s", __func__, err ? strerror(err) : strerror(errno));
         return DAQ_ERROR;
     }
 
@@ -159,7 +159,7 @@ static int set_up_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFP
     ring->entries = calloc(ring->layout.tp_frame_nr, sizeof(AFPacketEntry));
     if (!ring->entries)
     {
-        DPE(afpc->errbuf, "%s: Could not allocate ring buffer entries for device %s!", __FUNCTION__, instance->name);
+        DPE(afpc->errbuf, "%s: Could not allocate ring buffer entries for device %s!", __func__, instance->name);
         return DAQ_ERROR_NOMEM;
     }
 
@@ -255,14 +255,14 @@ static AFPacketInstance *create_instance(const char *device, char *errbuf, size_
     instance = calloc(1, sizeof(AFPacketInstance));
     if (!instance)
     {
-        snprintf(errbuf, errlen, "%s: Could not allocate a new instance structure.", __FUNCTION__);
+        snprintf(errbuf, errlen, "%s: Could not allocate a new instance structure.", __func__);
         goto err;
     }
     instance->buffer = MAP_FAILED;
 
     if ((instance->name = strdup(device)) == NULL)
     {
-        snprintf(errbuf, errlen, "%s: Could not allocate a copy of the device name.", __FUNCTION__);
+        snprintf(errbuf, errlen, "%s: Could not allocate a copy of the device name.", __func__);
         goto err;;
     }
 
@@ -270,7 +270,7 @@ static AFPacketInstance *create_instance(const char *device, char *errbuf, size_
     instance->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (instance->fd == -1)
     {
-        snprintf(errbuf, errlen, "%s: Could not open the PF_PACKET socket: %s", __FUNCTION__, strerror(errno));
+        snprintf(errbuf, errlen, "%s: Could not open the PF_PACKET socket: %s", __func__, strerror(errno));
         goto err;
     }
 
@@ -279,7 +279,7 @@ static AFPacketInstance *create_instance(const char *device, char *errbuf, size_
     strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
     if (ioctl(instance->fd, SIOCGIFINDEX, &ifr) == -1)
     {
-        snprintf(errbuf, errlen, "%s: Could not find index for device %s", __FUNCTION__, instance->name);
+        snprintf(errbuf, errlen, "%s: Could not find index for device %s", __func__, instance->name);
         goto err;
     }
     instance->index = ifr.ifr_ifindex;
@@ -353,7 +353,7 @@ static int calculate_layout(AFPacket_Context_t *afpc, struct tpacket_req *layout
     if (frames_per_block == 0)
     {
         DPE(afpc->errbuf, "%s: Invalid frames per block (%u/%u) for %s",
-                __FUNCTION__, layout->tp_block_size, layout->tp_frame_size, afpc->device);
+                __func__, layout->tp_block_size, layout->tp_frame_size, afpc->device);
         return DAQ_ERROR;
     }
 
@@ -397,7 +397,7 @@ static int create_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFP
                 continue;
             }
             DPE(afpc->errbuf, "%s: Couldn't create kernel ring on packet socket: %s",
-                    __FUNCTION__, strerror(errno));
+                    __func__, strerror(errno));
             return DAQ_ERROR;
         }
         /* Store the total ring size for later. */
@@ -421,7 +421,7 @@ static int mmap_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     instance->buffer = mmap(0, ringsize, PROT_READ | PROT_WRITE, MAP_SHARED, instance->fd, 0);
     if (instance->buffer == MAP_FAILED)
     {
-        DPE(afpc->errbuf, "%s: Could not MMAP the ring: %s", __FUNCTION__, strerror(errno));
+        DPE(afpc->errbuf, "%s: Could not MMAP the ring: %s", __func__, strerror(errno));
         return DAQ_ERROR;
     }
     instance->rx_ring.start = instance->buffer;
@@ -438,7 +438,7 @@ static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance
     fanout_arg = ((afpc->fanout_cfg.fanout_type | afpc->fanout_cfg.fanout_flags)) << 16 | instance->index;
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_FANOUT, &fanout_arg, sizeof(fanout_arg)) == -1)
     {
-        DPE(afpc->errbuf, "%s: Could not configure packet fanout: %s", __FUNCTION__, strerror(errno));
+        DPE(afpc->errbuf, "%s: Could not configure packet fanout: %s", __func__, strerror(errno));
         return DAQ_ERROR;
     }
 
@@ -461,7 +461,7 @@ static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     mr.mr_type = PACKET_MR_PROMISC;
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1)
     {
-        DPE(afpc->errbuf, "%s: setsockopt: %s", __FUNCTION__, strerror(errno));
+        DPE(afpc->errbuf, "%s: setsockopt: %s", __func__, strerror(errno));
         return -1;
     }
 
@@ -470,14 +470,14 @@ static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     if (arptype < 0)
     {
         DPE(afpc->errbuf, "%s: failed to get interface type for device %s: (%d) %s",
-                __FUNCTION__, instance->name, errno, strerror(errno));
+                __func__, instance->name, errno, strerror(errno));
         return -1;
     }
 
     if (arptype != ARPHRD_ETHER)
     {
         DPE(afpc->errbuf, "%s: invalid interface type for device %s: %d != %d",
-                __FUNCTION__, instance->name, arptype, ARPHRD_ETHER);
+                __func__, instance->name, arptype, ARPHRD_ETHER);
         return -1;
     }
 
@@ -605,7 +605,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
     afpc = calloc(1, sizeof(AFPacket_Context_t));
     if (!afpc)
     {
-        snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the new AFPacket context!", __FUNCTION__);
+        snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the new AFPacket context!", __func__);
         rval = DAQ_ERROR_NOMEM;
         goto err;
     }
@@ -613,7 +613,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
     afpc->device = strdup(config->name);
     if (!afpc->device)
     {
-        snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __FUNCTION__);
+        snprintf(errbuf, errlen, "%s: Couldn't allocate memory for the device string!", __func__);
         rval = DAQ_ERROR_NOMEM;
         goto err;
     }
@@ -624,7 +624,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
     dev = afpc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') || (config->mode == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
-        snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
+        snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
         goto err;
     }
 
@@ -633,7 +633,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
         len = strcspn(dev, ":");
         if (len >= IFNAMSIZ)
         {
-            snprintf(errbuf, errlen, "%s: Interface name too long! (%zu)", __FUNCTION__, len);
+            snprintf(errbuf, errlen, "%s: Interface name too long! (%zu)", __func__, len);
             goto err;
         }
         if (len != 0)
@@ -641,7 +641,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
             afpc->intf_count++;
             if (afpc->intf_count >= AF_PACKET_MAX_INTERFACES)
             {
-                snprintf(errbuf, errlen, "%s: Using more than %d interfaces is not supported!", __FUNCTION__, AF_PACKET_MAX_INTERFACES);
+                snprintf(errbuf, errlen, "%s: Using more than %d interfaces is not supported!", __func__, AF_PACKET_MAX_INTERFACES);
                 goto err;
             }
             snprintf(intf, len + 1, "%s", dev);
@@ -661,7 +661,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
 
                     if (create_bridge(afpc, name1, name2) != DAQ_SUCCESS)
                     {
-                        snprintf(errbuf, errlen, "%s: Couldn't create the bridge between %s and %s!", __FUNCTION__, name1, name2);
+                        snprintf(errbuf, errlen, "%s: Couldn't create the bridge between %s and %s!", __func__, name1, name2);
                         goto err;
                     }
                     num_intfs = 0;
@@ -678,7 +678,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
     if (!afpc->instances || (config->mode != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
-        snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __FUNCTION__, afpc->device);
+        snprintf(errbuf, errlen, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
         goto err;
     }
 
@@ -697,7 +697,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
         {
             if (!entry->value)
             {
-                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __func__, entry->key);
                 goto err;
             }
             /* Using anything other than 'hash' is probably asking for trouble, but
@@ -718,7 +718,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
 #endif
             else
             {
-                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __func__, entry->key, entry->value);
                 goto err;
             }
             afpc->fanout_cfg.enabled = true;
@@ -727,7 +727,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
         {
             if (!entry->value)
             {
-                snprintf(errbuf, errlen, "%s: %s requires an argument!", __FUNCTION__, entry->key);
+                snprintf(errbuf, errlen, "%s: %s requires an argument!", __func__, entry->key);
                 goto err;
             }
             if (!strcmp(entry->value, "rollover"))
@@ -736,7 +736,7 @@ static int afpacket_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, 
                 afpc->fanout_cfg.fanout_flags |= PACKET_FANOUT_FLAG_DEFRAG;
             else
             {
-                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __FUNCTION__, entry->key, entry->value);
+                snprintf(errbuf, errlen, "%s: Unrecognized argument for %s: '%s'!", __func__, entry->key, entry->value);
                 goto err;
             }
         }
@@ -786,13 +786,13 @@ static int afpacket_daq_set_filter(void *handle, const char *filter)
     afpc->filter = strdup(filter);
     if (!afpc->filter)
     {
-        DPE(afpc->errbuf, "%s: Couldn't allocate memory for the filter string!", __FUNCTION__);
+        DPE(afpc->errbuf, "%s: Couldn't allocate memory for the filter string!", __func__);
         return DAQ_ERROR;
     }
 
     if (sfbpf_compile(afpc->snaplen, DLT_EN10MB, &fcode, afpc->filter, 1, 0) < 0)
     {
-        DPE(afpc->errbuf, "%s: BPF state machine compilation failed!", __FUNCTION__);
+        DPE(afpc->errbuf, "%s: BPF state machine compilation failed!", __func__);
         return DAQ_ERROR;
     }
 
@@ -872,13 +872,13 @@ static int afpacket_daq_acquire(void *handle, int cnt, DAQ_Analysis_Func_t callb
                         break;
 
                     default:
-                        DPE(afpc->errbuf, "%s: Unknown TPACKET version: %u!", __FUNCTION__, instance->tp_version);
+                        DPE(afpc->errbuf, "%s: Unknown TPACKET version: %u!", __func__, instance->tp_version);
                         return DAQ_ERROR;
                 }
                 if (tp_mac + tp_snaplen > instance->rx_ring.layout.tp_frame_size)
                 {
                     DPE(afpc->errbuf, "%s: Corrupted frame on kernel ring (MAC offset %u + CapLen %u > FrameSize %d)",
-                        __FUNCTION__, tp_mac, tp_snaplen, instance->rx_ring.layout.tp_frame_size);
+                        __func__, tp_mac, tp_snaplen, instance->rx_ring.layout.tp_frame_size);
                     return DAQ_ERROR;
                 }
                 data = instance->rx_ring.cursor->hdr.raw + tp_mac;
@@ -980,7 +980,7 @@ send_packet:
             /* If we were interrupted by a signal, start the loop over.  The user should call daq_breakloop to actually exit. */
             if (ret < 0 && errno != EINTR)
             {
-                DPE(afpc->errbuf, "%s: Poll failed: %s (%d)", __FUNCTION__, strerror(errno), errno);
+                DPE(afpc->errbuf, "%s: Poll failed: %s (%d)", __func__, strerror(errno), errno);
                 return DAQ_ERROR;
             }
             /* If the poll times out, return control to the caller. */
@@ -994,11 +994,11 @@ send_packet:
                     if (pfd[i].revents & (POLLHUP | POLLRDHUP | POLLERR | POLLNVAL))
                     {
                         if (pfd[i].revents & (POLLHUP | POLLRDHUP))
-                            DPE(afpc->errbuf, "%s: Hang-up on a packet socket", __FUNCTION__);
+                            DPE(afpc->errbuf, "%s: Hang-up on a packet socket", __func__);
                         else if (pfd[i].revents & POLLERR)
-                            DPE(afpc->errbuf, "%s: Encountered error condition on a packet socket", __FUNCTION__);
+                            DPE(afpc->errbuf, "%s: Encountered error condition on a packet socket", __func__);
                         else if (pfd[i].revents & POLLNVAL)
-                            DPE(afpc->errbuf, "%s: Invalid polling request on a packet socket", __FUNCTION__);
+                            DPE(afpc->errbuf, "%s: Invalid polling request on a packet socket", __func__);
                         return DAQ_ERROR;
                     }
                 }
@@ -1035,7 +1035,7 @@ static int afpacket_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint
             instance->tx_ring.cursor = entry->next;
             if (send(instance->fd, NULL, 0, 0) < 0)
             {
-                DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
+                DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __func__, strerror(errno), errno);
                 return DAQ_ERROR;
             }
             afpc->stats.packets_injected++;
@@ -1052,7 +1052,7 @@ static int afpacket_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint
 
         if (sendto(instance->fd, packet_data, len, 0, (struct sockaddr *) sll, sizeof(*sll)) < 0)
         {
-            DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __FUNCTION__, strerror(errno), errno);
+            DPE(afpc->errbuf, "%s: Error sending packet: %s (%d)", __func__, strerror(errno), errno);
             return DAQ_ERROR;
         }
         afpc->stats.packets_injected++;

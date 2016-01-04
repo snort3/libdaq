@@ -110,12 +110,12 @@ static int dump_daq_initialize (
     {
         snprintf(errBuf, errMax,
             "%s: Couldn't allocate memory for the DAQ context",
-            __FUNCTION__);
+            __func__);
         return DAQ_ERROR_NOMEM;
     }
     if ( !mod || !(mod->type & DAQ_TYPE_FILE_CAPABLE) )
     {
-        snprintf(errBuf, errMax, "%s: no file capable daq provided", __FUNCTION__);
+        snprintf(errBuf, errMax, "%s: no file capable daq provided", __func__);
         free(impl);
         return DAQ_ERROR;
     }

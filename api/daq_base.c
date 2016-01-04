@@ -533,14 +533,14 @@ DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, con
         if (!new_entry)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry!\n",
-                    __FUNCTION__, (unsigned long) sizeof(struct _daq_dict_entry));
+                    __func__, (unsigned long) sizeof(struct _daq_dict_entry));
             return;
         }
         new_entry->key = strdup(key);
         if (!new_entry->key)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry key!\n",
-                    __FUNCTION__, (unsigned long) (strlen(key) + 1));
+                    __func__, (unsigned long) (strlen(key) + 1));
             free(new_entry);
             return;
         }
@@ -555,7 +555,7 @@ DAQ_LINKAGE void daq_config_set_value(DAQ_Config_t *config, const char *key, con
         if (!new_value)
         {
             fprintf(stderr, "%s: Could not allocate %lu bytes for a dictionary entry value!\n",
-                    __FUNCTION__, (unsigned long) (strlen(value) + 1));
+                    __func__, (unsigned long) (strlen(value) + 1));
             if (new_entry)
                 free(new_entry);
             return;
