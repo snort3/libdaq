@@ -23,12 +23,13 @@
 
 #include <stdint.h>
 #include <unistd.h>
-#include <netinet/in.h>
 #ifndef WIN32
+#include <netinet/in.h>
 #include <sys/time.h>
 #else
 /* for struct timeavl */
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #endif
 
@@ -399,7 +400,8 @@ typedef struct _daq_stats
 
 #define DAQ_DP_TUNNEL_TYPE_NON_TUNNEL 0
 #define DAQ_DP_TUNNEL_TYPE_GTP_TUNNEL 1
-#define DAQ_DP_TUNNEL_TYPE_OTHER_TUNNEL 2
+#define DAQ_DP_TUNNEL_TYPE_MPLS_TUNNEL 2
+#define DAQ_DP_TUNNEL_TYPE_OTHER_TUNNEL 3
 
 typedef struct _DAQ_DP_key_t {
     uint32_t af;                /* AF_INET or AF_INET6 */
@@ -448,5 +450,6 @@ typedef struct _DAQ_DP_key_t {
 #define DAQ_CAPA_DECODE_6IN4    0x00008000   /* decodes and tracks flows of IPv6 within IPv4. */
 #define DAQ_CAPA_DECODE_4IN6    0x00010000   /* decodes and tracks flows of IPv4 within IPv6. */
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
+#define DAQ_CAPA_DECODE_MPLS    0x00040000   /* decodes and tracks flows within MPLS. */
 
 #endif /* _DAQ_COMMON_H */
