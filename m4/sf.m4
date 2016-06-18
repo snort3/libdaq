@@ -50,17 +50,17 @@ AC_DEFUN([AC_SF_COMPILER_SETUP],
     fi
 
     if test "$GCC" = yes ; then
-        AX_CFLAGS_GCC_OPTION(-Wall)
-        AX_CFLAGS_GCC_OPTION(-Wwrite-strings)
-        AX_CFLAGS_GCC_OPTION(-Wsign-compare)
-        AX_CFLAGS_GCC_OPTION(-Wcast-align)
-        AX_CFLAGS_GCC_OPTION(-Wextra)
-        AX_CFLAGS_GCC_OPTION(-Wformat)
-        AX_CFLAGS_GCC_OPTION(-Wformat-security)
-        AX_CFLAGS_GCC_OPTION(-Wno-unused-parameter)
-        AX_CFLAGS_GCC_OPTION(-fno-strict-aliasing)
-        AX_CFLAGS_GCC_OPTION(-fdiagnostics-show-option)
-        AX_CFLAGS_GCC_OPTION(-pedantic -std=c99 -D_GNU_SOURCE)
+        AX_CHECK_COMPILE_FLAG(-Wall)
+        AX_CHECK_COMPILE_FLAG(-Wwrite-strings)
+        AX_CHECK_COMPILE_FLAG(-Wsign-compare)
+        AX_CHECK_COMPILE_FLAG(-Wcast-align)
+        AX_CHECK_COMPILE_FLAG(-Wextra)
+        AX_CHECK_COMPILE_FLAG(-Wformat)
+        AX_CHECK_COMPILE_FLAG(-Wformat-security)
+        AX_CHECK_COMPILE_FLAG(-Wno-unused-parameter)
+        AX_CHECK_COMPILE_FLAG(-fno-strict-aliasing)
+        AX_CHECK_COMPILE_FLAG(-fdiagnostics-show-option)
+        AX_CHECK_COMPILE_FLAG(-pedantic -std=c99 -D_GNU_SOURCE)
     fi
 ])
 

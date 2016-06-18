@@ -1,8 +1,8 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.62)
-AC_INIT([daq], [2.0.6], [snort-team@sourcefire.com])
+AC_PREREQ([2.69])
+AC_INIT([daq],[2.0.6],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([sfbpf/gencode.h])
 AC_CONFIG_HEADERS([config.h])
@@ -10,7 +10,7 @@ AM_INIT_AUTOMAKE
 
 # Checks for programs.
 AC_PROG_CC
-AC_PROG_LIBTOOL
+LT_INIT
 
 # Enable visibility if we can
 AC_ENABLE_VISIBILITY()
@@ -19,7 +19,7 @@ AC_SF_COMPILER_SETUP()
 
 # IPv6 configuration
 AC_ARG_ENABLE(ipv6, 
-AC_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if getaddrinfo available@:>@]),
+AS_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if getaddrinfo available@:>@]),
     [],
     [enable_ipv6=ifavailable])
 if test "$enable_ipv6" != "no"; then
@@ -106,7 +106,7 @@ DEFAULT_ENABLE=yes
 
 # Modules configuration
 AC_ARG_ENABLE(bundled-modules,
-              AC_HELP_STRING([--disable-bundled-modules],[don't build any of the bundled DAQ modules by default]),
+              AS_HELP_STRING([--disable-bundled-modules],[don't build any of the bundled DAQ modules by default]),
               [], [disable_bundled_modules=no])
 
 if test "$disable_bundled_modules" = no; then
@@ -117,7 +117,7 @@ fi
 
 # AFPacket Module
 AC_ARG_ENABLE(afpacket-module,
-              AC_HELP_STRING([--disable-afpacket-module],[don't build the bundled AFPacket module]),
+              AS_HELP_STRING([--disable-afpacket-module],[don't build the bundled AFPacket module]),
               [enable_afpacket_module="$enableval"], [enable_afpacket_module="$DEFAULT_ENABLE"])
 if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
@@ -130,7 +130,7 @@ AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
 
 # Dump Module
 AC_ARG_ENABLE(dump-module,
-              AC_HELP_STRING([--disable-dump-module],[don't build the bundled Dump module]),
+              AS_HELP_STRING([--disable-dump-module],[don't build the bundled Dump module]),
               [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
 if test "$enable_dump_module" = yes; then
     AC_CHECK_HEADER([pcap.h], [], [enable_dump_module=no])
@@ -143,7 +143,7 @@ AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
 # IPFW Module
 AC_ARG_ENABLE(ipfw-module,
-              AC_HELP_STRING([--disable-ipfw-module],[don't build the bundled IPFW module]),
+              AS_HELP_STRING([--disable-ipfw-module],[don't build the bundled IPFW module]),
               [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
 if test "$enable_ipfw_module" = yes; then
     STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
@@ -152,7 +152,7 @@ AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
 # IPQ Module
 AC_ARG_ENABLE(ipq-module,
-              AC_HELP_STRING([--disable-ipq-module],[don't build the bundled IPQ module]),
+              AS_HELP_STRING([--disable-ipq-module],[don't build the bundled IPQ module]),
               [enable_ipq_module="$enableval"], [enable_ipq_module="$DEFAULT_ENABLE"])
 if test "$enable_ipq_module" = yes; then
     AC_CHECK_HEADERS([netinet/in.h libipq.h], [], [enable_ipq_module=no])
@@ -168,7 +168,7 @@ AM_CONDITIONAL([BUILD_IPQ_MODULE], [test "$enable_ipq_module" = yes])
 
 # NFQ Module
 AC_ARG_ENABLE(nfq-module,
-              AC_HELP_STRING([--disable-nfq-module],[don't build the bundled NFQ module]),
+              AS_HELP_STRING([--disable-nfq-module],[don't build the bundled NFQ module]),
               [enable_nfq_module="$enableval"], [enable_nfq_module="$DEFAULT_ENABLE"])
 if test "$enable_nfq_module" = yes; then
     AC_CHECK_HEADERS([netinet/in.h libnetfilter_queue/libnetfilter_queue.h], [], [enable_nfq_module=no])
@@ -184,7 +184,7 @@ AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
 
 # PCAP Module
 AC_ARG_ENABLE(pcap-module,
-              AC_HELP_STRING([--disable-pcap-module],[don't build the bundled PCAP module]),
+              AS_HELP_STRING([--disable-pcap-module],[don't build the bundled PCAP module]),
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
     AC_CHECK_HEADER([pcap.h], [], [enable_pcap_module=no])
@@ -197,7 +197,7 @@ AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 
 # netmap Module
 AC_ARG_ENABLE(netmap-module,
-              AC_HELP_STRING([--disable-netmap-module],[don't build the bundled netmap module]),
+              AS_HELP_STRING([--disable-netmap-module],[don't build the bundled netmap module]),
               [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
 if test "$enable_netmap_module" = yes; then
     AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
