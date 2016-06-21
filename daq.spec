@@ -1,4 +1,4 @@
-%define version 2.0.6
+%define version 2.1.0
 
 Summary: Data Acquisition Library
 License: GNU General Public License
@@ -56,10 +56,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libsfbpf.so.0.0.1
 %{_libdir}/libsfbpf.so.0
 %{_libdir}/libdaq_static.la
-%{_libdir}/libdaq.so.2.0.4
+%{_libdir}/libdaq.so.3.0.0
 %{_libdir}/libsfbpf.so
 %{_libdir}/libdaq.a
 %{_libdir}/libdaq_static.a
-%{_libdir}/libdaq.so.2
+%{_libdir}/libdaq.so.3
 %{_bindir}/daq-modules-config
 
