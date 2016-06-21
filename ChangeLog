@@ -1,3 +1,60 @@
+Changes in 2.1.0 Release on 2016-06-21:
+---------------------------------------
+mialtize (Michael Altizer)
+	* Add extended flow modification support.  It now allows for storing an
+	opaque HA state blob and setting a QoS ID in addition to the original
+	opaque value setting functionality.
+	* Add flow querying support.  Currently supports querying scrubbed TCP
+	options and opaque HA state blobs.
+	* Add new metapacket type for HA state blobs (DAQ_METAHDR_TYPE_HA_STATE).
+	* Add DAQ_PKT_FLAG_ERROR_PACKET to mark packets with known errors.
+	* Add DAQ_PKT_FLAG_FLOWID_IS_VALID to indicate that the flow ID value in
+	the packet header is valid.
+	* Add DAQ_PKT_FLAG_LOCALLY_DESTINED and DAQ_PKT_FLAG_LOCALLY_ORIGINATED to
+	indicate locally destined and originated packets respectively.
+	* Add DAQ_PKT_FLAG_HA_STATE_AVAIL to indicate that HA state for the flow
+	associated with the packet is available to be queried.
+	* Increment DAQ API version to 0x00010003.
+	* Stop clobbering AM_CFLAGS.
+	* Replace AX_CFLAGS_GCC_OPTION with AX_CHECK_COMPILE_FLAG in SF autoconf
+	macros.
+	* Autoconf updates based on modern best practices.
+	* Replace deprecated __FUNCTION__ identifier with __func__.
+	* Remove RCS variable headers from source files.
+	* daq_afpacket: Add FANOUT configuration to support kernel-based
+	loadbalancing.  See the README for details.
+	* daq_afpacket: Improve SO_ERROR message and provide variable VLAN TPID
+	when available.
+	* daq_afpacket: Fix injection on passive interfaces as they do not have a
+	TX ring.
+	* Update LibDAQ version to 2.1.0 and library major version to 3.
+
+rdempste (Ron Dempster)
+	* Add capability flags for indicating the ability of backing hardware to
+	decode certain tunnel types (GTP, Teredo, GRE, 4-in-4, 6-in-4, 4-in-6,
+	6-in-6, and MPLS).
+	* Add MPLS DAQ dynamic protocol tunnel type.
+	* Add DAQ_PKT_FLAG_IGNORE_VLAN to inform the application that it should
+	ignore any VLAN tags on the packet.
+	* Add "real" IPs and ports to the DAQ packet header to propagate external
+	addresses for NAT'ed connections.
+	* Add DAQ_PKT_FLAG_REAL_ADDRESSES, DAQ_PKT_FLAG_REAL_SIP_V6, and
+	DAQ_PKT_FLAG_REAL_DIP_V6 to indicate that "real" IPs and ports in the DAQ
+	packet header are valid and whether they are IPv6.
+	* Add DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS to indicate that scrubbed TCP options
+	may be available to be queried.
+
+cwaxman (Carter Waxman)
+	* daq_pcap: Force packet counter rollover to be checked every billionth
+	packet.  (Thanks to Elof <elof@sentor.se>)
+
+stechew (Steve Chew)
+	* Add DAQ_PKT_FLAG_RETRY_PACKET to indicate that the packet is an
+	internally re-sent packet from the retry queue.
+
+rahburma (Rahul Burman)
+	* Modify daq_common.h includes to address win32 Snort build failure.
+
 Changes in 2.0.6 Release on 2015-07-15:
 ---------------------------------------
 2015-07-15 13:50  mialtize
