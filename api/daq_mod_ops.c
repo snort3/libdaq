@@ -380,7 +380,8 @@ DAQ_LINKAGE uint32_t daq_get_type(const DAQ_Module_t *module)
     return module->type;
 }
 
-DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
+DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr,
+                              DAQ_DP_key_t *dp_key, const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
 {
     if (!module)
         return DAQ_ERROR_NOMOD;
@@ -391,5 +392,5 @@ DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DA
     if (!module->dp_add_dc)
         return DAQ_SUCCESS;
 
-    return module->dp_add_dc(handle, hdr, dp_key, packet_data);
+    return module->dp_add_dc(handle, hdr, dp_key, packet_data, params);
 }

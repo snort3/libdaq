@@ -83,6 +83,7 @@ DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const D
 DAQ_LINKAGE int daq_hup_prep(const DAQ_Module_t *module, void *handle, void **new_config);
 DAQ_LINKAGE int daq_hup_apply(const DAQ_Module_t *module, void *handle, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_hup_post(const DAQ_Module_t *module, void *handle, void *old_config);
-DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key, const uint8_t *packet_data);
+DAQ_LINKAGE int daq_dp_add_dc(const DAQ_Module_t *module, void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
 
 #endif /* _DAQ_H */
