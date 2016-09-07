@@ -312,8 +312,8 @@ DAQ_LINKAGE int daq_instance_query_flow(const DAQ_Instance_t *instance, const DA
     return instance->module->query_flow(instance->context, hdr, query);
 }
 
-DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr,
-                                        DAQ_DP_key_t *dp_key, const uint8_t *packet_data)
+DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+                                        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
@@ -321,7 +321,7 @@ DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Instance_t *instance, const DAQ
     if (!instance->module->dp_add_dc)
         return DAQ_SUCCESS;
 
-    return instance->module->dp_add_dc(instance->context, hdr, dp_key, packet_data);
+    return instance->module->dp_add_dc(instance->context, hdr, dp_key, packet_data, params);
 }
 
 DAQ_LINKAGE int daq_instance_msg_receive(const DAQ_Instance_t *instance, const DAQ_Msg_t **msgptr)

@@ -410,7 +410,8 @@ typedef struct _daq_stats
 #define DAQ_DP_TUNNEL_TYPE_OTHER_TUNNEL 3
 
 typedef struct _DAQ_DP_key_t {
-    uint32_t af;                /* AF_INET or AF_INET6 */
+    uint16_t src_af;                /* AF_INET or AF_INET6 */
+    uint16_t dst_af;                /* AF_INET or AF_INET6 */
     union {
         struct in_addr src_ip4;
         struct in6_addr src_ip6;
@@ -427,6 +428,19 @@ typedef struct _DAQ_DP_key_t {
     uint16_t vlan_id;           /* VLAN ID */
     uint16_t vlan_cnots;
 } DAQ_DP_key_t;
+
+typedef struct _DAQ_Data_Channel_Params_t
+{
+    unsigned flags;     /* DAQ_DATA_CHANNEL_* flags*/
+    unsigned timeout_ms;/* timeout of the data channel in milliseconds */
+    unsigned length;    /* [Future] length of the data associated with the data channel */
+    uint8_t* data;      /* [Future] opaque data blob to return with the data channel */
+} DAQ_Data_Channel_Params_t;
+
+/* DAQ module data channel flags */
+#define DAQ_DATA_CHANNEL_FLOAT          0x01 /* the data channel can float to a different snort */
+#define DAQ_DATA_CHANNEL_ALLOW_MULTIPLE 0x02 /* allow multiple connections to use the same data channel entry */
+#define DAQ_DATA_CHANNEL_PERSIST        0x04 /* data channel entry persists even if control channel terminates */
 
 /* DAQ module type flags */
 #define DAQ_TYPE_FILE_CAPABLE   0x01    /* can read from a file */
