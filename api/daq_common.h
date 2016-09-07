@@ -256,6 +256,12 @@ typedef struct _flow_stats
     uint64_t responderPkts;         /* Not populated for SoF stats. */
     uint64_t initiatorBytes;        /* Not populated for SoF stats. */
     uint64_t responderBytes;        /* Not populated for SoF stats. */
+    /* QoS related variables */
+    uint64_t initiatorPktsDropped;  /* Not populated for SoF stats. */
+    uint64_t responderPktsDropped;  /* Not populated for SoF stats. */
+    uint64_t initiatorBytesDropped; /* Not populated for SoF stats. */
+    uint64_t responderBytesDropped; /* Not populated for SoF stats. */
+    uint8_t isQoSAppliedOnSrcIntf;  /* Not populated for SoF stats. */
     struct timeval sof_timestamp;
     struct timeval eof_timestamp;   /* Not populated for SoF stats. */
     uint16_t vlan_tag;
