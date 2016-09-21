@@ -69,6 +69,7 @@
 #include "daq.h"
 #include "daq_api.h"
 #include "daq_api_internal.h"
+#include "daq_version.h"
 
 #define NAME_SIZE       512
 
@@ -447,4 +448,14 @@ DAQ_LINKAGE void daq_set_verbosity(int level)
 DAQ_LINKAGE int daq_get_verbosity(void)
 {
     return daq_verbosity;
+}
+
+DAQ_LINKAGE uint32_t daq_version_number(void)
+{
+    return DAQ_VERSION_NUMERIC;
+}
+
+DAQ_LINKAGE const char *daq_version_string(void)
+{
+    return DAQ_VERSION_STRING;
 }

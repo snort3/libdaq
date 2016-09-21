@@ -1,12 +1,21 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
+m4_define([daq_major_version], [3])
+m4_define([daq_minor_version], [0])
+m4_define([daq_patch_version], [0])
+m4_define([daq_version], [daq_major_version.daq_minor_version.daq_patch_version])
+
 AC_PREREQ([2.69])
-AC_INIT([daq], [3.0.0], [snort-team@sourcefire.com])
+AC_INIT([daq],[daq_version],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([sfbpf/gencode.h])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
+
+DAQ_MAJOR_VERSION=daq_major_version
+DAQ_MINOR_VERSION=daq_minor_version
+DAQ_PATCH_VERSION=daq_patch_version
 
 # Checks for programs.
 AC_PROG_CC
@@ -359,6 +368,9 @@ AC_CHECK_FUNCS([gethostbyname getpagesize memset munmap socket strchr strcspn st
 AC_SUBST(LIBDL)
 AC_SUBST(AM_CPPFLAGS)
 AC_SUBST(CFLAGS)
+AC_SUBST(DAQ_MAJOR_VERSION)
+AC_SUBST(DAQ_MINOR_VERSION)
+AC_SUBST(DAQ_PATCH_VERSION)
 AC_SUBST(PCAP_CPPFLAGS)
 AC_SUBST(PCAP_LDFLAGS)
 
@@ -367,6 +379,7 @@ if test "${CODE_COVERAGE_ENABLED}" = yes ; then
 fi
 
 AC_CONFIG_FILES([Makefile
+                 api/daq_version.h
                  api/Makefile
                  example/Makefile
                  modules/Makefile

@@ -53,6 +53,7 @@ daq-*-coverage.info
 /test/test-suite.log
 
 # Locally generated artifacts
+api/daq_version.h
 modules/daq-modules-config
 sfbpf/sf_grammar.c
 sfbpf/sf_grammar.h
