@@ -34,6 +34,10 @@ typedef struct {
     uint32_t type;      /* Module capabilities */
 } DAQ_Module_Info_t;
 
+/* Library version information functions. */
+DAQ_LINKAGE uint32_t daq_version_number(void);
+DAQ_LINKAGE const char *daq_version_string(void);
+
 /* Functions for loading, handling, and unloading DAQ modules. */
 DAQ_LINKAGE void daq_set_verbosity(int level);
 DAQ_LINKAGE int daq_load_modules(const char *module_dirs[]);

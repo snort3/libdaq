@@ -1,12 +1,21 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
+m4_define([daq_major_version], [2])
+m4_define([daq_minor_version], [2])
+m4_define([daq_patch_version], [0])
+m4_define([daq_version], [daq_major_version.daq_minor_version.daq_patch_version])
+
 AC_PREREQ([2.69])
-AC_INIT([daq],[2.2.0],[snort-team@sourcefire.com])
+AC_INIT([daq],[daq_version],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([sfbpf/gencode.h])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
+
+DAQ_MAJOR_VERSION=daq_major_version
+DAQ_MINOR_VERSION=daq_minor_version
+DAQ_PATCH_VERSION=daq_patch_version
 
 # Checks for programs.
 AC_PROG_CC
@@ -292,8 +301,12 @@ AC_SUBST(V_YACC)
 AC_SUBST(XCCFLAGS)
 AC_SUBST(LIBDL)
 AC_SUBST(AM_CFLAGS)
+AC_SUBST(DAQ_MAJOR_VERSION)
+AC_SUBST(DAQ_MINOR_VERSION)
+AC_SUBST(DAQ_PATCH_VERSION)
 
 AC_CONFIG_FILES([Makefile
+                 api/daq_version.h
                  api/Makefile
                  os-daq-modules/Makefile
                  os-daq-modules/daq-modules-config
