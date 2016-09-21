@@ -1,3 +1,19 @@
+Changes in 2.2.0 Release on 2016-09-21:
+---------------------------------------
+mialtize (Michael Altizer)
+	* Add text output to the dump DAQ module.
+	* Add daq_version_number() and daq_version_string() API calls.
+	* Switch to my newer, less dead e-mail address.
+	* Update LibDAQ version to 2.2.0 and library major version to 4.
+
+rdempste (Ron Dempster)
+	* Update dp_add_dc() to take additional parameters for timeout length and
+	flags.  Also update DAQ_DP_key_t to support mixed family address
+	specifications.
+
+anagunas (Anand Gunasekaran)
+	* Add QOS-related counters to End of Flow statistics.
+
 Changes in 2.1.0 Release on 2016-06-21:
 ---------------------------------------
 mialtize (Michael Altizer)
