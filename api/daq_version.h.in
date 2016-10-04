@@ -23,12 +23,15 @@
 
 #define DAQ_VERSION_MAJOR @DAQ_MAJOR_VERSION@
 #define DAQ_VERSION_MINOR @DAQ_MINOR_VERSION@
-#define DAQ_VERISON_PATCH @DAQ_PATCH_VERSION@
+#define DAQ_VERSION_PATCH @DAQ_PATCH_VERSION@
 
-#define DAQ_VERSION_NUMERIC ((DAQ_VERSION_MAJOR << 24) | (DAQ_VERSION_MINOR << 16) | (DAQ_VERISON_PATCH << 8) | 0)
+#define DAQ_VERSION_NUMERIC ((DAQ_VERSION_MAJOR << 24) | (DAQ_VERSION_MINOR << 16) | (DAQ_VERSION_PATCH << 8) | 0)
+
+#define DAQ_VERSION_STRING_C_(major, minor, patch) \
+            #major "." #minor "." #patch
 
 #define DAQ_VERSION_STRING_C(major, minor, patch) \
-            #major "." #minor "." #patch
+            DAQ_VERSION_STRING_C_(major, minor, patch)
 
 #define DAQ_VERSION_STRING DAQ_VERSION_STRING_C( \
                 DAQ_VERSION_MAJOR, DAQ_VERSION_MINOR, \
