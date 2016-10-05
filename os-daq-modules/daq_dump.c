@@ -230,8 +230,8 @@ static DAQ_Verdict daq_dump_capture (
 
     if (impl->text_out)
     {
-        fprintf(impl->text_out, "PV: %lu.%lu(%u): %s\n", hdr->ts.tv_sec,
-                hdr->ts.tv_usec, hdr->caplen, daq_verdict_strings[verdict]);
+        fprintf(impl->text_out, "PV: %lu.%lu(%u): %s\n", (unsigned long) hdr->ts.tv_sec,
+                (unsigned long) hdr->ts.tv_usec, hdr->caplen, daq_verdict_strings[verdict]);
         if (verdict == DAQ_VERDICT_REPLACE)
             hexdump(impl->text_out, pkt, hdr->caplen, "    ");
     }
@@ -257,7 +257,7 @@ static int dump_daq_inject (
     if (impl->text_out)
     {
         fprintf(impl->text_out, "%cI: %lu.%lu(%u): %u\n", reverse ? 'R' : 'F',
-                hdr->ts.tv_sec, hdr->ts.tv_usec, hdr->caplen, len);
+                (unsigned long) hdr->ts.tv_sec, (unsigned long) hdr->ts.tv_usec, hdr->caplen, len);
         hexdump(impl->text_out, data, len, "    ");
         fprintf(impl->text_out, "\n");
     }
@@ -436,8 +436,8 @@ static int dump_daq_modify_flow(void *handle, const DAQ_PktHdr_t *hdr, const DAQ
 
     if (impl->text_out)
     {
-        fprintf(impl->text_out, "MF: %lu.%lu(%u): %d %u \n", hdr->ts.tv_sec,
-                hdr->ts.tv_usec, hdr->caplen, modify->type, modify->length);
+        fprintf(impl->text_out, "MF: %lu.%lu(%u): %d %u \n", (unsigned long) hdr->ts.tv_sec,
+                (unsigned long) hdr->ts.tv_usec, hdr->caplen, modify->type, modify->length);
         hexdump(impl->text_out, modify->value, modify->length, "    ");
     }
     return DAQ_SUCCESS;
@@ -452,8 +452,8 @@ static int dump_daq_dp_add_dc(void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_
     {
         char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
 
-        fprintf(impl->text_out, "DP: %lu.%lu(%u):\n", hdr->ts.tv_sec,
-                hdr->ts.tv_usec, hdr->caplen);
+        fprintf(impl->text_out, "DP: %lu.%lu(%u):\n", (unsigned long) hdr->ts.tv_sec,
+                (unsigned long) hdr->ts.tv_usec, hdr->caplen);
         if (dp_key->src_af == AF_INET)
             inet_ntop(AF_INET, &dp_key->sa.src_ip4, src_addr_str, sizeof(src_addr_str));
         else
