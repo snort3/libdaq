@@ -311,8 +311,6 @@ DAQ_LINKAGE int daq_load_modules(const char *directory_list[])
 
         while((de = readdir(dirp)) != NULL)
         {
-            if (de->d_name == NULL)
-                continue;
             p = strrchr(de->d_name, '.');
             if (!p || strcmp(p, extension))
                 continue;
