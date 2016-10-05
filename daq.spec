@@ -1,4 +1,4 @@
-%define version 2.2.0
+%define version 2.2.1
 
 Summary: Data Acquisition Library
 License: GNU General Public License

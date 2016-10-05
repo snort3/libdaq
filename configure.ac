@@ -3,7 +3,7 @@
 
 m4_define([daq_major_version], [2])
 m4_define([daq_minor_version], [2])
-m4_define([daq_patch_version], [0])
+m4_define([daq_patch_version], [1])
 m4_define([daq_version], [daq_major_version.daq_minor_version.daq_patch_version])
 
 AC_PREREQ([2.69])

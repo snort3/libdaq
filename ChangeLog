@@ -1,3 +1,9 @@
+Changes in 2.2.1 Release on 2016-10-05:
+---------------------------------------
+mialtize (Michael Altizer)
+	* Fix erroneous version string generation.
+	* Fix some OS X compiler warnings in base and the dump DAQ module.
+
 Changes in 2.2.0 Release on 2016-09-21:
 ---------------------------------------
 mialtize (Michael Altizer)
