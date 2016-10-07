@@ -864,5 +864,6 @@ const DAQ_Module_t netmap_daq_module_data =
     /* .hup_prep = */ NULL,
     /* .hup_apply = */ NULL,
     /* .hup_post = */ NULL,
-    /* .dp_add_dc = */ NULL
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL
 };
