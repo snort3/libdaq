@@ -27,6 +27,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#include <sys/socket.h>
+#endif
+
 #include "daq.h"
 #include "daq_api.h"
 
