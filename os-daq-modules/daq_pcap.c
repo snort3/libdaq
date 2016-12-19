@@ -40,7 +40,7 @@
 
 #include "daq_api.h"
 
-#define DAQ_PCAP_VERSION 3
+#define DAQ_PCAP_VERSION 4
 #define DAQ_PCAP_ROLLOVER_LIM 1000000000 //Check for rollover every billionth packet
 
 typedef struct _pcap_context
@@ -52,6 +52,7 @@ typedef struct _pcap_context
     pcap_t *handle;
     char errbuf[PCAP_ERRBUF_SIZE];
     int promisc_flag;
+    int immediate_flag;
     int timeout;
     int buffer_size;
     int packets;
@@ -122,6 +123,8 @@ static int pcap_daq_open(Pcap_Context_t *context)
         context->handle = pcap_create(context->device, context->errbuf);
         if (!context->handle)
             return DAQ_ERROR;
+        if ((status = pcap_set_immediate_mode(context->handle, context->immediate_flag ? 1 : 0)) < 0)
+            goto fail;
         if ((status = pcap_set_snaplen(context->handle, context->snaplen)) < 0)
             goto fail;
         if ((status = pcap_set_promisc(context->handle, context->promisc_flag ? 1 : 0)) < 0)
@@ -221,6 +224,8 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
     {
         if (!strcmp(entry->key, "buffer_size"))
             context->buffer_size = strtol(entry->value, NULL, 10);
+        else if (!strcmp(entry->key,  "immediate"))
+            context->immediate_flag = strtol(entry->value, NULL, 10);
     }
     /* Try to account for legacy PCAP_FRAMES environment variable if we weren't passed a buffer size. */
     if (context->buffer_size == 0)

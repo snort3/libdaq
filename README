@@ -20,7 +20,7 @@ The DAQ is bundled with Snort but must be built first using these steps:
 
 This will build and install both static and dynamic DAQ modules.
 
-Note that pcap >= 1.0.0 is required.  pcap 1.1.1 is available at the time
+Note that pcap >= 1.5.0 is required.  pcap 1.8.1 is available at the time
 of this writing and is recommended.
 
 Also, libdnet is required for IPQ and NFQ DAQs.  If you get a relocation error
@@ -69,6 +69,18 @@ operate as it always did using this module.  These are equivalent:
 You can specify the buffer size pcap uses with:
 
     ./snort --daq pcap --daq-var buffer_size=<#bytes>
+
+Immediate (less-buffered or unbuffered) delivery mode can be enabled with:
+
+    ./snort --daq pcap --daq-var immediate=1
+
+This immediate delivery mode can be particularly useful on modern Linux systems
+with TPACKET_V3 support.  LibPCAP will attempt to use this mode when it is
+available, but it introduces some potentially undesirable behavior in exchange
+for better performance.  The most notable behavior change is that the packet
+timeout will never occur if packets are not being received, causing the poll()
+to potentially hang indefinitely.  Enabling immediate delivery mode will cause
+LibPCAP to use TPACKET_V2 instead of TPACKET_V3.
 
 * The pcap DAQ does not count filtered packets. *
 
