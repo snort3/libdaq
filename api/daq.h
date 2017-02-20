@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <daq_common.h>
 
-#define DAQ_VERSION 6
+#define DAQ_VERSION 7
 
 /* Definition of the structures returned by daq_get_module_list(). */
 typedef struct {

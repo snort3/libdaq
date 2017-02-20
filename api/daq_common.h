@@ -82,27 +82,29 @@
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
 #define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
-#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x00001 /* The DAQ module reports that the checksum for this packet is good. */
-#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_NOT_FORWARDING     0x00004 /* The DAQ module will not be actively forwarding this packet
+#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x000001 /* The DAQ module reports that the checksum for this packet is good. */
+#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x000002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_NOT_FORWARDING     0x000004 /* The DAQ module will not be actively forwarding this packet
                                                     regardless of the verdict (e.g, Passive or Inline Tap interfaces). */
-#define DAQ_PKT_FLAG_PRE_ROUTING        0x00008 /* The packet is being routed via us but packet modifications
+#define DAQ_PKT_FLAG_PRE_ROUTING        0x000008 /* The packet is being routed via us but packet modifications
                                                     (MAC and TTL) have not yet been made. */
-#define DAQ_PKT_FLAG_SSL_DETECTED       0x00010 /* Packet is ssl client hello */
-#define DAQ_PKT_FLAG_SSL_SHELLO         0x00020 /* Packet is ssl server hello */
-#define DAQ_PKT_FLAG_SSL_SERVER_KEYX    0x00040 /* Packet is ssl server keyx */
-#define DAQ_PKT_FLAG_SSL_CLIENT_KEYX    0x00080 /* Packet is ssl client keyx */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00100 /* Ignore vlan tags in the packet */
-#define DAQ_PKT_FLAG_REAL_ADDRESSES     0x00200 /* The real address values in the header are valid */
-#define DAQ_PKT_FLAG_REAL_SIP_V6        0x00400 /* The real source address is IPv6 */
-#define DAQ_PKT_FLAG_REAL_DIP_V6        0x00800 /* The real destination address is IPv6 */
-#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x01000 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x02000 /* The packet is destined for local delivery */
-#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x04000 /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x08000 /* Scrubbed tcp options maybe available */
-#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x10000 /* HA State is availble for the flow this packet is associated with. */
-#define DAQ_PKT_FLAG_ERROR_PACKET       0x20000 /* Lower level reports that the packet has errors. */
-#define DAQ_PKT_FLAG_RETRY_PACKET       0x40000 /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_SSL_DETECTED       0x000010 /* Packet is ssl client hello */
+#define DAQ_PKT_FLAG_SSL_SHELLO         0x000020 /* Packet is ssl server hello */
+#define DAQ_PKT_FLAG_SSL_SERVER_KEYX    0x000040 /* Packet is ssl server keyx */
+#define DAQ_PKT_FLAG_SSL_CLIENT_KEYX    0x000080 /* Packet is ssl client keyx */
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x000100 /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_REAL_ADDRESSES     0x000200 /* The real address values in the header are valid */
+#define DAQ_PKT_FLAG_REAL_SIP_V6        0x000400 /* The real source address is IPv6 */
+#define DAQ_PKT_FLAG_REAL_DIP_V6        0x000800 /* The real destination address is IPv6 */
+#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x001000 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x002000 /* The packet is destined for local delivery */
+#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x004000 /* The packet was originated locally */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x008000 /* Scrubbed tcp options maybe available */
+#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x010000 /* HA State is availble for the flow this packet is associated with. */
+#define DAQ_PKT_FLAG_ERROR_PACKET       0x020000 /* Lower level reports that the packet has errors. */
+#define DAQ_PKT_FLAG_RETRY_PACKET       0x040000 /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x080000 /* Tracing due to packet trace or capture with trace */
+#define DAQ_PKT_FLAG_SIMULATED          0x100000 /* Packet is simulated/virtual */
 
 /* The DAQ packet header structure passed to DAQ Analysis Functions.
  * This should NEVER be modified by user applications. */
@@ -132,7 +134,8 @@ typedef struct _daq_pkthdr
 } DAQ_PktHdr_t;
 
 
-/* HA state binary blob descriptor used for DAQ_METAHDR_TYPE_HA_STATE and DAQ_QUERYFLOW_TYPE_HA_STATE. */
+/* HA state binary blob descriptor used for DAQ_METAHDR_TYPE_HA_STATE, DAQ_MODFLOW_TYPE_HA_STATE,
+     and DAQ_QUERYFLOW_TYPE_HA_STATE. */
 typedef struct _daq_ha_state_data
 {
     uint32_t length;
@@ -220,12 +223,22 @@ typedef struct _daq_vpn_login_info
 #define DAQ_MODFLOW_TYPE_OPAQUE     1
 #define DAQ_MODFLOW_TYPE_HA_STATE   2
 #define DAQ_MODFLOW_TYPE_SET_QOS_ID 3
+#define DAQ_MODFLOW_TYPE_PKT_TRACE  4 /* To send verdict reason and trace data */
+#define DAQ_MODFLOW_TYPE_VER_REASON 5 /* To send verdict reason only */
 typedef struct _daq_modflow
 {
     int type;
     uint32_t length;
     const void *value;
 } DAQ_ModFlow_t;
+
+/* Packet tracing information used for DAQ_MODFLOW_TYPE_PKT_TRACE. */
+typedef struct _daq_modflowpkttrace
+{
+    uint8_t vreason;
+    uint32_t pkt_trace_data_len;
+    uint8_t *pkt_trace_data;
+} DAQ_ModFlowPktTrace_t;
 
 
 /*
@@ -242,7 +255,7 @@ typedef struct _daq_queryflow
     void *value;
 } DAQ_QueryFlow_t;
 
-/* TCP option flags Used by DAQ_TCP_Opts_t. */
+/* TCP option flags used by DAQ_TCP_Opts_t. */
 typedef enum
 {
     DAQ_TCP_OPTS_MSS_CHANGED = 0x01,

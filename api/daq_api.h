@@ -103,7 +103,7 @@ struct _daq_module
     int (*query_flow) (void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
 };
 
-#define DAQ_API_VERSION    0x00010006
+#define DAQ_API_VERSION    0x00010007
 
 #define DAQ_ERRBUF_SIZE 256
 /* This is a convenience macro for safely printing to DAQ error buffers.  It must be called on a known-size character array. */
