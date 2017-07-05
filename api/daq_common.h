@@ -220,11 +220,12 @@ typedef struct _daq_vpn_login_info
  * Flow modification definitions.
  */
 
-#define DAQ_MODFLOW_TYPE_OPAQUE     1
-#define DAQ_MODFLOW_TYPE_HA_STATE   2
-#define DAQ_MODFLOW_TYPE_SET_QOS_ID 3
-#define DAQ_MODFLOW_TYPE_PKT_TRACE  4 /* To send verdict reason and trace data */
-#define DAQ_MODFLOW_TYPE_VER_REASON 5 /* To send verdict reason only */
+#define DAQ_MODFLOW_TYPE_OPAQUE         1
+#define DAQ_MODFLOW_TYPE_HA_STATE       2
+#define DAQ_MODFLOW_TYPE_SET_QOS_ID     3
+#define DAQ_MODFLOW_TYPE_PKT_TRACE      4 /* To send verdict reason and trace data */
+#define DAQ_MODFLOW_TYPE_VER_REASON     5 /* To send verdict reason only */
+#define DAQ_MODFLOW_TYPE_PRESERVE_FLOW  6 /* Keep passing packets if Snort goes down */
 typedef struct _daq_modflow
 {
     int type;
