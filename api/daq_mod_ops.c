@@ -307,7 +307,7 @@ DAQ_LINKAGE int daq_instance_query_flow(const DAQ_Instance_t *instance, const DA
         return DAQ_ERROR_NOCTX;
 
     if (!instance->module->query_flow)
-        return DAQ_SUCCESS;
+        return DAQ_ERROR_NOTSUP;
 
     return instance->module->query_flow(instance->context, hdr, query);
 }
