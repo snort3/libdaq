@@ -1,3 +1,23 @@
+Changes in 2.2.2 Release on 2017-07-05:
+---------------------------------------
+mialtize (Michael Altizer)
+	* daq_dump: Fix compilation on FreeBSD and OpenBSD
+	* daq_netmap: Add NULL query_flow API entry
+	* daq_pcap: Add 'immediate' configuration variable
+	* daq_pcap: Don't leak filename when initialize fails
+		This variable allows configuring libpcap in immediate delivery mode,
+		which notably disables TPACKET_V3 usage and avoids some of its
+		potentially undesirable behavior changes.
+		The minimum version requirement for libpcap has been bumped to 1.5.0
+		(released November 2013) to support this change.
+	* api: Don't return success when the module doesn't support query_flow
+
+mashasan (Masud Hasan)
+	* api: Add packet tracing flow modifier
+
+stechew (Steve Chew)
+	* api: Add preserve flow flow modifier
+
 Changes in 2.2.1 Release on 2016-10-05:
 ---------------------------------------
 mialtize (Michael Altizer)
