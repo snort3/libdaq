@@ -260,6 +260,7 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
         if (pcap_daq_open(context) != DAQ_SUCCESS)
         {
             snprintf(errbuf, len, "%s", context->errbuf);
+            free(context->file);
             free(context);
             return DAQ_ERROR;
         }
