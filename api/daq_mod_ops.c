@@ -356,7 +356,7 @@ DAQ_LINKAGE int daq_query_flow(const DAQ_Module_t *module, void *handle, const D
         return DAQ_ERROR_NOMOD;
 
     if (!module->query_flow)
-        return DAQ_SUCCESS;
+        return DAQ_ERROR_NOTSUP;
 
     return module->query_flow(handle, hdr, query);
 }
