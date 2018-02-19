@@ -55,9 +55,9 @@ daq-*-coverage.info
 # Locally generated artifacts
 modules/daq-modules-config
 sfbpf/sf_grammar.c
+sfbpf/sf_grammar.h
 sfbpf/sf_scanner.c
 sfbpf/sf_scanner.h
-sfbpf/tokdefs.h
 example/daqtest
 example/daqtest-static
 

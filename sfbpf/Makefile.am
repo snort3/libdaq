@@ -30,26 +30,34 @@ sunatmpos.h
 EXTRA_DIST = grammar.y scanner.l \
 win32-stdinc.h \
 sfbpf-int.h \
-sfbpf-int.c \
-runlex.sh
+sfbpf-int.c
 
-nodist_libsfbpf_la_SOURCES = sf_grammar.c sf_scanner.c tokdefs.h
+nodist_libsfbpf_la_SOURCES = sf_grammar.c sf_grammar.h sf_scanner.c sf_scanner.h
 
+libsfbpf_la_CPPFLAGS = $(AM_CPPFLAGS) $(CODE_COVERAGE_CPPFLAGS)
 libsfbpf_la_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS) -Dyylval=sfbpf_lval
-libsfbpf_la_LDFLAGS = $(CODE_COVERAGE_LDFLAGS) -version-info 0:1:0 @XCCFLAGS@
+libsfbpf_la_LDFLAGS = $(CODE_COVERAGE_LDFLAGS) -version-info 0:1:0
 
-# use of $@ and $< here is a GNU idiom that borks BSD
 sf_scanner.c: $(srcdir)/scanner.l
-	@rm -f $(srcdir)/sf_scanner.c
-	$(srcdir)/runlex.sh $(V_LEX) -osf_scanner.c $(srcdir)/scanner.l
+	$(LEX) -P sfbpf_ --header-file=sf_scanner.h --nounput -o sf_scanner.c $<
 
-sf_scanner.o: sf_scanner.c tokdefs.h
+sf_scanner.h: sf_scanner.c
+	## Recover from the removal of $@
+	@if test -f $@; then :; else \
+		rm -f sf_scanner.c; \
+		$(MAKE) $(MAKEFLAGS) sf_scanner.c; \
+	fi
 
-tokdefs.h: sf_grammar.c
+sf_scanner.o: sf_scanner.c sf_grammar.h
+
 sf_grammar.c: $(srcdir)/grammar.y
-	@rm -f sf_grammar.c tokdefs.h
-	$(V_YACC) -l -d $(srcdir)/grammar.y
-	mv y.tab.c sf_grammar.c
-	mv y.tab.h tokdefs.h
+	$(YACC) -p sfbpf_ -o sf_grammar.c -d $<
+sf_grammar.h: sf_grammar.c
+	## Recover from the removal of $@
+	@if test -f $@; then :; else \
+		rm -f sf_grammar.c; \
+		$(MAKE) $(MAKEFLAGS) sf_grammar.c; \
+	fi
+sf_grammar.o: sf_grammar.c sf_scanner.h
 
-CLEANFILES = sf_scanner.c sf_grammar.c tokdefs.h sf_scanner.h
+CLEANFILES = sf_grammar.c sf_grammar.h sf_scanner.c sf_scanner.h

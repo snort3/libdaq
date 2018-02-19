@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.62)
+AC_PREREQ([2.69])
 AC_INIT([daq], [3.0.0], [snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([sfbpf/gencode.h])
@@ -11,15 +11,37 @@ AM_INIT_AUTOMAKE
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_AR
-AC_PROG_LIBTOOL
 AC_PROG_SED
+
+LT_INIT
 
 # Enable visibility if we can
 gl_VISIBILITY
-AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
+AM_CPPFLAGS="$AM_CPPFLAGS $CFLAG_VISIBILITY"
 
-# Special compiler flags for ICC, etc.
-AC_SF_COMPILER_SETUP()
+# Special compiler flags
+if test -n "$GCC" ; then
+    AX_CHECK_PREPROC_FLAG([-Wall], [AM_CPPFLAGS="$AM_CPPFLAGS -Wall"])
+    AX_CHECK_PREPROC_FLAG([-Wstrict-prototypes], [AM_CPPFLAGS="$AM_CPPFLAGS -Wstrict-prototypes"])
+    AX_CHECK_PREPROC_FLAG([-Wmissing-prototypes], [AM_CPPFLAGS="$AM_CPPFLAGS -Wmissing-prototypes"])
+    AX_CHECK_PREPROC_FLAG([-Wmissing-declarations], [AM_CPPFLAGS="$AM_CPPFLAGS -Wmissing-declarations"])
+    AX_CHECK_PREPROC_FLAG([-Wold-style-definition], [AM_CPPFLAGS="$AM_CPPFLAGS -Wold-style-definition"])
+    AX_CHECK_PREPROC_FLAG([-Wpointer-arith], [AM_CPPFLAGS="$AM_CPPFLAGS -Wpointer-arith"])
+    AX_CHECK_PREPROC_FLAG([-Wcast-align], [AM_CPPFLAGS="$AM_CPPFLAGS -Wcast-align"])
+    AX_CHECK_PREPROC_FLAG([-Wnested-externs], [AM_CPPFLAGS="$AM_CPPFLAGS -Wnested-externs"])
+    AX_CHECK_PREPROC_FLAG([-Wcast-qual], [AM_CPPFLAGS="$AM_CPPFLAGS -Wcast-qual"])
+    AX_CHECK_PREPROC_FLAG([-Wformat], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat"])
+    AX_CHECK_PREPROC_FLAG([-Wformat-nonliteral], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat-nonliteral"])
+    AX_CHECK_PREPROC_FLAG([-Wformat-security], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat-security"])
+    AX_CHECK_PREPROC_FLAG([-Wundef], [AM_CPPFLAGS="$AM_CPPFLAGS -Wundef"])
+    AX_CHECK_PREPROC_FLAG([-Wwrite-strings], [AM_CPPFLAGS="$AM_CPPFLAGS -Wwrite-strings"])
+    AX_CHECK_PREPROC_FLAG([-std=gnu99], [AM_CPPFLAGS="$AM_CPPFLAGS -std=gnu99"])
+    AX_CHECK_PREPROC_FLAG([-Wextra], [AM_CPPFLAGS="$AM_CPPFLAGS -Wextra"])
+    AX_CHECK_PREPROC_FLAG([-Wsign-compare], [AM_CPPFLAGS="$AM_CPPFLAGS -Wsign-compare"])
+    AX_CHECK_PREPROC_FLAG([-Wno-unused-parameter], [AM_CPPFLAGS="$AM_CPPFLAGS -Wno-unused-parameter"])
+    AX_CHECK_PREPROC_FLAG([-fno-strict-aliasing], [AM_CPPFLAGS="$AM_CPPFLAGS -fno-strict-aliasing"])
+    AX_CHECK_PREPROC_FLAG([-fdiagnostics-show-option], [AM_CPPFLAGS="$AM_CPPFLAGS -fdiagnostics-show-option"])
+fi
 
 # Set up code coverage
 AX_CODE_COVERAGE
@@ -29,7 +51,7 @@ AM_CHECK_CMOCKA
 
 # IPv6 configuration
 AC_ARG_ENABLE(ipv6, 
-AC_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if getaddrinfo available@:>@]),
+AS_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if getaddrinfo available@:>@]),
     [],
     [enable_ipv6=ifavailable])
 if test "$enable_ipv6" != "no"; then
@@ -44,26 +66,51 @@ if test "$enable_ipv6" != "no"; then
         ])
 fi
 
-# YACC/LEX configuration
-AC_LBL_LEX_AND_YACC(V_LEX, V_YACC, sfbpf_)
-if test "$V_LEX" = lex ; then
-# Some versions of lex can't handle the definitions section of scanner.l .
-# Try lexing it and complain if it can't deal.
-    AC_CACHE_CHECK([for capable lex], sf_cv_capable_lex,
-        if lex -t scanner.l > /dev/null 2>&1; then
-            sf_cv_capable_lex=yes
-        else
-            sf_cv_capable_lex=insufficient
-        fi)
-    if test $sf_cv_capable_lex = insufficient ; then
-        AC_MSG_ERROR(
-        [The lex on your operating system is insufficient to compile
-         libsfbpf. You should install both bison and flex.
-         flex is a lex replacement that has many advantages,
-         including being able to compile libsfbpf.  For more
-         information, see http://www.gnu.org/software/flex/flex.html .])
-    fi
+# Flex/Bison tests shamelessly stolen from libpcap
+
+#
+# Look for {f}lex.
+#
+AC_PROG_LEX
+if test "$LEX" = ":"; then
+    AC_MSG_ERROR([Neither flex nor lex was found.])
 fi
+
+#
+# Make sure {f}lex supports the -P, --header-file, and --nounput flags
+# and supports processing our scanner.l.
+#
+AC_CACHE_CHECK([for capable lex], sfbpf_cv_capable_lex,
+    if $LEX -P sfbpf_ --header-file=/dev/null --nounput -t $srcdir/sfbpf/scanner.l > /dev/null 2>&1; then
+        sfbpf_cv_capable_lex=yes
+    else
+        sfbpf_cv_capable_lex=insufficient
+    fi)
+if test $sfbpf_cv_capable_lex = insufficient ; then
+    AC_MSG_ERROR([$LEX is insufficient to compile libsfbpf.
+ libsfbpf requires Flex 2.5.31 or later, or a compatible version of lex.])
+fi
+
+#
+# Look for yacc/bison/byacc.
+#
+AC_PROG_YACC
+
+#
+# Make sure it supports the -p flag and supports processing our
+# grammar.y.
+#
+AC_CACHE_CHECK([for capable yacc/bison], sfbpf_cv_capable_yacc,
+    if $YACC -p sfbpf_ -o /dev/null $srcdir/sfbpf/grammar.y >/dev/null 2>&1; then
+        sfbpf_cv_capable_yacc=yes
+    else
+        sfbpf_cv_capable_yacc=insufficient
+    fi)
+if test $sfbpf_cv_capable_yacc = insufficient ; then
+    AC_MSG_ERROR([$YACC is insufficient to compile libsfbpf.
+ libsfbpf requires Bison, Berkeley YACC, or another YACC compatible with them.])
+fi
+
 
 save_LIBS=${LIBS}
 
@@ -116,7 +163,7 @@ DEFAULT_ENABLE=yes
 
 # Modules configuration
 AC_ARG_ENABLE(bundled-modules,
-              AC_HELP_STRING([--disable-bundled-modules],[do not build any of the bundled DAQ modules by default]),
+              AS_HELP_STRING([--disable-bundled-modules],[do not build any of the bundled DAQ modules by default]),
               [], [disable_bundled_modules=no])
 
 if test "$disable_bundled_modules" = no; then
@@ -127,7 +174,7 @@ fi
 
 # AFPacket Module
 AC_ARG_ENABLE(afpacket-module,
-              AC_HELP_STRING([--disable-afpacket-module],[do not build the bundled AFPacket module]),
+              AS_HELP_STRING([--disable-afpacket-module],[do not build the bundled AFPacket module]),
               [enable_afpacket_module="$enableval"], [enable_afpacket_module="$DEFAULT_ENABLE"])
 if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
@@ -140,7 +187,7 @@ AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
 
 # Dump Module
 AC_ARG_ENABLE(dump-module,
-              AC_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
+              AS_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
               [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
 if test "$enable_dump_module" = yes; then
     save_CPPFLAGS="$CPPFLAGS"
@@ -159,7 +206,7 @@ AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
 # IPFW Module
 #AC_ARG_ENABLE(ipfw-module,
-#              AC_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
+#              AS_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
 #              [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
 #if test "$enable_ipfw_module" = yes; then
 #    STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
@@ -168,7 +215,7 @@ AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
 # IPQ Module
 #AC_ARG_ENABLE(ipq-module,
-#              AC_HELP_STRING([--disable-ipq-module],[do not build the bundled IPQ module]),
+#              AS_HELP_STRING([--disable-ipq-module],[do not build the bundled IPQ module]),
 #              [enable_ipq_module="$enableval"], [enable_ipq_module="$DEFAULT_ENABLE"])
 #if test "$enable_ipq_module" = yes; then
 #    AC_CHECK_HEADERS([netinet/in.h libipq.h], [], [enable_ipq_module=no])
@@ -184,7 +231,7 @@ AM_CONDITIONAL([BUILD_IPQ_MODULE], [test "$enable_ipq_module" = yes])
 
 # NFQ Module
 #AC_ARG_ENABLE(nfq-module,
-#              AC_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
+#              AS_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
 #              [enable_nfq_module="$enableval"], [enable_nfq_module="$DEFAULT_ENABLE"])
 #if test "$enable_nfq_module" = yes; then
 #    AC_CHECK_HEADERS([netinet/in.h libnetfilter_queue/libnetfilter_queue.h], [], [enable_nfq_module=no])
@@ -200,7 +247,7 @@ AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
 
 # PCAP Module
 AC_ARG_ENABLE(pcap-module,
-              AC_HELP_STRING([--disable-pcap-module],[do not build the bundled PCAP module]),
+              AS_HELP_STRING([--disable-pcap-module],[do not build the bundled PCAP module]),
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
     save_CPPFLAGS="$CPPFLAGS"
@@ -208,7 +255,7 @@ if test "$enable_pcap_module" = yes; then
     CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
     LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
     AC_CHECK_HEADER([pcap.h], [], [enable_pcap_module=no])
-    AC_CHECK_PCAP_VER("1.0.0")
+    AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_pcap_module="no"],[])
     if test "$enable_pcap_module" = yes; then
         STATIC_LIBS="${STATIC_LIBS} -lpcap"
     fi
@@ -219,7 +266,7 @@ AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 
 # netmap Module
 #AC_ARG_ENABLE(netmap-module,
-#              AC_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
+#              AS_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
 #              [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
 #if test "$enable_netmap_module" = yes; then
 #    AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
@@ -309,11 +356,8 @@ AC_FUNC_MMAP
 AC_CHECK_FUNCS([gethostbyname getpagesize memset munmap socket strchr strcspn strdup strerror strrchr strstr strtoul])
 
 # Substitutions
-AC_SUBST(V_LEX)
-AC_SUBST(V_YACC)
-AC_SUBST(XCCFLAGS)
 AC_SUBST(LIBDL)
-AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CPPFLAGS)
 AC_SUBST(CFLAGS)
 AC_SUBST(PCAP_CPPFLAGS)
 AC_SUBST(PCAP_LDFLAGS)
@@ -342,7 +386,6 @@ AC_MSG_RESULT([
     cc:             ${CC}
     cppflags:       ${CPPFLAGS}
     am_cppflags:    ${AM_CPPFLAGS}
-    am_cxxflags:    ${AM_CXXFLAGS}
     cflags:         ${CFLAGS}
     am_cflags:      ${AM_CFLAGS}
     ldflags:        ${LDFLAGS}
@@ -350,8 +393,9 @@ AC_MSG_RESULT([
     libs:           ${LIBS}
 
     code_coverage_enabled:  ${CODE_COVERAGE_ENABLED}
-    code_coverage_ldflags:  ${CODE_COVERAGE_LDFLAGS}
+    code_coverage_cppflags: ${CODE_COVERAGE_CPPFLAGS}
     code_coverage_cflags:   ${CODE_COVERAGE_CFLAGS}
+    code_coverage_ldflags:  ${CODE_COVERAGE_LDFLAGS}
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
     Build Dump DAQ module...... : $enable_dump_module

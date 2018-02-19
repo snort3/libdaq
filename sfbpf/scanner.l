@@ -62,7 +62,7 @@
 #endif
 #endif /*INET6*/
 #include "namedb.h"
-#include "tokdefs.h"
+#include "sf_grammar.h"
 
 static int stoi(char *);
 static inline int xdtoi(int);
