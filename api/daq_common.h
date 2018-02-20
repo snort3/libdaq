@@ -112,47 +112,124 @@ typedef struct _daq_msg
 #define DAQ_PKT_FLAG_SSL_SHELLO         0x00020 /* Packet is ssl server hello */
 #define DAQ_PKT_FLAG_SSL_SERVER_KEYX    0x00040 /* Packet is ssl server keyx */
 #define DAQ_PKT_FLAG_SSL_CLIENT_KEYX    0x00080 /* Packet is ssl client keyx */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00100 /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00100 /* Application should ignore VLAN tags on the packet */
 #define DAQ_PKT_FLAG_REAL_ADDRESSES     0x00200 /* The real address values in the header are valid */
 #define DAQ_PKT_FLAG_REAL_SIP_V6        0x00400 /* The real source address is IPv6 */
 #define DAQ_PKT_FLAG_REAL_DIP_V6        0x00800 /* The real destination address is IPv6 */
 #define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x01000 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
 #define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x02000 /* The packet is destined for local delivery */
 #define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x04000 /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x08000 /* Scrubbed tcp options maybe available */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x08000 /* Scrubbed tcp options may be available */
 #define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x10000 /* HA State is availble for the flow this packet is associated with. */
 #define DAQ_PKT_FLAG_ERROR_PACKET       0x20000 /* Lower level reports that the packet has errors. */
 #define DAQ_PKT_FLAG_RETRY_PACKET       0x40000 /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_PARSED             0x80000 /* Packet has been parsed and has decode data is available. */
+
+#define DAQ_PKT_OFFSET_INVALID          0x0fffffff
+
+typedef union {
+    uint32_t all;
+
+    struct {
+        uint32_t l2:1;              /* Parsed known L2 protocol */
+        uint32_t l2_checksum:1;     /* L2 checksum was calculated and validated. */
+        uint32_t l3:1;              /* Parsed known L3 protocol */
+        uint32_t l3_checksum:1;     /* L3 checksum was calculated and validated. */
+        uint32_t l4:1;              /* Parsed known L4 protocol */
+        uint32_t l4_checksum:1;     /* L4 checksum was calculated and validated. */
+
+        uint32_t vlan:1;            /* VLAN header found and parsed */
+        uint32_t vlan_qinq:1;       /* Stacked VLAN header (QinQ) found and parsed */
+
+        uint32_t ipv4:1;
+        uint32_t ipv6:1;
+
+        uint32_t udp:1;
+        uint32_t tcp:1;
+        uint32_t icmp:1;
+    };
+} DAQ_PktDecodeFlags_t;
+
+typedef struct _daq_pkt_decode_data
+{
+    uint32_t l2_offset;
+    uint16_t vlan_s_tag;
+    uint16_t vlan_c_tag;
+    uint32_t l3_offset;
+    uint32_t l3_protocol;
+    uint32_t l3_len;
+    uint32_t l4_offset;
+    uint32_t l4_protocol;
+    uint32_t l4_len;
+    uint32_t payload_offset;
+    DAQ_PktDecodeFlags_t flags;
+} DAQ_PktDecodeData_t;
 
 /* The DAQ packet header structure passed to DAQ Analysis Functions.
  * This should NEVER be modified by user applications. */
 #define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
 #define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
-typedef struct _daq_pkthdr
+typedef struct _daq_pkt_hdr
 {
-    struct timeval ts;      /* Timestamp */
-    uint32_t caplen;        /* Length of the portion present */
-    uint32_t pktlen;        /* Length of this packet (off wire) */
-    int32_t ingress_index;  /* Index of the inbound interface. */
-    int32_t egress_index;   /* Index of the outbound interface. */
-    int32_t ingress_group;  /* Index of the inbound group. */
-    int32_t egress_group;   /* Index of the outbound group. */
-    uint32_t flags;         /* Flags for the packet (DAQ_PKT_FLAG_*) */
-    uint32_t opaque;        /* Opaque context value from the DAQ module or underlying hardware.
-                               Directly related to the opaque value in FlowStats. */
-    void *priv_ptr;         /* Private data pointer */
-    uint32_t flow_id;       /* Flow ID value provided from the DAQ module or underlying hardware. */
-    uint16_t address_space_id; /* Unique ID of the address space */
+    struct timeval ts;          /* Timestamp */
+    uint32_t caplen;            /* Length of the portion present */
+    uint32_t pktlen;            /* Length of this packet (off wire) */
+    uint16_t address_space_id;  /* Unique ID of the address space */
+    int32_t ingress_index;      /* Index of the inbound interface. */
+    int32_t egress_index;       /* Index of the outbound interface. */
+    int32_t ingress_group;      /* Index of the inbound group. */
+    int32_t egress_group;       /* Index of the outbound group. */
+    uint32_t opaque;            /* Opaque context value from the DAQ module or underlying hardware.
+                                    Directly related to the opaque value in FlowStats. */
+    uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
+    uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
+
+    DAQ_PktDecodeData_t decode_data;    /* Decoded packet data */
+
+    void *priv_ptr;             /* Private data pointer (for DAQ module use only) */
 
     /* Real values for NAT'ed connections */
     struct in6_addr real_sIP;
     struct in6_addr real_dIP;
     uint16_t n_real_sPort;
     uint16_t n_real_dPort;
-
-    const uint8_t *data;    /* Packet data */
 } DAQ_PktHdr_t;
 
+typedef struct _daq_flow_desc
+{
+    /* Interface/Flow ID/Address Space Information */
+    int32_t ingress_index;  /* Index of the inbound interface */
+    int32_t egress_index;   /* Index of the outbound interface */
+    int32_t ingress_group;  /* Index of the inbound group */
+    int32_t egress_group;   /* Index of the outbound group */
+    uint32_t flow_id;       /* Flow ID value provided from the DAQ module or underlying hardware. */
+    uint16_t addr_space_id; /* Address space this traffic belongs to */
+    /* L2 Information */
+    uint16_t vlan_tag;
+    /* L3 Information */
+    union {
+        struct in_addr in_addr;
+        struct in6_addr in6_addr;
+    } src_addr;
+    union {
+        struct in_addr in_addr;
+        struct in6_addr in6_addr;
+    } dst_addr;
+    uint8_t family;
+    /* L4 Information */
+    uint8_t protocol;
+    uint16_t src_port;
+    uint16_t dst_port;
+} DAQ_FlowDesc_t;
+
+#define DAQ_PLD_FLAG_REVERSED   0x1 /* L3/L4 addresses/ports are the reverse of the flow desc */
+typedef struct _daq_payload_hdr
+{
+    struct timeval ts;          /* Timestamp */
+    uint32_t len;               /* Length of the payload */
+    uint32_t flags;             /* Flags for the payload (DAQ_PLD_FLAG_*) */
+    DAQ_FlowDesc_t flow_desc;   /* Description of the flow this payload came from */
+} DAQ_PayloadHdr_t;
 
 /* HA state binary blob descriptor used for DAQ_MSG_TYPE_HA_STATE and DAQ_QUERYFLOW_TYPE_HA_STATE. */
 typedef struct _daq_ha_state_data
@@ -160,7 +237,6 @@ typedef struct _daq_ha_state_data
     uint32_t length;
     void *data;
 } DAQ_HA_State_Data_t;
-
 
 /* Flow statistics structure used for DAQ_MSG_TYPE_TYPE_SOF and DAQ_MSG_TYPE_TYPE_EOF. */
 typedef struct _flow_stats
@@ -184,7 +260,7 @@ typedef struct _flow_stats
     uint16_t vlan_tag;
     uint16_t address_space_id;
     uint8_t protocol;
-} Flow_Stats_t, *Flow_Stats_p;
+} Flow_Stats_t;
 
 /* VPN session type used by DAQ_VPN_Login_Info_t for DAQ_MSG_TYPE_TYPE_VPN_LOGIN. */
 typedef enum {
