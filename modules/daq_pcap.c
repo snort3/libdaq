@@ -193,7 +193,7 @@ static int pcap_daq_install_filter(Pcap_Context_t *context, const char *filter)
 {
     struct bpf_program fcode;
 
-    if (pcap_compile(context->handle, &fcode, (char *)filter, 1, context->netmask) < 0)
+    if (pcap_compile(context->handle, &fcode, filter, 1, context->netmask) < 0)
     {
         DPE(context->errbuf, "%s: pcap_compile: %s", __func__, pcap_geterr(context->handle));
         return DAQ_ERROR;
@@ -232,7 +232,7 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
             DPE(context->errbuf, "%s: Could not allocate a dead PCAP handle!", __func__);
             return DAQ_ERROR_NOMEM;
         }
-        if (pcap_compile(dead_handle, &fcode, (char *)filter, 1, context->netmask) < 0)
+        if (pcap_compile(dead_handle, &fcode, filter, 1, context->netmask) < 0)
         {
             DPE(context->errbuf, "%s: pcap_compile: %s", __func__, pcap_geterr(dead_handle));
             return DAQ_ERROR;

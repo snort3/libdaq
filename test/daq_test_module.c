@@ -30,11 +30,11 @@ static int daq_test_stop(void *handle)
     return DAQ_SUCCESS;
 }
 
-void daq_test_shutdown(void *handle)
+static void daq_test_shutdown(void *handle)
 {
 }
 
-DAQ_State daq_test_check_status(void *handle)
+static DAQ_State daq_test_check_status(void *handle)
 {
     return DAQ_SUCCESS;
 }
@@ -44,7 +44,7 @@ static int daq_test_get_stats(void *handle, DAQ_Stats_t *stats)
     return DAQ_SUCCESS;
 }
 
-void daq_test_reset_stats(void *handle)
+static void daq_test_reset_stats(void *handle)
 {
 }
 
@@ -53,7 +53,7 @@ static int daq_test_get_snaplen(void *handle)
     return DAQ_SUCCESS;
 }
 
-uint32_t daq_test_get_capabilities(void *handle)
+static uint32_t daq_test_get_capabilities(void *handle)
 {
     return DAQ_SUCCESS;
 }
@@ -63,12 +63,12 @@ static int daq_test_get_datalink_type(void *handle)
     return DAQ_SUCCESS;
 }
 
-const char *daq_test_get_errbuf(void *handle)
+static const char *daq_test_get_errbuf(void *handle)
 {
     return DAQ_SUCCESS;
 }
 
-void daq_test_set_errbuf(void *handle, const char *string)
+static void daq_test_set_errbuf(void *handle, const char *string)
 {
 }
 
@@ -87,12 +87,12 @@ static int daq_test_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     return DAQ_SUCCESS;
 }
 
-DAQ_PktHdr_t *daq_test_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
+static DAQ_PktHdr_t *daq_test_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
 {
     return NULL;
 }
 
-const uint8_t *daq_test_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
+static const uint8_t *daq_test_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
 {
     return NULL;
 }

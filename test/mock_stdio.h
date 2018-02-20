@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+void mock_stdio_set_debug_capture(bool debug);
 const char *mock_stdio_get_stdout(void);
 void mock_stdio_reset_stdout(void);
 void mock_stdio_set_capture_stdout(bool capture);

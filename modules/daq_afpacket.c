@@ -1116,7 +1116,7 @@ static int afpacket_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
     AFPacketInstance *instance;
     AFPacketEntry *entry;
     DAQ_PktHdr_t *pkthdr;
-    const uint8_t *data;
+    uint8_t *data;
     unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
     int ret;
 

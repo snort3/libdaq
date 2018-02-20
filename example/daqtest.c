@@ -134,7 +134,7 @@ static void handler(int sig)
     }
 }
 
-static void usage()
+static void usage(void)
 {
     printf("Usage: daqtest -d <daq_module> -i <input> [OPTION]...\n");
     printf("  -A <ip>           Specify an IP to respond to ARPs on (may be specified multiple times)\n");
@@ -215,10 +215,10 @@ static uint16_t in_cksum(uint16_t *addr, int len)
     return (answer);
 }
 
-static void initialize_static_data()
+static void initialize_static_data(void)
 {
     char c;
-    int i;
+    unsigned i;
 
     for (c = 0, i = 0; i < IP_MAXPACKET; c++, i++)
     {
@@ -301,7 +301,7 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
     memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
 
     /* Now the ARP header... */
-    etharp_request = (struct ether_arp *) dtp->arp;
+    etharp_request = (const struct ether_arp *) dtp->arp;
     etharp_reply = (struct ether_arp *) (reply + arphdr_offset);
     memcpy(&etharp_reply->ea_hdr, &etharp_request->ea_hdr, sizeof(struct arphdr));
     etharp_reply->ea_hdr.ar_op = htons(ARPOP_REPLY);
@@ -399,6 +399,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 free(reply);
                 return DAQ_VERDICT_BLOCK;
             }
+            break;
 
         case PING_ACTION_DROP:
             printf("Blocking the ping packet.\n");
@@ -410,6 +411,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 replace_icmp_data(dtp);
                 return DAQ_VERDICT_REPLACE;
             }
+            break;
 
         case PING_ACTION_BLACKLIST:
             printf("Blacklisting the ping's flow.\n");
@@ -431,6 +433,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 printf("Blocking the original ICMP packet.\n");
                 return DAQ_VERDICT_BLOCK;
             }
+            break;
     }
     return DAQ_VERDICT_PASS;
 }
@@ -467,7 +470,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     if (ntohs(dtp->arp->ar_hrd) != ARPHRD_ETHER)
         return dtc.default_verdict;
 
-    etharp = (struct ether_arp *) dtp->arp;
+    etharp = (const struct ether_arp *) dtp->arp;
 
     printf("  Sender: ");
     print_mac(etharp->arp_sha);
@@ -566,9 +569,9 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
         offset = sizeof(*dtp->eth);
         while (ether_type == ETH_P_8021Q)
         {
-            VlanTagHdr *vlan;
+            const VlanTagHdr *vlan;
 
-            vlan = (VlanTagHdr *) (dtp->packet + offset);
+            vlan = (const VlanTagHdr *) (dtp->packet + offset);
             ether_type = ntohs(vlan->vth_proto);
             offset += sizeof(*vlan);
             printf(" %hu/%hu", VTH_VLAN(vlan), VTH_PRIORITY(vlan));
@@ -597,29 +600,29 @@ static DAQ_Verdict process_packet(DAQTestPacket *dtp)
 
 static void decode_icmp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->icmp = (struct icmphdr *) cursor;
+    dtp->icmp = (const struct icmphdr *) cursor;
 }
 
 static void decode_icmp6(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->icmp6 = (struct icmp6_hdr *) cursor;
+    dtp->icmp6 = (const struct icmp6_hdr *) cursor;
 }
 
 static void decode_tcp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->tcp = (struct tcphdr *) cursor;
+    dtp->tcp = (const struct tcphdr *) cursor;
 }
 
 static void decode_udp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->udp = (struct udphdr *) cursor;
+    dtp->udp = (const struct udphdr *) cursor;
 }
 
 static void decode_ip6(DAQTestPacket *dtp, const uint8_t *cursor)
 {
     uint16_t offset;
 
-    dtp->ip6 = (struct ip6_hdr *) cursor;
+    dtp->ip6 = (const struct ip6_hdr *) cursor;
     offset = sizeof(*dtp->ip6);
 
     switch (dtp->ip6->ip6_nxt)
@@ -640,7 +643,7 @@ static void decode_ip(DAQTestPacket *dtp, const uint8_t *cursor)
 {
     uint16_t offset;
 
-    dtp->ip = (struct iphdr *) cursor;
+    dtp->ip = (const struct iphdr *) cursor;
     if ((dtp->ip->ihl * 4) < 20)
     {
         printf("   * Invalid IP header length: %d bytes\n", dtp->ip->ihl * 4);
@@ -665,7 +668,7 @@ static void decode_ip(DAQTestPacket *dtp, const uint8_t *cursor)
 
 static void decode_arp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->arp = (struct arphdr *) cursor;
+    dtp->arp = (const struct arphdr *) cursor;
 }
 
 static void decode_eth(DAQTestPacket *dtp, const uint8_t *cursor)
@@ -673,14 +676,14 @@ static void decode_eth(DAQTestPacket *dtp, const uint8_t *cursor)
     uint16_t ether_type;
     uint16_t offset;
 
-    dtp->eth = (struct ether_header *) (cursor);
+    dtp->eth = (const struct ether_header *) (cursor);
     ether_type = ntohs(dtp->eth->ether_type);
     offset = sizeof(*dtp->eth);
     while (ether_type == ETH_P_8021Q)
     {
-        VlanTagHdr *vlan;
+        const VlanTagHdr *vlan;
 
-        vlan = (VlanTagHdr *) (cursor + offset);
+        vlan = (const VlanTagHdr *) (cursor + offset);
         ether_type = ntohs(vlan->vth_proto);
         offset += sizeof(*vlan);
         dtp->vlan_tags++;
@@ -802,7 +805,7 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
 
 static void handle_flow_stats_message(const DAQ_Msg_t *msg)
 {
-    Flow_Stats_p stats = (Flow_Stats_p) msg->msg;
+    Flow_Stats_t *stats = (Flow_Stats_t *) msg->msg;
     char addr_str[INET6_ADDRSTRLEN];
     struct in6_addr* tmpIp;
 

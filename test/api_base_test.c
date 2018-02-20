@@ -92,18 +92,21 @@ static void test_string_translation(void **state)
     assert_null(daq_verdict_string(MAX_DAQ_VERDICT));
 }
 
+DIR *__wrap_opendir(const char *name);
 DIR *__wrap_opendir(const char *name)
 {
     check_expected_ptr(name);
     return (DIR *) mock();
 }
 
+struct dirent *__wrap_readdir(DIR *dirp);
 struct dirent *__wrap_readdir(DIR *dirp)
 {
     check_expected_ptr(dirp);
     return (struct dirent *) mock();
 }
 
+int __wrap_closedir(DIR *dirp);
 int __wrap_closedir(DIR *dirp)
 {
     check_expected_ptr(dirp);
@@ -112,6 +115,7 @@ int __wrap_closedir(DIR *dirp)
 
 #ifdef __USE_EXTERN_INLINES
 
+int __wrap___xstat(int ver, const char *pathname, struct stat *buf);
 int __wrap___xstat(int ver, const char *pathname, struct stat *buf)
 {
     check_expected_ptr(pathname);
@@ -121,6 +125,7 @@ int __wrap___xstat(int ver, const char *pathname, struct stat *buf)
 
 #else
 
+int __wrap_stat(const char *pathname, struct stat *buf);
 int __wrap_stat(const char *pathname, struct stat *buf)
 {
     check_expected_ptr(pathname);
@@ -130,6 +135,7 @@ int __wrap_stat(const char *pathname, struct stat *buf)
 
 #endif /* __USE_EXTERN_INLINES */
 
+void *__wrap_dlopen(const char *filename, int flags);
 void *__wrap_dlopen(const char *filename, int flags)
 {
     check_expected_ptr(filename);
@@ -138,6 +144,7 @@ void *__wrap_dlopen(const char *filename, int flags)
     return (void *) mock();
 }
 
+void *__wrap_dlsym(void *handle, const char *symbol);
 void *__wrap_dlsym(void *handle, const char *symbol)
 {
     check_expected_ptr(handle);
@@ -146,6 +153,7 @@ void *__wrap_dlsym(void *handle, const char *symbol)
     return (void *) mock();
 }
 
+int __wrap_dlclose(void *handle);
 int __wrap_dlclose(void *handle)
 {
     check_expected_ptr(handle);

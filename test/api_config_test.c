@@ -33,8 +33,6 @@ static void test_no_config(void **state)
 
 static void test_no_module_config(void **state)
 {
-    int rval;
-
     assert_null(daq_module_config_get_module(NULL));
 
     assert_null(daq_module_config_get_next(NULL));
