@@ -226,6 +226,14 @@ different name.
 
     ./snort --daq dump --daq-var file=<name>
 
+The dump DAQ also supports text output of verdicts rendered, injected packets,
+and other such items.  In order to enable text output, the 'output' DAQ
+variable must be set to either 'text' (text output only) or 'both' (both text
+and PCAP output will be written). The default filename for the text output is
+inline-out.txt, but it can be overridden like so:
+
+    ./snort --daq dump --daq-var output=text --daq-var text-file=<filename>
+
 dump uses the pcap daq for packet acquisition.  It therefore does not count
 filtered packets (a pcap limitation).
 
