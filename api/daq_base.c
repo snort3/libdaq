@@ -218,6 +218,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     /* Prepare the DAQ module for future use. */
     base_api.api_version = DAQ_BASE_API_VERSION;
     base_api.api_size = sizeof(DAQ_BaseAPI_t);
+    base_api.module_config_get_module = daq_module_config_get_module;
     base_api.module_config_get_input = daq_module_config_get_input;
     base_api.module_config_get_snaplen = daq_module_config_get_snaplen;
     base_api.module_config_get_timeout = daq_module_config_get_timeout;
