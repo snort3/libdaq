@@ -39,7 +39,7 @@
 
 #include "daq_api.h"
 
-#define DAQ_PCAP_VERSION 3
+#define DAQ_PCAP_VERSION 4
 #define DAQ_PCAP_ROLLOVER_LIM 1000000000 //Check for rollover every billionth packet
 
 typedef struct _pcap_pkt_desc
@@ -59,6 +59,7 @@ typedef struct _pcap_context
     int timeout;
     int buffer_size;
     int no_promisc;
+    int immediate_mode;
     uint32_t netmask;
     DAQ_Mode mode;
     DAQ_Stats_t stats;
@@ -79,6 +80,7 @@ static void pcap_daq_reset_stats(void *handle);
 static DAQ_VariableDesc_t pcap_variable_descriptions[] = {
     { "buffer_size", "Packet buffer space to allocate in bytes", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
     { "no_promiscuous", "Disables opening the interface in promiscuous mode", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "immediate", "Enables immediate mode for traffic capture", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -155,6 +157,8 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
             context->buffer_size = strtol(varValue, NULL, 10);
         else if (!strcmp(varKey, "no_promiscuous"))
             context->no_promisc = 1;
+        else if (!strcmp(varKey, "immediate"))
+            context->immediate_mode = 1;
 
         daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
@@ -266,6 +270,8 @@ static int pcap_daq_start(void *handle)
         context->handle = pcap_create(context->device, context->errbuf);
         if (!context->handle)
             return DAQ_ERROR;
+        if ((status = pcap_set_immediate_mode(context->handle, context->immediate_mode ? 1 : 0)) < 0)
+            goto fail;
         if ((status = pcap_set_snaplen(context->handle, context->snaplen)) < 0)
             goto fail;
         if ((status = pcap_set_promisc(context->handle, context->no_promisc ? 0 : 1)) < 0)
