@@ -106,7 +106,7 @@ DAQ_LINKAGE int daq_instance_hup_apply(DAQ_Instance_h instance, void *new_config
 DAQ_LINKAGE int daq_instance_hup_post(DAQ_Instance_h instance, void *old_config);
 DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
                                         const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
-DAQ_LINKAGE int daq_instance_msg_receive(DAQ_Instance_h instance, const DAQ_Msg_t **msgptr);
+DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
 DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
 DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
 DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);

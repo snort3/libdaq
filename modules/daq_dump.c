@@ -422,11 +422,11 @@ static int dump_daq_dp_add_dc(void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_
     return DAQ_SUCCESS;
 }
 
-static int dump_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
+static unsigned dump_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     DumpContext *dc = (DumpContext *) handle;
 
-    return dc->wrapped_module->msg_receive(dc->wrapped_context, msgptr);
+    return dc->wrapped_module->msg_receive(dc->wrapped_context, max_recv, msgs, rstat);
 }
 
 static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };

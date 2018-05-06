@@ -324,12 +324,15 @@ DAQ_LINKAGE int daq_instance_dp_add_dc(const DAQ_Instance_t *instance, const DAQ
     return instance->module->dp_add_dc(instance->context, hdr, dp_key, packet_data, params);
 }
 
-DAQ_LINKAGE int daq_instance_msg_receive(const DAQ_Instance_t *instance, const DAQ_Msg_t **msgptr)
+DAQ_LINKAGE unsigned daq_instance_msg_receive(const DAQ_Instance_t *instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     if (!instance)
-        return DAQ_ERROR_NOCTX;
+    {
+        *rstat = DAQ_RSTAT_INVALID;
+        return 0;
+    }
 
-    return instance->module->msg_receive(instance->context, msgptr);
+    return instance->module->msg_receive(instance->context, max_recv, msgs, rstat);
 }
 
 DAQ_LINKAGE int daq_instance_msg_finalize(const DAQ_Instance_t *instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict)

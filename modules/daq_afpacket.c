@@ -48,6 +48,7 @@
 
 #define DAQ_AFPACKET_VERSION 6
 
+#define DEFAULT_POOL_SIZE 16
 #define AF_PACKET_DEFAULT_BUFFER_SIZE   128
 #define AF_PACKET_MAX_INTERFACES    32
 
@@ -98,15 +99,19 @@ typedef struct _af_packet_fanout_cfg
 
 typedef struct _af_packet_pkt_desc
 {
-    AFPacketInstance *instance;
-    AFPacketEntry *entry;
-    const uint8_t *data;
-    unsigned int length;
+    DAQ_Msg_t msg;
     DAQ_PktHdr_t pkthdr;
+    uint8_t *data;
+    AFPacketInstance *instance;
+    unsigned int length;
+    struct _af_packet_pkt_desc *next;
 } AFPacketPktDesc;
 
 typedef struct _afpacket_context
 {
+    AFPacketPktDesc *pool;
+    AFPacketPktDesc *pkt_freelist;
+    unsigned pool_size;
     char *device;
     char *filter;
     int snaplen;
@@ -125,8 +130,6 @@ typedef struct _afpacket_context
 #endif
     /* Message receive state */
     AFPacketInstance *curr_instance;
-    DAQ_Msg_t curr_msg;
-    AFPacketPktDesc curr_packet;
 } AFPacket_Context_t;
 
 /* VLAN defintions stolen from LibPCAP's vlan.h. */
@@ -145,6 +148,57 @@ static DAQ_VariableDesc_t afpacket_variable_descriptions[] = {
 
 static const int vlan_offset = 2 * ETH_ALEN;
 static DAQ_BaseAPI_t daq_base_api;
+
+static void destroy_packet_pool(AFPacket_Context_t *context)
+{
+    if (context->pool)
+    {
+        while (context->pool_size > 0)
+            free(context->pool[--context->pool_size].data);
+        free(context->pool);
+        context->pool = NULL;
+    }
+    context->pkt_freelist = NULL;
+}
+
+static int create_packet_pool(AFPacket_Context_t *context, unsigned size)
+{
+    context->pool = calloc(sizeof(AFPacketPktDesc), size);
+    if (!context->pool)
+    {
+        DPE(context->errbuf, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
+                __func__, sizeof(AFPacketPktDesc) * size);
+        return DAQ_ERROR_NOMEM;
+    }
+    while (context->pool_size < size)
+    {
+        /* Allocate packet data and set up descriptor */
+        AFPacketPktDesc *desc = &context->pool[context->pool_size];
+        desc->data = malloc(context->snaplen);
+        if (!desc->data)
+        {
+            DPE(context->errbuf, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
+                    __func__, sizeof(AFPacketPktDesc) * size);
+            return DAQ_ERROR_NOMEM;
+        }
+
+        /* Initialize non-zero invariant packet header fields. */
+        DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+        pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
+        pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
+
+        DAQ_Msg_t *msg = &desc->msg;
+        msg->type = DAQ_MSG_TYPE_PACKET;
+        msg->msg = desc;
+
+        /* Place it on the free list */
+        desc->next = context->pkt_freelist;
+        context->pkt_freelist = desc;
+
+        context->pool_size++;
+    }
+    return DAQ_SUCCESS;
+}
 
 static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
@@ -723,6 +777,12 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
         goto err;
     }
 
+    if (create_packet_pool(afpc, DEFAULT_POOL_SIZE) != DAQ_SUCCESS)
+    {
+        snprintf(errbuf, errlen, "%s", afpc->errbuf);
+        goto err;
+    }
+
     /*
      * Determine the dimensions of the kernel RX ring(s) to request.
      */
@@ -805,6 +865,8 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_
 
     afpc->curr_instance = afpc->instances;
 
+    afpc->pool = malloc(afpc->snaplen);
+
     afpc->state = DAQ_STATE_INITIALIZED;
 
     *ctxt_ptr = afpc;
@@ -816,6 +878,7 @@ err:
         af_packet_close(afpc);
         if (afpc->device)
             free(afpc->device);
+        destroy_packet_pool(afpc);
         free(afpc);
     }
     return rval;
@@ -962,6 +1025,7 @@ static void afpacket_daq_shutdown(void *handle)
         free(afpc->device);
     if (afpc->filter)
         free(afpc->filter);
+    destroy_packet_pool(afpc);
     free(afpc);
 }
 
@@ -1105,108 +1169,136 @@ static inline int afpacket_wait_for_packet(AFPacket_Context_t *afpc)
     return 1;
 }
 
-static inline void afpacket_free_packet(AFPacket_Context_t *afpc, AFPacketPktDesc *desc)
-{
-    desc->entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
-}
-
-static int afpacket_daq_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
+static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
     AFPacketInstance *instance;
-    AFPacketEntry *entry;
-    DAQ_PktHdr_t *pkthdr;
-    uint8_t *data;
-    unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
-    int ret;
+    DAQ_RecvStatus status = DAQ_RSTAT_OK;
+    unsigned idx;
 
-    *msgptr = NULL;
-    do
+    for (idx = 0; idx < max_recv; idx++)
     {
-        entry = afpacket_find_packet(afpc);
-        if (!entry)
+        /* Make sure that we have a packet descriptor available to populate. */
+        AFPacketPktDesc *desc = afpc->pkt_freelist;
+        if (!desc)
         {
-            while ((ret = afpacket_wait_for_packet(afpc)) == DAQ_ERROR_AGAIN);
-            if (ret <= 0)
-                return ret;
-            continue;
+            *rstat = DAQ_RSTAT_NOBUF;
+            break;
         }
-        tp_len = entry->hdr.h2->tp_len;
-        tp_mac = entry->hdr.h2->tp_mac;
-        tp_snaplen = entry->hdr.h2->tp_snaplen;
-        tp_sec = entry->hdr.h2->tp_sec;
-        tp_usec = entry->hdr.h2->tp_nsec / 1000;
-        instance = afpc->curr_instance;
-        if (tp_mac + tp_snaplen > instance->rx_ring.layout.tp_frame_size)
+
+        /* Attempt to receive a packet into it, skipping filtered packets along the way. */
+        do
         {
-            DPE(afpc->errbuf, "%s: Corrupted frame on kernel ring (MAC offset %u + CapLen %u > FrameSize %d)",
-                    __func__, tp_mac, tp_snaplen, afpc->curr_instance->rx_ring.layout.tp_frame_size);
-            return DAQ_ERROR;
-        }
-        data = entry->hdr.raw + tp_mac;
-        /* Make a valiant attempt at reconstructing the VLAN tag if it has been stripped.  This really sucks. :( */
-        if ((instance->tp_version == TPACKET_V2) &&
+            AFPacketEntry *entry = afpacket_find_packet(afpc);
+            if (!entry)
+            {
+                /* Only block waiting for a packet if we haven't received anything yet. */
+                if (idx != 0)
+                {
+                    status = DAQ_RSTAT_WOULD_BLOCK;
+                    break;
+                }
+                int ret;
+                while ((ret = afpacket_wait_for_packet(afpc)) == DAQ_ERROR_AGAIN);
+                if (ret <= 0)
+                {
+                    if (ret == 0)
+                        status = DAQ_RSTAT_TIMEOUT;
+                    else
+                        status = DAQ_RSTAT_ERROR;
+                    break;
+                }
+                continue;
+            }
+            unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
+            tp_len = entry->hdr.h2->tp_len;
+            tp_mac = entry->hdr.h2->tp_mac;
+            tp_snaplen = entry->hdr.h2->tp_snaplen;
+            tp_sec = entry->hdr.h2->tp_sec;
+            tp_usec = entry->hdr.h2->tp_nsec / 1000;
+            instance = afpc->curr_instance;
+            if (tp_mac + tp_snaplen > instance->rx_ring.layout.tp_frame_size)
+            {
+                DPE(afpc->errbuf, "%s: Corrupted frame on kernel ring (MAC offset %u + CapLen %u > FrameSize %d)",
+                        __func__, tp_mac, tp_snaplen, afpc->curr_instance->rx_ring.layout.tp_frame_size);
+                status = DAQ_RSTAT_ERROR;
+                break;
+            }
+            uint8_t *data = entry->hdr.raw + tp_mac;
+            /* Make a valiant attempt at reconstructing the VLAN tag if it has been stripped.  This really sucks. :( */
+            if ((instance->tp_version == TPACKET_V2) &&
 #if defined(TP_STATUS_VLAN_VALID)
-                (entry->hdr.h2->tp_vlan_tci || (entry->hdr.h2->tp_status & TP_STATUS_VLAN_VALID)) &&
+                    (entry->hdr.h2->tp_vlan_tci || (entry->hdr.h2->tp_status & TP_STATUS_VLAN_VALID)) &&
 #else
-                entry->hdr.h2->tp_vlan_tci &&
+                    entry->hdr.h2->tp_vlan_tci &&
 #endif
-                tp_snaplen >= (unsigned int) vlan_offset)
-        {
-            struct vlan_tag *tag;
+                    tp_snaplen >= (unsigned int) vlan_offset)
+            {
+                struct vlan_tag *tag;
 
-            data -= VLAN_TAG_LEN;
-            memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
+                data -= VLAN_TAG_LEN;
+                memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
 
-            tag = (struct vlan_tag *) (data + vlan_offset);
+                tag = (struct vlan_tag *) (data + vlan_offset);
 #if defined(TP_STATUS_VLAN_TPID_VALID)
-            if (entry->hdr.h2->tp_vlan_tpid && (entry->hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
-                tag->vlan_tpid = htons(entry->hdr.h2->tp_vlan_tpid);
-            else
+                if (entry->hdr.h2->tp_vlan_tpid && (entry->hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
+                    tag->vlan_tpid = htons(entry->hdr.h2->tp_vlan_tpid);
+                else
 #endif
-                tag->vlan_tpid = htons(ETH_P_8021Q);
-            tag->vlan_tci = htons(entry->hdr.h2->tp_vlan_tci);
+                    tag->vlan_tpid = htons(ETH_P_8021Q);
+                tag->vlan_tci = htons(entry->hdr.h2->tp_vlan_tci);
 
-            tp_snaplen += VLAN_TAG_LEN;
-            tp_len += VLAN_TAG_LEN;
-        }
-        /* Check to see if this hits the BPF.  If it does, dispose of it and
-            move on to the next packet (transmitting in the inline scenario). */
-        if (afpc->fcode.bf_insns && sfbpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
-        {
-            afpc->stats.packets_filtered++;
-            afpacket_transmit_packet(instance->peer, data, tp_snaplen);
-            afpacket_free_packet(afpc, &afpc->curr_packet);
-            continue;
-        }
-        /* Set up the packet descriptor. */
-        afpc->curr_packet.instance = instance;
-        afpc->curr_packet.entry = entry;
-        afpc->curr_packet.data = data;
-        afpc->curr_packet.length = tp_snaplen;
-        /* Then, set up the DAQ packet header. */
-        pkthdr = &afpc->curr_packet.pkthdr;
-        pkthdr->ts.tv_sec = tp_sec;
-        pkthdr->ts.tv_usec = tp_usec;
-        pkthdr->caplen = tp_snaplen;
-        pkthdr->pktlen = tp_len;
-        pkthdr->ingress_index = instance->index;
-        pkthdr->egress_index = instance->peer ? instance->peer->index : DAQ_PKTHDR_UNKNOWN;
-        pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->flags = 0;
-        pkthdr->opaque = 0;
-        pkthdr->priv_ptr = NULL;
-        pkthdr->address_space_id = 0;
-        /* Finally, set up the DAQ message descriptor and return it. */
-        afpc->curr_msg.type = DAQ_MSG_TYPE_PACKET;
-        afpc->curr_msg.msg = &afpc->curr_packet;
-        *msgptr = &afpc->curr_msg;
+                tp_snaplen += VLAN_TAG_LEN;
+                tp_len += VLAN_TAG_LEN;
+            }
+            /* Check to see if this hits the BPF.  If it does, dispose of it and
+               move on to the next packet (transmitting in the inline scenario). */
+            if (afpc->fcode.bf_insns && sfbpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
+            {
+                afpc->stats.packets_filtered++;
+                afpacket_transmit_packet(instance->peer, data, tp_snaplen);
+                entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
+                continue;
+            }
+            /* Populate the packet descriptor, copying the packet data and releasing the packet
+                ring entry back to the kernel for reuse. */
+            memcpy(desc->data, data, tp_snaplen);
+            entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
+            desc->instance = instance;
+            desc->length = tp_snaplen;
 
-        return DAQ_SUCCESS;
-    } while (!afpc->break_loop);
+            /* Then, set up the DAQ packet header. */
+            DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+            pkthdr->ts.tv_sec = tp_sec;
+            pkthdr->ts.tv_usec = tp_usec;
+            pkthdr->caplen = tp_snaplen;
+            pkthdr->pktlen = tp_len;
+            pkthdr->ingress_index = instance->index;
+            pkthdr->egress_index = instance->peer ? instance->peer->index : DAQ_PKTHDR_UNKNOWN;
+            pkthdr->flags = 0;
+            /* The following fields should remain in their virgin state:
+                address_space_id (0)
+                ingress_group (DAQ_PKTHDR_UNKNOWN)
+                egress_group (DAQ_PKTHDR_UNKNOWN)
+                opaque (0)
+                flow_id (0)
+            */
 
-    return DAQ_SUCCESS;
+            /* Last, but not least, extract this descriptor from the free list and insert it in message vector. */
+            afpc->pkt_freelist = desc->next;
+            desc->next = NULL;
+            msgs[idx] = &desc->msg;
+
+            break;
+        } while (!afpc->break_loop);
+
+        if (status != DAQ_RSTAT_OK || afpc->break_loop)
+            break;
+    }
+
+    *rstat = status;
+
+    return idx;
 }
 
 static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
@@ -1222,20 +1314,19 @@ static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
 static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    AFPacketPktDesc *desc;
+    AFPacketPktDesc *desc = (AFPacketPktDesc *) msg->msg;
 
-    desc = (AFPacketPktDesc *) msg->msg;
-    /* FIXME: Temporary sanity check. */
-    if (msg != &afpc->curr_msg || desc != &afpc->curr_packet)
-        return DAQ_ERROR;
-    /* Sanitize the verdict. */
+    /* Sanitize and enact the verdict. */
     if (verdict >= MAX_DAQ_VERDICT)
         verdict = DAQ_VERDICT_PASS;
     afpc->stats.verdicts[verdict]++;
     verdict = verdict_translation_table[verdict];
     if (verdict == DAQ_VERDICT_PASS)
         afpacket_transmit_packet(desc->instance->peer, desc->data, desc->length);
-    afpacket_free_packet(afpc, desc);
+
+    /* Toss the descriptor back on the free list for reuse. */
+    desc->next = afpc->pkt_freelist;
+    afpc->pkt_freelist = desc;
 
     return DAQ_SUCCESS;
 }

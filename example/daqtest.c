@@ -1192,11 +1192,10 @@ int main(int argc, char *argv[])
     DAQ_Module_h module;
     DAQ_Config_h config;
     DAQ_Stats_t stats;
-    DAQ_Verdict verdict;
-    const DAQ_Msg_t *msg;
-    unsigned int i, timeout_count = 0;
+    unsigned int i, max_recv, timeout_count;
     char *key, *value;
     char errbuf[256];
+    uint64_t recv_counters[MAX_DAQ_RSTAT];
     int rval;
 
     cfg = &dtc;
@@ -1309,43 +1308,75 @@ int main(int argc, char *argv[])
     print_mac(local_mac_addr);
     printf("\n");
 
+    memset(recv_counters, 0, sizeof(recv_counters));
+    max_recv = timeout_count = 0;
     while (notdone && (!cfg->packet_limit || packet_count < cfg->packet_limit))
     {
-        rval = daq_instance_msg_receive(instance,  &msg);
-        if (rval < 0)
+        const DAQ_Msg_t *msgs[16];
+        DAQ_RecvStatus rstat;
+        unsigned num_recv;
+
+        num_recv = daq_instance_msg_receive(instance, 16, msgs, &rstat);
+        recv_counters[rstat]++;
+        if (num_recv > max_recv)
+            max_recv = num_recv;
+
+        for (unsigned idx = 0; idx < num_recv; idx++)
         {
-            //if (rval == DAQ_READFILE_EOF && cfg->mode == DAQ_MODE_READ_FILE)
-            if (rval == DAQ_READFILE_EOF)
+            const DAQ_Msg_t *msg = msgs[idx];
+            DAQ_Verdict verdict = DAQ_VERDICT_PASS;
+            switch (msg->type)
+            {
+                case DAQ_MSG_TYPE_PACKET:
+                    verdict = handle_packet_message(msg);
+                    break;
+                case DAQ_MSG_TYPE_SOF:
+                case DAQ_MSG_TYPE_EOF:
+                    handle_flow_stats_message(msg);
+                    break;
+                default:
+                    break;
+            }
+            daq_instance_msg_finalize(instance, msg, verdict);
+        }
+
+        if (rstat != DAQ_RSTAT_OK && rstat != DAQ_RSTAT_WOULD_BLOCK)
+        {
+            if (rstat == DAQ_RSTAT_TIMEOUT)
+            {
+                timeout_count++;
+                if (!cfg->timeout_limit || timeout_count < cfg->timeout_limit)
+                    continue;
+            }
+            else if (rstat == DAQ_RSTAT_EOF)
                 printf("Read the entire file!\n");
-            else
-                fprintf(stderr, "Error acquiring packets! (%d)\n", rval);
+            else if (rstat == DAQ_RSTAT_NOBUF)
+                printf("Ran out of buffers to use, this really shouldn't happen...\n");
+            else if (rstat == DAQ_RSTAT_ERROR)
+                fprintf(stderr, "Error receiving messages: %s\n", daq_instance_get_error(instance));
             break;
         }
-        /* Timeout? */
-        if (!msg)
-        {
-            timeout_count++;
-            if (cfg->timeout_limit && timeout_count >= cfg->timeout_limit)
-                break;
-            continue;
-        }
-        verdict = DAQ_VERDICT_PASS;
-        switch (msg->type)
-        {
-            case DAQ_MSG_TYPE_PACKET:
-                verdict = handle_packet_message(msg);
-                break;
-            case DAQ_MSG_TYPE_SOF:
-            case DAQ_MSG_TYPE_EOF:
-                handle_flow_stats_message(msg);
-                break;
-            default:
-                break;
-        }
-        daq_instance_msg_finalize(instance, msg, verdict);
     }
 
     printf("\nDAQ receive timed out %u times.\n", timeout_count);
+    printf("Maximum messages received in a burst: %u\n", max_recv);
+
+    printf("\n*Receive Status Counters*\n");
+    const char *recv_status_string[MAX_DAQ_RSTAT] = {
+        "Ok",           // DAQ_RSTAT_OK
+        "Would Block",  // DAQ_RSTAT_WOULD_BLOCK
+        "Timeout",      // DAQ_RSTAT_TIMEOUT
+        "End of File",  // DAQ_RSTAT_EOF
+        "No Buffers",   // DAQ_RSTAT_NOBUF
+        "Error",        // DAQ_RSTAT_ERROR
+        "Invalid",      // DAQ_RSTAT_INVALID
+    };
+    for (i = 0; i < MAX_DAQ_RSTAT; i++)
+    {
+        if (recv_counters[i])
+            printf("  %s: %" PRIu64 "\n", recv_status_string[i], recv_counters[i]);
+    }
+    printf("\n");
 
     if ((rval = daq_instance_get_stats(instance, &stats)) != 0)
         fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_instance_get_error(instance));

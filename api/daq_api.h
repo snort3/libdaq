@@ -117,7 +117,7 @@ typedef struct _daq_module_api
     /* Query a flow */
     int (*query_flow) (void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
 
-    int (*msg_receive) (void *handle, const DAQ_Msg_t **msgptr);
+    unsigned (*msg_receive) (void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
     int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
     DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
     const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);

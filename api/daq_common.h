@@ -82,6 +82,18 @@
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
 #define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
+typedef enum
+{
+    DAQ_RSTAT_OK = 0,
+    DAQ_RSTAT_WOULD_BLOCK,
+    DAQ_RSTAT_TIMEOUT,
+    DAQ_RSTAT_EOF,
+    DAQ_RSTAT_NOBUF,
+    DAQ_RSTAT_ERROR,
+    DAQ_RSTAT_INVALID,
+    MAX_DAQ_RSTAT
+} DAQ_RecvStatus;
+
 typedef const struct _daq_module_api *DAQ_Module_h;
 typedef const struct _daq_instance *DAQ_Instance_h;
 
@@ -188,8 +200,6 @@ typedef struct _daq_pkt_hdr
     uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
 
     DAQ_PktDecodeData_t decode_data;    /* Decoded packet data */
-
-    void *priv_ptr;             /* Private data pointer (for DAQ module use only) */
 
     /* Real values for NAT'ed connections */
     struct in6_addr real_sIP;
