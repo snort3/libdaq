@@ -222,22 +222,6 @@ AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 #fi
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
-# IPQ Module
-#AC_ARG_ENABLE(ipq-module,
-#              AS_HELP_STRING([--disable-ipq-module],[do not build the bundled IPQ module]),
-#              [enable_ipq_module="$enableval"], [enable_ipq_module="$DEFAULT_ENABLE"])
-#if test "$enable_ipq_module" = yes; then
-#    AC_CHECK_HEADERS([netinet/in.h libipq.h], [], [enable_ipq_module=no])
-#    AC_CHECK_HEADER([linux/netfilter.h], [], [enable_ipq_module=no],
-#                    [
-#                        #include <netinet/in.h>
-#                    ])
-#    if test "$enable_ipq_module" = yes; then
-#        STATIC_LIBS="${STATIC_LIBS} -lipq -lsfbpf"
-#    fi
-#fi
-AM_CONDITIONAL([BUILD_IPQ_MODULE], [test "$enable_ipq_module" = yes])
-
 # NFQ Module
 #AC_ARG_ENABLE(nfq-module,
 #              AS_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
@@ -295,7 +279,7 @@ AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 #fi
 AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 
-if test "$enable_ipq_module" = yes -o "$enable_nfq_module" = yes ; then
+if test "$enable_nfq_module" = yes ; then
     AC_CHECK_HEADERS(dnet.h,,DNET_H="no")
     AC_CHECK_HEADERS(dumbnet.h,,DUMBNET_H="no")
 
@@ -336,7 +320,6 @@ AC_SUBST(DNET_LDFLAGS)
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
                                       "$enable_ipfw_module" = yes -o \
-                                      "$enable_ipq_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
                                       "$enable_pcap_module" = yes])
 
@@ -412,9 +395,8 @@ AC_MSG_RESULT([
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
     Build Dump DAQ module...... : $enable_dump_module
-#   Build IPFW DAQ module...... : $enable_ipfw_module
-#   Build IPQ DAQ module....... : $enable_ipq_module
-#   Build NFQ DAQ module....... : $enable_nfq_module
+    Build IPFW DAQ module...... : $enable_ipfw_module
+    Build NFQ DAQ module....... : $enable_nfq_module
     Build PCAP DAQ module...... : $enable_pcap_module
-#   Build netmap DAQ module.... : $enable_netmap_module
+    Build netmap DAQ module.... : $enable_netmap_module
 ])

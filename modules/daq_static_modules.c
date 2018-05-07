@@ -32,9 +32,6 @@ const DAQ_ModuleAPI_t *static_modules[] =
 #ifdef BUILD_IPFW_MODULE
     &ipfw_daq_module_data,
 #endif
-#ifdef BUILD_IPQ_MODULE
-    &ipq_daq_module_data,
-#endif
 #ifdef BUILD_NFQ_MODULE
     &nfq_daq_module_data,
 #endif

@@ -30,9 +30,6 @@ extern const DAQ_ModuleAPI_t dump_daq_module_data;
 #ifdef BUILD_IPFW_MODULE
 extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
 #endif
-#ifdef BUILD_IPQ_MODULE
-extern const DAQ_ModuleAPI_t ipq_daq_module_data;
-#endif
 #ifdef BUILD_NFQ_MODULE
 extern const DAQ_ModuleAPI_t nfq_daq_module_data;
 #endif

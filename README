@@ -23,7 +23,7 @@ This will build and install both static and dynamic DAQ modules.
 Note that pcap >= 1.5.0 is required.  pcap 1.8.1 is available at the time
 of this writing and is recommended.
 
-Also, libdnet is required for IPQ and NFQ DAQs.  If you get a relocation error
+Also, libdnet is required for the NFQ module.  If you get a relocation error
 trying to build those DAQs, you may need to reinstall libdnet and configure it
 with something like this:
 
@@ -173,33 +173,6 @@ and won't change user or group.
 Notes on iptables are given below.
 
 
-IPQ Module
-==========
-
-IPQ is the old way to process iptables packets.  It replaces the inline version
-available in pre-2.9 versions built with this:
-
-    ./configure --enable-inline
-
-Note that layer 2 resets are not supported with the IPQ DAQ:
-
-    config layer2resets[: <mac>]
-
-Start the IPQ DAQ as follows:
-
-    ./snort --daq ipq \
-        [--daq-var device=<dev>] \
-        [--daq-var proto=<proto>] \
-
-    <dev> ::= ip | eth0, etc; default is IP injection
-    <proto> ::= ip4 | ip6; default is ip4
-
-This module can not run unprivileged so ./snort -u -g will produce a warning
-and won't change user or group.
-
-Notes on iptables are given below.
-
-
 IPFW Module
 ===========
 
@@ -326,7 +299,7 @@ Notes on iptables
 =================
 
 These notes are just a quick reminder that you need to set up iptables to use
-the IPQ or NFQ DAQs.  Doing so may cause problems with your network so tread
+the NFQ DAQs.  Doing so may cause problems with your network so tread
 carefully.  The examples below are intentionally incomplete so please read the
 related documentation first.
 
@@ -338,10 +311,6 @@ You can check this out for queue sizing tips:
 
     http://www.inliniac.net/blog/2008/01/23/improving-snort_inlines-nfq-performance.html
 
-You might find useful IPQ info here:
-
-    http://snort-inline.sourceforge.net/
-
 Use this to examine your iptables:
 
     sudo /sbin/iptables -L
@@ -352,10 +321,6 @@ Use something like this to set up NFQ:
         -I <table> [<protocol stuff>] [<state stuff>]
         -j NFQUEUE --queue-num 1
 
-Use something like this to set up IPQ:
-
-    sudo iptables -I FORWARD -j QUEUE
-
 Use something like this to "disconnect" snort:
 
     sudo /sbin/iptables -D <table> <rule pos>
@@ -364,22 +329,6 @@ Be sure to start Snort prior to routing packets through NFQ with iptables.
 Such packets will be dropped until Snort is started.
 
 The queue-num is the number you must give Snort.
-
-If you are running on a system with both NFQ and IPQ support, you may
-experience some start-up failures of the sort:
-
-The solution seems to be to remove both modules from the kernel like this:
-
-    modprobe -r nfnetlink_queue
-    modprobe -r ip_queue
-
-and then install the module you want:
-
-    modprobe ip_queue
-
-or:
-
-    modprobe nfnetlink_queue
 
 These DAQs should be run with a snaplen of 65535 since the kernel defrags the
 packets before queuing.  Also, no need to configure frag3.

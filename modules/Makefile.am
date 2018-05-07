@@ -57,18 +57,6 @@ endif
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_IPFW_MODULE
 endif
 
-if BUILD_IPQ_MODULE
-if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_ipq.la
-    daq_ipq_la_SOURCES = daq_ipq.c
-    daq_ipq_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_ipq_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @DNET_LDFLAGS@
-    daq_ipq_la_LIBADD = -lipq @DNET_LDFLAGS@ $(top_builddir)/sfbpf/libsfbpf.la
-endif
-    libdaq_static_modules_la_SOURCES += daq_ipq.c
-    libdaq_static_modules_la_CPPFLAGS += -DBUILD_IPQ_MODULE
-endif
-
 if BUILD_NFQ_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += daq_nfq.la
