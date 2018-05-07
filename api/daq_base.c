@@ -176,8 +176,8 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     /* Check to make sure that all of the required function pointers are populated. */
     if (!dm->prepare || !dm->initialize || !dm->start || !dm->inject || !dm->breakloop ||
         !dm->stop || !dm->shutdown || !dm->check_status || !dm->get_stats || !dm->reset_stats ||
-        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type || !dm->get_errbuf ||
-        !dm->set_errbuf || !dm->get_device_index || !dm->msg_receive || !dm->msg_finalize ||
+        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type ||
+        !dm->get_device_index || !dm->msg_receive || !dm->msg_finalize ||
         !dm->packet_header_from_msg || !dm->packet_data_from_msg)
     {
         fprintf(stderr, "%s: Module definition is missing function pointer(s)!\n", dm->name);
@@ -227,6 +227,9 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     base_api.module_config_first_variable = daq_module_config_first_variable;
     base_api.module_config_next_variable = daq_module_config_next_variable;
     base_api.module_config_get_next = daq_module_config_get_next;
+    base_api.instance_set_context = daq_instance_set_context;
+    base_api.instance_get_context = daq_instance_get_context;
+    base_api.instance_set_errbuf = daq_instance_set_errbuf;
     if ((rval = dm->prepare(&base_api)) != DAQ_SUCCESS)
     {
         fprintf(stderr, "%s: Error preparing module for use! (%d)\n", dm->name, rval);

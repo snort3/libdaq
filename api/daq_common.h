@@ -95,7 +95,7 @@ typedef enum
 } DAQ_RecvStatus;
 
 typedef const struct _daq_module_api *DAQ_Module_h;
-typedef const struct _daq_instance *DAQ_Instance_h;
+typedef struct _daq_instance *DAQ_Instance_h;
 
 typedef enum
 {

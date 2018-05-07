@@ -48,6 +48,8 @@ typedef enum {
 
 typedef struct
 {
+    DAQ_Instance_h instance;
+
     // delegate most stuff to the wrapped module
     const DAQ_ModuleAPI_t *wrapped_module;
     void *wrapped_context;
@@ -105,7 +107,7 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(dump_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errBuf, size_t errMax)
+static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
 {
     DAQ_ModuleConfig_h subconfig;
     DumpContext *dc;
@@ -115,16 +117,17 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     subconfig = daq_base_api.module_config_get_next(config);
     if (!subconfig)
     {
-        snprintf(errBuf, errMax, "%s: No submodule configuration provided", __func__);
+        daq_base_api.instance_set_errbuf(instance, "%s: No submodule configuration provided", __func__);
         return DAQ_ERROR_INVAL;
     }
 
     dc = calloc(1, sizeof(DumpContext));
     if (!dc)
     {
-        snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the DAQ context", __func__);
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the DAQ context", __func__);
         return DAQ_ERROR_NOMEM;
     }
+    dc->instance = instance;
     dc->output_type = DUMP_OUTPUT_PCAP;
 
     daq_base_api.module_config_first_variable(config, &varKey, &varValue);
@@ -135,7 +138,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
             dc->pcap_filename = strdup(varValue);
             if (!dc->pcap_filename)
             {
-                snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the PCAP output filename", __func__);
+                daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the PCAP output filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }
@@ -145,7 +148,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
             dc->text_filename = strdup(varValue);
             if (!dc->text_filename)
             {
-                snprintf(errBuf, errMax, "%s: Couldn't allocate memory for the text output filename", __func__);
+                daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the text output filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }
@@ -162,7 +165,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
                 dc->output_type = DUMP_OUTPUT_BOTH;
             else
             {
-                snprintf(errBuf, errMax, "%s: Invalid output type (%s)", __func__, varValue);
+                daq_base_api.instance_set_errbuf(instance, "%s: Invalid output type (%s)", __func__, varValue);
                 free(dc);
                 return DAQ_ERROR_INVAL;
             }
@@ -171,7 +174,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
     }
 
     dc->wrapped_module = daq_base_api.module_config_get_module(subconfig);
-    rval = dc->wrapped_module->initialize(subconfig, &dc->wrapped_context, errBuf, errMax);
+    rval = dc->wrapped_module->initialize(subconfig, instance);
     if (rval != DAQ_SUCCESS)
     {
         if (dc->pcap_filename)
@@ -182,7 +185,8 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr,
         return rval;
     }
 
-    *ctxt_ptr = dc;
+    dc->wrapped_context = daq_base_api.instance_get_context(instance);
+    daq_base_api.instance_set_context(instance, dc);
 
     return DAQ_SUCCESS;
 }
@@ -222,7 +226,7 @@ static int dump_daq_inject (void *handle, const DAQ_PktHdr_t* hdr, const uint8_t
 
         if (ferror(pcap_dump_file(dc->dump)))
         {
-            dc->wrapped_module->set_errbuf(dc->wrapped_context, "inject can't write to dump file");
+            daq_base_api.instance_set_errbuf(dc->instance, "inject can't write to dump file");
             return DAQ_ERROR;
         }
     }
@@ -254,7 +258,7 @@ static int dump_daq_start(void* handle)
         if (!dc->dump)
         {
             dc->wrapped_module->stop(dc->wrapped_context);
-            dc->wrapped_module->set_errbuf(dc->wrapped_context, "can't open dump file");
+            daq_base_api.instance_set_errbuf(dc->instance, "can't open dump file");
             return DAQ_ERROR;
         }
         pcap_close(pcap);
@@ -268,7 +272,7 @@ static int dump_daq_start(void* handle)
         if (!dc->text_out)
         {
             dc->wrapped_module->stop(dc->wrapped_context);
-            dc->wrapped_module->set_errbuf(dc->wrapped_context, "can't open text output file");
+            daq_base_api.instance_set_errbuf(dc->instance, "can't open text output file");
             return DAQ_ERROR;
         }
     }
@@ -359,20 +363,6 @@ static int dump_daq_get_datalink_type (void *handle)
     DumpContext *dc = (DumpContext *) handle;
 
     return dc->wrapped_module->get_datalink_type(dc->wrapped_context);
-}
-
-static const char* dump_daq_get_errbuf (void* handle)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->get_errbuf(dc->wrapped_context);
-}
-
-static void dump_daq_set_errbuf (void* handle, const char* s)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    dc->wrapped_module->set_errbuf(dc->wrapped_context, s ? s : "");
 }
 
 static int dump_daq_get_device_index(void *handle, const char *device)
@@ -516,8 +506,6 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .get_snaplen = */ dump_daq_get_snaplen,
     /* .get_capabilities = */ dump_daq_get_capabilities,
     /* .get_datalink_type = */ dump_daq_get_datalink_type,
-    /* .get_errbuf = */ dump_daq_get_errbuf,
-    /* .set_errbuf = */ dump_daq_set_errbuf,
     /* .get_device_index = */ dump_daq_get_device_index,
     /* .modify_flow = */ dump_daq_modify_flow,
     /* .hup_prep = */ NULL,

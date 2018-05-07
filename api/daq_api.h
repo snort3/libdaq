@@ -41,6 +41,10 @@ typedef struct _daq_base_api
     int (*module_config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
     int (*module_config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
     DAQ_ModuleConfig_h (*module_config_get_next) (DAQ_ModuleConfig_h modcfg);
+    /* Instance operations */
+    void (*instance_set_context) (DAQ_Instance_h instance, void *context);
+    void *(*instance_get_context) (DAQ_Instance_h instance);
+    void (*instance_set_errbuf) (DAQ_Instance_h instance, const char *format, ...);
 } DAQ_BaseAPI_t;
 
 #define DAQ_MODULE_API_VERSION    0x00010004
@@ -64,7 +68,7 @@ typedef struct _daq_module_api
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
-    int (*initialize) (const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t len);
+    int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_Instance_h instance);
     /* Set the module's BPF based on the given string */
     int (*set_filter) (void *handle, const char *filter);
     /* Complete device opening and begin queuing packets if they have not been already. */
@@ -89,10 +93,6 @@ typedef struct _daq_module_api
     uint32_t (*get_capabilities) (void *handle);
     /* Return the instance's Data Link Type */
     int (*get_datalink_type) (void *handle);
-    /* Return a pointer to the module's internal error buffer */
-    const char * (*get_errbuf) (void *handle);
-    /* Write a string to the module instance's internal error buffer */
-    void (*set_errbuf) (void *handle, const char *string);
     /* Return the index of the given named device if possible. */
     int (*get_device_index) (void *handle, const char *device);
     /* Modify a flow */

@@ -97,7 +97,6 @@ DAQ_LINKAGE int daq_instance_get_snaplen(DAQ_Instance_h instance);
 DAQ_LINKAGE uint32_t daq_instance_get_capabilities(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_datalink_type(DAQ_Instance_h instance);
 DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_h instance);
-DAQ_LINKAGE void daq_instance_clear_error(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_device_index(DAQ_Instance_h instance, const char *device);
 DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
 DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
