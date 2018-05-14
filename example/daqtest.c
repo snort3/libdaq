@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
+#include <netinet/icmp6.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
@@ -455,6 +456,23 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
     return dtc.default_verdict;
 }
 
+static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
+{
+    unsigned int dlen;
+
+    dlen = ntohs(dtp->ip6->ip6_plen) - sizeof(struct ip6_hdr) - sizeof(struct icmp6_hdr);
+    printf("  ICMP: Type %hu  Code %hu  Checksum %hu  (%u bytes of data)\n",
+           dtp->icmp6->icmp6_type, dtp->icmp6->icmp6_code, dtp->icmp6->icmp6_cksum, dlen);
+    if (dtp->icmp6->icmp6_type == ICMP6_ECHO_REQUEST || dtp->icmp6->icmp6_type == ICMP6_ECHO_REPLY)
+    {
+        printf("   Echo: ID %hu  Sequence %hu\n",
+               ntohs(dtp->icmp6->icmp6_id), ntohs(dtp->icmp6->icmp6_seq));
+        //return process_ping(dtp);
+    }
+
+    return dtc.default_verdict;
+}
+
 static DAQ_Verdict process_arp(DAQTestPacket *dtp)
 {
     const struct ether_arp *etharp;
@@ -513,7 +531,22 @@ static DAQ_Verdict process_ip6(DAQTestPacket *dtp)
     /* Print source and destination IP addresses. */
     inet_ntop(AF_INET6, &dtp->ip6->ip6_src, src_addr_str, sizeof(src_addr_str));
     inet_ntop(AF_INET6, &dtp->ip6->ip6_dst, dst_addr_str, sizeof(dst_addr_str));
-    printf(" IP: %s -> %s\n", src_addr_str, dst_addr_str);
+    printf(" IP6: %s -> %s\n", src_addr_str, dst_addr_str);
+
+    switch (dtp->ip6->ip6_nxt)
+    {
+        case IPPROTO_TCP:
+            printf(" Protocol: TCP\n");
+            break;
+        case IPPROTO_UDP:
+            printf(" Protocol: UDP\n");
+            break;
+        case IPPROTO_ICMPV6:
+            printf(" Protocol: ICMPv6\n");
+            return process_icmp6(dtp);
+        default:
+            printf(" Protocol: unknown\n");
+    }
 
     return dtc.default_verdict;
 }
@@ -592,8 +625,23 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_packet(DAQTestPacket *dtp)
 {
-    if (dtp->eth)
-        return process_eth(dtp);
+    switch (dlt)
+    {
+        case DLT_EN10MB:
+            if (dtp->eth)
+                return process_eth(dtp);
+            break;
+
+        case DLT_RAW:
+            if (dtp->ip)
+                return process_ip(dtp);
+            if (dtp->ip6)
+                return process_ip6(dtp);
+            break;
+
+        default:
+            printf("Unhandled datalink type: %d!\n", dlt);
+    }
 
     return dtc.default_verdict;
 }
@@ -696,6 +744,17 @@ static void decode_eth(DAQTestPacket *dtp, const uint8_t *cursor)
         decode_ip6(dtp, cursor + offset);
 }
 
+static void decode_raw(DAQTestPacket *dtp, const uint8_t *cursor)
+{
+    uint8_t ipver = (cursor[0] & 0xf0) >> 4;
+    if (ipver == 4)
+        return decode_ip(dtp, cursor);
+    else if (ipver == 6)
+        return decode_ip6(dtp, cursor);
+    else
+        printf("Unknown IP version on raw packet: %hhu!\n", ipver);
+}
+
 static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_PktHdr_t *hdr)
 {
     memset(dtp, 0, sizeof(*dtp));
@@ -707,7 +766,7 @@ static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_P
             return decode_eth(dtp, packet);
 
         case DLT_RAW:
-            return decode_ip(dtp, packet);
+            return decode_raw(dtp, packet);
 
         default:
             printf("Unhandled datalink type: %d!\n", dlt);
@@ -731,8 +790,9 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
     if (dtc.performance_mode)
         return dtc.default_verdict;
 
-    printf("\nGot Packet! Ingress = %d (Group = %d), Egress = %d (Group = %d), Addr Space ID = %u",
-            hdr->ingress_index, hdr->ingress_group, hdr->egress_index, hdr->egress_group, hdr->address_space_id);
+    printf("\nGot Packet! Size = %u/%u, Ingress = %d (Group = %d), Egress = %d (Group = %d), Addr Space ID = %u",
+            hdr->caplen, hdr->pktlen, hdr->ingress_index, hdr->ingress_group, hdr->egress_index, hdr->egress_group,
+            hdr->address_space_id);
     if (hdr->flags & DAQ_PKT_FLAG_OPAQUE_IS_VALID)
         printf(", Opaque = %u", hdr->opaque);
     if (hdr->flags & DAQ_PKT_FLAG_FLOWID_IS_VALID)
