@@ -600,8 +600,13 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
                 daq_base_api.instance_set_errbuf(context->instance, "%s", pcap_geterr(context->handle));
                 *rstat = DAQ_RSTAT_ERROR;
             }
-            else if (context->mode == DAQ_MODE_READ_FILE && pcap_rval == -2)
-                *rstat = DAQ_RSTAT_EOF;
+            else if (pcap_rval == -2)
+            {
+                if (context->mode == DAQ_MODE_READ_FILE)
+                    *rstat = DAQ_RSTAT_EOF;
+                else
+                    *rstat = DAQ_RSTAT_INTERRUPTED;
+            }
             break;
         }
 

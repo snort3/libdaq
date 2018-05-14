@@ -1427,6 +1427,7 @@ int main(int argc, char *argv[])
         "Would Block",  // DAQ_RSTAT_WOULD_BLOCK
         "Timeout",      // DAQ_RSTAT_TIMEOUT
         "End of File",  // DAQ_RSTAT_EOF
+        "Interrupted",  // DAQ_RSTAT_INTERRUPTED
         "No Buffers",   // DAQ_RSTAT_NOBUF
         "Error",        // DAQ_RSTAT_ERROR
         "Invalid",      // DAQ_RSTAT_INVALID

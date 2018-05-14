@@ -127,7 +127,7 @@ typedef struct _afpacket_context
     AFPacketInstance *instances;
     uint32_t intf_count;
     struct sfbpf_program fcode;
-    volatile int break_loop;
+    volatile bool break_loop;
     DAQ_Stats_t stats;
     DAQ_State state;
     /* Message receive state */
@@ -1182,16 +1182,28 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
                     status = DAQ_RSTAT_WOULD_BLOCK;
                     break;
                 }
-                int ret;
-                while ((ret = afpacket_wait_for_packet(afpc)) == DAQ_ERROR_AGAIN);
-                if (ret <= 0)
+                while (status == DAQ_RSTAT_OK)
                 {
-                    if (ret == 0)
-                        status = DAQ_RSTAT_TIMEOUT;
-                    else
-                        status = DAQ_RSTAT_ERROR;
+                    int ret = afpacket_wait_for_packet(afpc);
+                    if (ret <= 0)
+                    {
+                        if (ret == 0)
+                            status = DAQ_RSTAT_TIMEOUT;
+                        else if (ret == DAQ_ERROR_AGAIN)
+                        {
+                            if (afpc->break_loop)
+                            {
+                                afpc->break_loop = false;
+                                status = DAQ_RSTAT_INTERRUPTED;
+                            }
+                        }
+                        else
+                            status = DAQ_RSTAT_ERROR;
+                    }
                     break;
                 }
+                if (status != DAQ_RSTAT_OK)
+                    break;
                 continue;
             }
             unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
