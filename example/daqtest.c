@@ -407,7 +407,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             return DAQ_VERDICT_BLOCK;
 
         case PING_ACTION_REPLACE:
-            if (dtp->eth)
+            if (dtp->icmp)
             {
                 replace_icmp_data(dtp);
                 return DAQ_VERDICT_REPLACE;
@@ -533,7 +533,14 @@ static DAQ_Verdict process_ip6(DAQTestPacket *dtp)
     inet_ntop(AF_INET6, &dtp->ip6->ip6_dst, dst_addr_str, sizeof(dst_addr_str));
     printf(" IP6: %s -> %s\n", src_addr_str, dst_addr_str);
 
-    switch (dtp->ip6->ip6_nxt)
+    uint8_t next_hdr = dtp->ip6->ip6_nxt;
+    if (next_hdr == IPPROTO_FRAGMENT)
+    {
+        const struct ip6_frag *frag = (const struct ip6_frag *) (dtp->ip6 + 1);
+        next_hdr = frag->ip6f_nxt;
+    }
+
+    switch (next_hdr)
     {
         case IPPROTO_TCP:
             printf(" Protocol: TCP\n");
@@ -673,7 +680,15 @@ static void decode_ip6(DAQTestPacket *dtp, const uint8_t *cursor)
     dtp->ip6 = (const struct ip6_hdr *) cursor;
     offset = sizeof(*dtp->ip6);
 
-    switch (dtp->ip6->ip6_nxt)
+    uint8_t next_hdr = dtp->ip6->ip6_nxt;
+    if (next_hdr == IPPROTO_FRAGMENT)
+    {
+        const struct ip6_frag *frag = (const struct ip6_frag *) (cursor + offset);
+        next_hdr = frag->ip6f_nxt;
+        offset += sizeof(struct ip6_frag);
+    }
+
+    switch (next_hdr)
     {
         case IPPROTO_TCP:
             decode_tcp(dtp, cursor + offset);
@@ -683,6 +698,9 @@ static void decode_ip6(DAQTestPacket *dtp, const uint8_t *cursor)
             break;
         case IPPROTO_ICMPV6:
             decode_icmp6(dtp, cursor + offset);
+            break;
+        default:
+            printf("Unknown next header: 0x%x\n", dtp->ip6->ip6_nxt);
             break;
     }
 }
