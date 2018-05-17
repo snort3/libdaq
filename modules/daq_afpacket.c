@@ -179,8 +179,8 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
         desc->data = malloc(afpc->snaplen);
         if (!desc->data)
         {
-            daq_base_api.instance_set_errbuf(afpc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
-                    __func__, sizeof(AFPacketPktDesc) * size);
+            daq_base_api.instance_set_errbuf(afpc->instance, "%s: Could not allocate %d bytes for a packet descriptor message buffer!",
+                    __func__, afpc->snaplen);
             return DAQ_ERROR_NOMEM;
         }
 

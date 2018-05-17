@@ -124,10 +124,17 @@ static int create_packet_pool(Pcap_Context_t *context, unsigned size)
         desc->data = malloc(context->snaplen);
         if (!desc->data)
         {
-            daq_base_api.instance_set_errbuf(context->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
-                    __func__, sizeof(PcapPktDesc) * size);
+            daq_base_api.instance_set_errbuf(context->instance, "%s: Could not allocate %d bytes for a packet descriptor message buffer!",
+                    __func__, context->snaplen);
             return DAQ_ERROR_NOMEM;
         }
+
+        /* Initialize non-zero invariant packet header fields. */
+        DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+        pkthdr->ingress_index = DAQ_PKTHDR_UNKNOWN;
+        pkthdr->egress_index = DAQ_PKTHDR_UNKNOWN;
+        pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
+        pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
 
         DAQ_Msg_t *msg = &desc->msg;
         msg->type = DAQ_MSG_TYPE_PACKET;
@@ -623,13 +630,6 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
         pkthdr->caplen = pcaphdr->caplen;
         pkthdr->pktlen = pcaphdr->len;
         pkthdr->ts = pcaphdr->ts;
-        pkthdr->ingress_index = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->egress_index = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
-        pkthdr->flags = 0;
-        pkthdr->opaque = 0;
-        pkthdr->address_space_id = 0;
 
         msgs[idx] = &desc->msg;
 
