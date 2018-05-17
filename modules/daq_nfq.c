@@ -1,720 +1,854 @@
 /*
- ** Portions Copyright (C) 1998-2013 Sourcefire, Inc.
- **
- ** This program is free software; you can redistribute it and/or modify
- ** it under the terms of the GNU General Public License as published by
- ** the Free Software Foundation; either version 2 of the License, or
- ** (at your option) any later version.
- **
- ** This program is distributed in the hope that it will be useful,
- ** but WITHOUT ANY WARRANTY; without even the implied warranty of
- ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- ** GNU General Public License for more details.
- **
- ** You should have received a copy of the GNU General Public License
- ** along with this program; if not, write to the Free Software
- ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+** Copyright (C) 2018 Cisco and/or its affiliates. All rights reserved.
+** Author: Michael R. Altizer <mialtize@cisco.com>
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License Version 2 as
+** published by the Free Software Foundation.  You may not use, modify or
+** distribute this program under any other version of the GNU General
+** Public License.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+#include <arpa/inet.h>
+
 #include <errno.h>
-#include <stdio.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter/nfnetlink_queue.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <sys/types.h>
 #include <sys/time.h>
-#include <sys/unistd.h>
 
-#include <netinet/ip.h>
+#include <libmnl/libmnl.h>
 
-#ifdef HAVE_DUMBNET_H
-#include <dumbnet.h>
-#else
-#include <dnet.h>
-#endif
-#include <linux/netfilter.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
+#include <sfbpf_dlt.h>
 
 #include "daq_api.h"
-#include "sfbpf.h"
 
-#define DAQ_MOD_VERSION  7
+#define DAQ_NFQ_VERSION 8
 
-#define DAQ_NAME "nfq"
-#define DAQ_TYPE (DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | \
-                  DAQ_TYPE_MULTI_INSTANCE | DAQ_TYPE_NO_UNPRIV)
+#define DEFAULT_POOL_SIZE 16
+#define DEFAULT_QUEUE_MAXLEN 1024   // Based on NFQNL_QMAX_DEFAULT from nfnetlnk_queue_core.c
 
-// FIXTHIS meta data is 80 bytes on my test platform but who knows?
-// documentation is poor; need correct way to size meta data
-// erring on the high side here to avoid truncation errors
-#define META_DATA_SIZE 512
-
-#define MSG_BUF_SIZE META_DATA_SIZE + IP_MAXPACKET
-
-typedef struct
+typedef struct _nfq_pkt_desc
 {
-    int protos, sock, qid;
-    int qlen;
+    DAQ_Msg_t msg;
+    DAQ_PktHdr_t pkthdr;
+    uint8_t *nlmsg_buf;
+    const struct nlmsghdr *nlmh;
+    struct nfqnl_msg_packet_hdr *nlph;
+    uint8_t *data;
+    struct _nfq_pkt_desc *next;
+} NfqPktDesc;
 
-    struct nfq_handle* nf_handle;
-    struct nfq_q_handle* nf_queue;
-
-    const char* device;
-    char* filter;
-    struct sfbpf_program fcode;
-
-    ip_t* net;
-    eth_t* link;
-
-    uint8_t* buf;
-    void* user_data;
-    DAQ_Analysis_Func_t user_func;
-
-    volatile int count;
-    int passive;
-    uint32_t snaplen;
-    unsigned timeout;
-
-    char error[DAQ_ERRBUF_SIZE];
+typedef struct _nfq_context
+{
+    /* Configuration */
+    unsigned queue_num;
+    int snaplen;
+    unsigned pool_size;
+    int timeout;
+    unsigned queue_maxlen;
+    bool fail_open;
+    bool debug;
+    /* State */
+    DAQ_Instance_h instance;
     DAQ_State state;
     DAQ_Stats_t stats;
-} NfqImpl;
+    NfqPktDesc *pool;
+    NfqPktDesc *pkt_freelist;
+    char *nlmsg_buf;
+    size_t nlmsg_bufsize;
+    struct mnl_socket *nlsock;
+    int nlsock_fd;
+    unsigned portid;
+    volatile bool break_loop;
+} Nfq_Context_t;
 
-static void nfq_daq_shutdown(void* handle);
-static int daq_nfq_callback(struct nfq_q_handle* qh, struct nfgenmsg* nfmsg,
-    struct nfq_data* nfad, void* data);
+static DAQ_VariableDesc_t nfq_variable_descriptions[] = {
+    { "debug", "Enable debugging output to stdout", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "fail_open", "Allow the kernel to bypass the netfilter queue when it is full", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "queue_maxlen", "Maximum queue length (default: 1024)", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+};
 
-//-------------------------------------------------------------------------
-// utilities
+static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_PASS */
+    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLOCK */
+    DAQ_VERDICT_REPLACE,    /* DAQ_VERDICT_REPLACE */
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_WHITELIST */
+    DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLACKLIST */
+    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_IGNORE */
+    DAQ_VERDICT_BLOCK       /* DAQ_VERDICT_RETRY */
+};
 
-#define DEFAULT_Q 0
+static DAQ_BaseAPI_t daq_base_api;
 
-#define IP4(i) (i->protos & 0x1)
-#define IP6(i) (i->protos & 0x2)
 
-// FIXTHIS ip4 is always enabled??
+/*
+ * Private Functions
+ */
 
-static int nfq_daq_get_protos (const char* s)
+static void destroy_packet_pool(Nfq_Context_t *nfqc)
 {
-    if ( !s || !strncasecmp(s, "ip4", 3) )
-        return 0x1;
-
-    if ( !strncasecmp(s, "ip6", 3) )
-        return 0x2;
-#if 0
-    // doesn't look like both can be handled simultaneously
-    if ( !strncasecmp(s, "ip*", 3) )
-        return 0x3;
-#endif
-    return 0;
+    if (nfqc->pool)
+    {
+        while (nfqc->pool_size > 0)
+            free(nfqc->pool[--nfqc->pool_size].nlmsg_buf);
+        free(nfqc->pool);
+        nfqc->pool = NULL;
+    }
+    nfqc->pkt_freelist = NULL;
 }
 
-static int nfq_daq_get_setup(NfqImpl *impl, const DAQ_Config_h config, char *errBuf, size_t errMax)
+static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
 {
+    nfqc->pool = calloc(sizeof(NfqPktDesc), size);
+    if (!nfqc->pool)
+    {
+        daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
+                __func__, sizeof(NfqPktDesc) * size);
+        return DAQ_ERROR_NOMEM;
+    }
+    while (nfqc->pool_size < size)
+    {
+        /* Allocate netlink message receive buffer and set up descriptor */
+        NfqPktDesc *desc = &nfqc->pool[nfqc->pool_size];
+        desc->nlmsg_buf = malloc(nfqc->nlmsg_bufsize);
+        if (!desc->nlmsg_buf)
+        {
+            daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Could not allocate %zu bytes for a packet descriptor message buffer!",
+                    __func__, nfqc->nlmsg_bufsize);
+            return DAQ_ERROR_NOMEM;
+        }
+
+        /* Initialize non-zero invariant packet header fields. */
+        DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+        pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
+        pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
+
+        DAQ_Msg_t *msg = &desc->msg;
+        msg->type = DAQ_MSG_TYPE_PACKET;
+        msg->msg = desc;
+
+        /* Place it on the free list */
+        desc->next = nfqc->pkt_freelist;
+        nfqc->pkt_freelist = desc;
+
+        nfqc->pool_size++;
+    }
+    return DAQ_SUCCESS;
+}
+
+/* Netlink message building routines vaguely lifted from libmnl's netfilter queue example
+    (nf-queue.c) to avoid having to link the seemingly deprecated libnetfilter_queue (which uses
+    libmnl anyway). */
+static inline struct nlmsghdr *nfq_hdr_put(char *buf, int type, uint32_t queue_num)
+{
+    struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
+    nlh->nlmsg_type = (NFNL_SUBSYS_QUEUE << 8) | type;
+    nlh->nlmsg_flags = NLM_F_REQUEST;
+
+    struct nfgenmsg *nfg = mnl_nlmsg_put_extra_header(nlh, sizeof(*nfg));
+    nfg->nfgen_family = AF_UNSPEC;
+    nfg->version = NFNETLINK_V0;
+    nfg->res_id = htons(queue_num);
+
+    return nlh;
+}
+
+static struct nlmsghdr *nfq_build_cfg_command(char *buf, uint16_t pf, uint8_t command, int queue_num)
+{
+    struct nlmsghdr *nlh = nfq_hdr_put(buf, NFQNL_MSG_CONFIG, queue_num);
+    struct nfqnl_msg_config_cmd cmd = {
+        .command = command,
+        .pf = htons(pf),
+    };
+    mnl_attr_put(nlh, NFQA_CFG_CMD, sizeof(cmd), &cmd);
+
+    return nlh;
+}
+
+static struct nlmsghdr *nfq_build_cfg_params(char *buf, uint8_t mode, int range, int queue_num)
+{
+    struct nlmsghdr *nlh = nfq_hdr_put(buf, NFQNL_MSG_CONFIG, queue_num);
+    struct nfqnl_msg_config_params params = {
+        .copy_range = htonl(range),
+        .copy_mode = mode,
+    };
+    mnl_attr_put(nlh, NFQA_CFG_PARAMS, sizeof(params), &params);
+
+    return nlh;
+}
+
+static struct nlmsghdr *nfq_build_verdict(char *buf, int id, int queue_num, int verd, uint32_t plen, uint8_t *pkt)
+{
+    struct nlmsghdr *nlh = nfq_hdr_put(buf, NFQNL_MSG_VERDICT, queue_num);
+    struct nfqnl_msg_verdict_hdr vh = {
+        .verdict = htonl(verd),
+        .id = htonl(id),
+    };
+    mnl_attr_put(nlh, NFQA_VERDICT_HDR, sizeof(vh), &vh);
+    if (plen)
+        mnl_attr_put(nlh, NFQA_PAYLOAD, plen, pkt);
+
+    return nlh;
+}
+
+/* Oh, don't mind me; I'm just reimplementing all of mnl_socket_recvfrom so that I can pass in
+    a single flag to recvmsg (MSG_DONTWAIT). */
+static ssize_t nl_socket_recv(const Nfq_Context_t *nfqc, void *buf, size_t bufsiz, bool blocking)
+{
+    ssize_t ret;
+    struct sockaddr_nl addr;
+    struct iovec iov = {
+        .iov_base   = buf,
+        .iov_len    = bufsiz,
+    };
+    struct msghdr msg = {
+        .msg_name   = &addr,
+        .msg_namelen    = sizeof(struct sockaddr_nl),
+        .msg_iov    = &iov,
+        .msg_iovlen = 1,
+        .msg_control    = NULL,
+        .msg_controllen = 0,
+        .msg_flags  = 0,
+    };
+    ret = recvmsg(nfqc->nlsock_fd, &msg, blocking ? 0 : MSG_DONTWAIT);
+    if (ret == -1)
+        return ret;
+
+    if (msg.msg_flags & MSG_TRUNC) {
+        errno = ENOSPC;
+        return -1;
+    }
+    if (msg.msg_namelen != sizeof(struct sockaddr_nl)) {
+        errno = EINVAL;
+        return -1;
+    }
+    return ret;
+}
+
+static int parse_attr_cb(const struct nlattr *attr, void *data)
+{
+    const struct nlattr **tb = data;
+    int type = mnl_attr_get_type(attr);
+
+    /* skip unsupported attribute in user-space */
+    if (mnl_attr_type_valid(attr, NFQA_MAX) < 0)
+        return MNL_CB_OK;
+
+    switch(type) {
+        case NFQA_MARK:
+        case NFQA_IFINDEX_INDEV:
+        case NFQA_IFINDEX_OUTDEV:
+        case NFQA_IFINDEX_PHYSINDEV:
+        case NFQA_IFINDEX_PHYSOUTDEV:
+        case NFQA_CAP_LEN:
+        case NFQA_SKB_INFO:
+        case NFQA_SECCTX:
+        case NFQA_UID:
+        case NFQA_GID:
+        case NFQA_CT_INFO:
+            if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0)
+                return MNL_CB_ERROR;
+            break;
+        case NFQA_TIMESTAMP:
+            if (mnl_attr_validate2(attr, MNL_TYPE_UNSPEC,
+                        sizeof(struct nfqnl_msg_packet_timestamp)) < 0) {
+                return MNL_CB_ERROR;
+            }
+            break;
+        case NFQA_HWADDR:
+            if (mnl_attr_validate2(attr, MNL_TYPE_UNSPEC,
+                        sizeof(struct nfqnl_msg_packet_hw)) < 0) {
+                return MNL_CB_ERROR;
+            }
+            break;
+        case NFQA_PACKET_HDR:
+            if (mnl_attr_validate2(attr, MNL_TYPE_UNSPEC,
+                        sizeof(struct nfqnl_msg_packet_hdr)) < 0) {
+                return MNL_CB_ERROR;
+            }
+            break;
+        case NFQA_PAYLOAD:
+        case NFQA_CT:
+        case NFQA_EXP:
+            break;
+    }
+    tb[type] = attr;
+    return MNL_CB_OK;
+}
+
+static int process_message_cb(const struct nlmsghdr *nlh, void *data)
+{
+    NfqPktDesc *desc = (NfqPktDesc *) data;
+    struct nlattr *attr[NFQA_MAX+1] = { };
+    int ret;
+
+    /* FIXIT-L In the event that there is actually more than one packet per message, handle it gracefully.
+        I haven't actually seen this happen yet. */
+    if (desc->nlmh)
+        return MNL_CB_ERROR;
+
+    /* Parse the message attributes */
+    if ((ret = mnl_attr_parse(nlh, sizeof(struct nfgenmsg), parse_attr_cb, attr)) != MNL_CB_OK)
+        return ret;
+
+    /* Populate the packet descriptor */
+    desc->nlmh = nlh;
+    desc->nlph = mnl_attr_get_payload(attr[NFQA_PACKET_HDR]);
+    desc->data = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
+
+    DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+    pkthdr->pktlen = mnl_attr_get_payload_len(attr[NFQA_PAYLOAD]);
+    if (attr[NFQA_CAP_LEN])
+        pkthdr->caplen = ntohl(mnl_attr_get_u32(attr[NFQA_CAP_LEN]));
+    else
+        pkthdr->caplen = pkthdr->pktlen;
+    /*
+     * FIXIT-M Implement getting timestamps from the message if it happens to have that attribute
+    if (attr[NFQA_TIMESTAMP])
+    {
+        struct nfqnl_msg_packet_timestamp *qpt = (struct nfqnl_msg_packet_timestamp *) mnl_attr_get_payload(attr[NFQA_TIMESTAMP]);
+        ...
+    }
+    else
+    */
+        gettimeofday(&pkthdr->ts, NULL);
+    if (attr[NFQA_IFINDEX_INDEV])
+        pkthdr->ingress_index = ntohl(mnl_attr_get_u32(attr[NFQA_IFINDEX_INDEV]));
+    else
+        pkthdr->ingress_index = DAQ_PKTHDR_UNKNOWN;
+    if (attr[NFQA_IFINDEX_OUTDEV])
+        pkthdr->egress_index = ntohl(mnl_attr_get_u32(attr[NFQA_IFINDEX_OUTDEV]));
+    else
+        pkthdr->egress_index = DAQ_PKTHDR_UNKNOWN;
+
+    return MNL_CB_OK;
+}
+
+
+/*
+ * DAQ Module API Implementation
+ */
+
+/* Module->prepare() */
+static int nfq_daq_prepare(const DAQ_BaseAPI_t *base_api)
+{
+    if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
+        return DAQ_ERROR;
+
+    daq_base_api = *base_api;
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->get_variable_descs() */
+static int nfq_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
+{
+    *var_desc_table = nfq_variable_descriptions;
+
+    return sizeof(nfq_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
+}
+
+/* Module->initialize() */
+static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+{
+    Nfq_Context_t *nfqc;
+    int rval = DAQ_ERROR;
+
+    nfqc = calloc(1, sizeof(Nfq_Context_t));
+    if (!nfqc)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the new NFQ context", __func__);
+        return DAQ_ERROR_NOMEM;
+    }
+    nfqc->instance = instance;
+
+    nfqc->queue_maxlen = DEFAULT_QUEUE_MAXLEN;
+
+    char *endptr;
+    errno = 0;
+    nfqc->queue_num = strtoul(daq_base_api.module_config_get_input(config), &endptr, 10);
+    if (*endptr != '\0' || errno != 0)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Invalid queue number specified: '%s'",
+                __func__, daq_base_api.module_config_get_input(config));
+        rval = DAQ_ERROR_INVAL;
+        goto fail;
+    }
+
     const char *varKey, *varValue;
-
-    impl->protos = 0x1;
-    impl->qid = DEFAULT_Q;
-    impl->qlen = 0;
-
-    daq_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
     while (varKey)
     {
-        if (!varValue || !*varValue)
+        if (!strcmp(varKey, "debug"))
+            nfqc->debug = true;
+        else if (!strcmp(varKey, "fail_open"))
+            nfqc->fail_open = true;
+        else if (!strcmp(varKey, "queue_maxlen"))
         {
-            snprintf(errBuf, errMax, "%s: variable needs value (%s)\n", __func__, varKey);
-            return DAQ_ERROR;
-        }
-        else if (!strcmp(varKey, "device"))
-        {
-            impl->device = strdup(varValue);
-            if (!impl->device)
+            errno = 0;
+            nfqc->queue_maxlen = strtol(varValue, NULL, 10);
+            if (*endptr != '\0' || errno != 0)
             {
-                snprintf(errBuf, errMax, "%s: can't allocate memory for device (%s)\n",
-                    __func__, varValue);
-                return DAQ_ERROR;
+                daq_base_api.instance_set_errbuf(instance, "%s: Invalid value for key '%s': '%s'",
+                        __func__, varKey, varValue);
+                rval = DAQ_ERROR_INVAL;
+                goto fail;
             }
         }
-        else if (!strcmp(varKey, "proto"))
+
+        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
+    }
+
+    nfqc->snaplen = daq_base_api.module_config_get_snaplen(config);
+
+    /* Largest desired packet payload plus netlink data overhead - this is probably overkill
+        (the libnetfilter_queue example inexplicably halves MNL_SOCKET_BUFFER_SIZE), but it
+        should be safe from truncation.  */
+    nfqc->nlmsg_bufsize = nfqc->snaplen + MNL_SOCKET_BUFFER_SIZE;
+    if (nfqc->debug)
+        printf("Netlink message buffer size is %ld\n", nfqc->nlmsg_bufsize);
+
+    /* Allocate a scratch buffer for general usage by the context (basically for anything that's not
+        receiving a packet) */
+    nfqc->nlmsg_buf = malloc(nfqc->nlmsg_bufsize);
+    if (!nfqc->nlmsg_buf)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate %zu bytes for a general use buffer",
+                __func__, nfqc->nlmsg_bufsize);
+        rval = DAQ_ERROR_NOMEM;
+        goto fail;
+    }
+
+    /* Netlink message buffer length must be determined prior to creating packet pool */
+    if (create_packet_pool(nfqc, DEFAULT_POOL_SIZE) != DAQ_SUCCESS)
+        goto fail;
+
+    /* Open the netfilter netlink socket */
+    nfqc->nlsock = mnl_socket_open(NETLINK_NETFILTER);
+    if (!nfqc->nlsock)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't open netfilter netlink socket: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
+    }
+    /* Cache the socket file descriptor for later use in the critical path for receive */
+    nfqc->nlsock_fd = mnl_socket_get_fd(nfqc->nlsock);
+
+    /* Implement the requested timeout by way of the receive timeout on the netlink socket */
+    nfqc->timeout = daq_base_api.module_config_get_timeout(config);
+    if (nfqc->timeout)
+    {
+        struct timeval tv;
+        tv.tv_sec = nfqc->timeout / 1000;
+        tv.tv_usec = (nfqc->timeout % 1000) * 1000;
+        if (setsockopt(nfqc->nlsock_fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv, sizeof(tv)) == -1)
         {
-            impl->protos = nfq_daq_get_protos(varValue);
-            if (!impl->protos)
-            {
-                snprintf(errBuf, errMax, "%s: bad proto (%s)\n", __func__, varValue);
-                return DAQ_ERROR;
-            }
-        }
-        else if (!strcmp(varKey, "queue"))
-        {
-            char *endptr = NULL;
-
-            if (!varValue)
-            {
-                snprintf(errBuf, errMax, "%s: %s requires an argument!", __func__, varKey);
-                return DAQ_ERROR;
-            }
-
-            impl->qid = (int) strtol(varValue, &endptr, 0);
-
-            if (*endptr != '\0' || impl->qid < 0 || impl->qid > 65535 )
-            {
-                snprintf(errBuf, errMax, "%s: bad queue (%s)\n", __func__, varValue);
-                return DAQ_ERROR;
-            }
-        }
-        else if (!strcmp(varKey, "queue_len"))
-        {
-            char *endptr = NULL;
-
-            if (!varValue)
-            {
-                snprintf(errBuf, errMax, "%s: %s requires an argument!", __func__, varKey);
-                return DAQ_ERROR;
-            }
-
-            impl->qlen = (int) strtol(varValue, &endptr, 0);
-
-            if (*endptr != '\0' || impl->qlen < 0 || impl->qlen > 65535)
-            {
-                snprintf(errBuf, errMax, "%s: bad queue length (%s)\n", __func__, varValue);
-                return DAQ_ERROR;
-            }
-        }
-        else
-        {
-            snprintf(errBuf, errMax, "%s: unsupported variable (%s=%s)\n",
-                    __func__, varKey, varValue);
-            return DAQ_ERROR;
-        }
-        daq_config_next_variable(config, &varKey, &varValue);
-    }
-
-    impl->snaplen = daq_config_get_snaplen(config) ? daq_config_get_snaplen(config) : IP_MAXPACKET;
-    impl->timeout = daq_config_get_timeout(config) / 1000;    // convert ms to secs
-    impl->passive = ( daq_config_get_mode(config) == DAQ_MODE_PASSIVE );
-
-    return DAQ_SUCCESS;
-}
-
-//-------------------------------------------------------------------------
-
-static int nfq_daq_initialize(const DAQ_Config_h config, void **handle, char *errBuf, size_t errMax)
-{
-    if (daq_config_get_name(config))
-    {
-        snprintf(errBuf, errMax, "The nfq DAQ module does not support interface or readback mode!");
-        return DAQ_ERROR_INVAL;
-    }
-    // setup internal stuff
-    NfqImpl *impl = calloc(1, sizeof(*impl));
-
-    if (!impl)
-    {
-        snprintf(errBuf, errMax, "%s: failed to allocate nfq context", __func__);
-        return DAQ_ERROR_NOMEM;
-    }
-
-    if (nfq_daq_get_setup(impl, config, errBuf, errMax) != DAQ_SUCCESS)
-    {
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    if ( (impl->buf = malloc(MSG_BUF_SIZE)) == NULL )
-    {
-        snprintf(errBuf, errMax, "%s: failed to allocate nfq buffer", __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR_NOMEM;
-    }
-
-    // setup input stuff
-    // 1. get a new q handle
-    if ( !(impl->nf_handle = nfq_open()) )
-    {
-        snprintf(errBuf, errMax, "%s: failed to get handle for nfq\n",
-            __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    // 2. now use the new q handle to rip the rug out from other
-    //    nfq users / handles?  actually that doesn't seem to
-    //    happen which is good, but then why is this *supposed*
-    //    to be necessary?  especially since we haven't bound to
-    //    a qid yet, and that is exclusive anyway.
-    if (
-        (IP4(impl) && nfq_unbind_pf(impl->nf_handle, PF_INET) < 0) ||
-        (IP6(impl) && nfq_unbind_pf(impl->nf_handle, PF_INET6) < 0) )
-    {
-        snprintf(errBuf, errMax, "%s: failed to unbind protocols for nfq\n",
-            __func__);
-        //nfq_daq_shutdown(impl);
-        //return DAQ_ERROR;
-    }
-
-    // 3. select protocols for the q handle
-    //    this is necessary but insufficient because we still
-    //    must configure iptables externally, eg:
-    //
-    //    iptables -A OUTPUT -p icmp -j NFQUEUE [--queue-num <#>]
-    //    (# defaults to 0).
-    //
-    // :( iptables rules should be managed automatically to avoid
-    //    queueing packets to nowhere or waiting for packets that
-    //    will never come.  (ie this bind should take the -p, -s,
-    //    etc args you can pass to iptables and create the dang
-    //    rule!)
-    if (
-        (IP4(impl) && nfq_bind_pf(impl->nf_handle, PF_INET) < 0) ||
-        (IP6(impl) && nfq_bind_pf(impl->nf_handle, PF_INET6) < 0) )
-    {
-        snprintf(errBuf, errMax, "%s: failed to bind protocols for nfq\n",
-            __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    // 4. bind to/allocate the specified nfqueue instance
-    //    (this is the puppy specified via iptables as in
-    //    above example.)
-    //
-    // ** there can be at most 1 nf_queue per qid
-    if ( !(impl->nf_queue = nfq_create_queue(
-        impl->nf_handle, impl->qid, daq_nfq_callback, impl)) )
-    {
-        snprintf(errBuf, errMax, "%s: nf queue creation failed\n",
-            __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    // 5. configure copying for maximum overhead
-    if ( nfq_set_mode(impl->nf_queue, NFQNL_COPY_PACKET, IP_MAXPACKET) < 0 )
-    {
-        snprintf(errBuf, errMax, "%s: unable to set packet copy mode\n",
-            __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    // 6. set queue length (optional)
-    if ( impl->qlen > 0 &&
-            nfq_set_queue_maxlen(impl->nf_queue, impl->qlen))
-    {
-        snprintf(errBuf, errMax, "%s: unable to set queue length\n",
-                __func__);
-        nfq_daq_shutdown(impl);
-        return DAQ_ERROR;
-    }
-
-    // 7. get the q socket descriptor
-    //    (after getting not 1 but 2 handles!)
-    impl->sock = nfq_fd(impl->nf_handle);
-
-    // setup output stuff
-    // we've got 2 handles and a socket descriptor but, incredibly,
-    // no way to inject?
-    if ( impl->device && strcasecmp(impl->device, "ip") )
-    {
-        impl->link = eth_open(impl->device);
-
-        if ( !impl->link )
-        {
-            snprintf(errBuf, errMax, "%s: can't open %s!\n",
-                __func__, impl->device);
-            nfq_daq_shutdown(impl);
-            return DAQ_ERROR;
-        }
-    }
-    else
-    {
-        impl->net = ip_open();
-
-        if ( !impl->net )
-        {
-            snprintf(errBuf, errMax, "%s: can't open ip!\n", __func__);
-            nfq_daq_shutdown(impl);
-            return DAQ_ERROR;
+            daq_base_api.instance_set_errbuf(instance, "%s: Couldn't set receive timeout on netlink socket: %s (%d)",
+                    __func__, strerror(errno), errno);
+            goto fail;
         }
     }
 
-    // from Florign Westphal ...
-    // tell kernel that we do not need to know about queue overflows.
-    // Without this, read operations on the netlink socket will fail
-    // with ENOBUFS on queue overrun.
+    /* Set the socket receive buffer to something reasonable based on the desired queue and capture lengths.
+        Try with FORCE first to allow overriding the system's global rmem_max, then fall back on being limited
+        by it if that doesn't work.
+        The value will be doubled to allow room for bookkeeping overhead, so the default of 1024 * 1500 will
+        end up allocating about 3MB of receive buffer space.  The unmodified default tends to be around 208KB. */
+    unsigned int socket_rcvbuf_size = nfqc->queue_maxlen * nfqc->snaplen;
+    if (setsockopt(nfqc->nlsock_fd, SOL_SOCKET, SO_RCVBUFFORCE, &socket_rcvbuf_size, sizeof(socket_rcvbuf_size)) == -1)
     {
-        int option = 1;
-        setsockopt(impl->sock, SOL_NETLINK, NETLINK_NO_ENOBUFS,
-                   &option, sizeof(option));
-    }
-    impl->state = DAQ_STATE_INITIALIZED;
-
-    *handle = impl;
-    return DAQ_SUCCESS;
-}
-
-//-------------------------------------------------------------------------
-
-static void nfq_daq_shutdown (void* handle)
-{
-    NfqImpl *impl = (NfqImpl*)handle;
-    impl->state = DAQ_STATE_UNINITIALIZED;
-
-    if (impl->nf_queue)
-        nfq_destroy_queue(impl->nf_queue);
-
-    // note that we don't unbind here because
-    // we will unbind other programs too
-
-    if(impl->nf_handle)
-        nfq_close(impl->nf_handle);
-
-    if ( impl->link )
-        eth_close(impl->link);
-
-    if ( impl->net )
-        ip_close(impl->net);
-
-    if ( impl->filter )
-        free(impl->filter);
-
-    if ( impl->buf )
-        free(impl->buf);
-
-    free(impl);
-}
-
-//-------------------------------------------------------------------------
-
-static inline int SetPktHdr (
-    NfqImpl* impl,
-    struct nfq_data* nfad,
-    DAQ_PktHdr_t* hdr,
-    uint8_t** pkt
-) {
-    int len = nfq_get_payload(nfad, pkt);
-
-    if ( len <= 0 )
-        return -1;
-
-    hdr->caplen = ((uint32_t)len <= impl->snaplen) ? (uint32_t)len : impl->snaplen;
-    hdr->pktlen = len;
-    hdr->flags = 0;
-    hdr->address_space_id = 0;
-
-    // if nfq fails to provide a timestamp, we fall back on tod
-    if ( nfq_get_timestamp(nfad, &hdr->ts) )
-        gettimeofday(&hdr->ts, NULL);
-
-    hdr->ingress_index = nfq_get_physindev(nfad);
-    hdr->egress_index = -1;
-    hdr->ingress_group = -1;
-    hdr->egress_group = -1;
-
-    return 0;
-}
-
-//-------------------------------------------------------------------------
-
-// forward all but blocks, retries and blacklists:
-static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
-
-static int daq_nfq_callback(
-    struct nfq_q_handle* qh,
-    struct nfgenmsg* nfmsg,
-    struct nfq_data* nfad,
-    void* data)
-{
-    NfqImpl *impl = (NfqImpl*)data;
-    struct nfqnl_msg_packet_hdr* ph = nfq_get_msg_packet_hdr(nfad);
-
-    DAQ_Verdict verdict;
-    DAQ_PktHdr_t hdr;
-    uint8_t* pkt;
-    int nf_verdict;
-    uint32_t data_len;
-
-    if ( impl->state != DAQ_STATE_STARTED )
-        return -1;
-
-    if ( !ph || SetPktHdr(impl, nfad, &hdr, &pkt) )
-    {
-        DPE(impl->error, "%s: can't setup packet header",
-            __func__);
-        return -1;
-    }
-
-    if (
-        impl->fcode.bf_insns &&
-        sfbpf_filter(impl->fcode.bf_insns, pkt, hdr.caplen, hdr.caplen) == 0
-    ) {
-        verdict = DAQ_VERDICT_PASS;
-        impl->stats.packets_filtered++;
-    }
-    else
-    {
-        verdict = impl->user_func(impl->user_data, &hdr, pkt);
-
-        if ( verdict >= MAX_DAQ_VERDICT )
-            verdict = DAQ_VERDICT_BLOCK;
-
-        impl->stats.verdicts[verdict]++;
-        impl->stats.packets_received++;
-    }
-    nf_verdict = ( impl->passive || s_fwd[verdict] ) ? NF_ACCEPT : NF_DROP;
-    data_len = ( verdict == DAQ_VERDICT_REPLACE ) ? hdr.caplen : 0;
-
-    nfq_set_verdict(
-        impl->nf_queue, ntohl(ph->packet_id),
-        nf_verdict, data_len, pkt);
-
-    return 0;
-}
-
-//-------------------------------------------------------------------------
-// 0. we open the queue and supply our internal callback,
-//    daq_nfq_callback.
-// 1. the daq client calls in here to get packets.
-//    we save off the user's data and callback.
-// 2. then we call nfq_handle_packet for each packet received
-// 3. nfq_handle_packet casts a magic spell and then calls our
-//    internal callback.
-// 4. that in turn applies an optional bpf and passes traffic
-//    that is filtered out.
-// 5. traffic that is not filtered out is passed to the previously
-//    saved user callback along with the user data.
-// 6. the verdict returned from the callback is used to issue
-//    a pass / drop verdict to the nfq.
-// 7. this unwinds and we repeat back at step 2.
-
-static int nfq_daq_acquire (
-    void* handle, int c, DAQ_Analysis_Func_t callback, DAQ_Meta_Func_t metaback, void* user)
-{
-    NfqImpl *impl = (NfqImpl*)handle;
-
-    int n = 0;
-    fd_set fdset;
-    struct timeval tv;
-    tv.tv_usec = 0;
-
-    // If c is <= 0, don't limit the packets acquired.  However,
-    // impl->count = 0 has a special meaning, so interpret accordingly.
-    impl->count = (c == 0) ? -1 : c;
-    impl->user_data = user;
-    impl->user_func = callback;
-
-    while ( (impl->count < 0) || (n < impl->count) )
-    {
-        FD_ZERO(&fdset);
-        FD_SET(impl->sock, &fdset);
-
-        // set this per call
-        tv.tv_sec = impl->timeout;
-        tv.tv_usec = 0;
-
-        // at least ipq had a timeout!
-        if ( select(impl->sock+1, &fdset, NULL, NULL, &tv) < 0 )
+        if (setsockopt(nfqc->nlsock_fd, SOL_SOCKET, SO_RCVBUF, &socket_rcvbuf_size, sizeof(socket_rcvbuf_size)) == -1)
         {
-            if ( errno == EINTR )
-                break;
-            DPE(impl->error, "%s: select = %s",
-                __func__, strerror(errno));
-            return DAQ_ERROR;
-        }
-
-        if (FD_ISSET(impl->sock, &fdset))
-        {
-            int len = recv(impl->sock, impl->buf, MSG_BUF_SIZE, 0);
-
-            if ( len > 0)
-            {
-                int stat = nfq_handle_packet(
-                    impl->nf_handle, (char*)impl->buf, len);
-
-                impl->stats.hw_packets_received++;
-
-                if ( stat < 0 )
-                {
-                    DPE(impl->error, "%s: nfq_handle_packet = %s",
-                        __func__, strerror(errno));
-                    return DAQ_ERROR;
-                }
-                n++;
-            }
+            daq_base_api.instance_set_errbuf(instance, "%s: Couldn't set receive buffer size on netlink socket to %u: %s (%d)",
+                    __func__, socket_rcvbuf_size, strerror(errno), errno);
+            goto fail;
         }
     }
-    return 0;
-}
+    if (nfqc->debug)
+        printf("Set socket receive buffer size to %u\n", socket_rcvbuf_size);
 
-//-------------------------------------------------------------------------
-
-static int nfq_daq_inject (
-    void* handle, const DAQ_PktHdr_t* hdr, const uint8_t* buf, uint32_t len,
-    int reverse)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    ssize_t sent = 0;
-
-    if ( impl->link )
-        sent = eth_send(impl->link, buf, len);
-
-    else if ( impl->net )
-        sent = ip_send(impl->net, buf, len);
-
-    if ( sent != len )
+    if (mnl_socket_bind(nfqc->nlsock, 0, MNL_SOCKET_AUTOPID) == -1)
     {
-        DPE(impl->error, "%s: failed to send",
-            __func__);
-        return DAQ_ERROR;
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't bind the netlink socket: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
     }
-    impl->stats.packets_injected++;
-    return DAQ_SUCCESS;
-}
+    nfqc->portid = mnl_socket_get_portid(nfqc->nlsock);
 
-//-------------------------------------------------------------------------
+    struct nlmsghdr *nlh;
 
-static int nfq_daq_set_filter (void* handle, const char* filter)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    struct sfbpf_program fcode;
-    int dlt = IP4(impl) ? DLT_IPV4 : DLT_IPV6;
-
-    if (sfbpf_compile(impl->snaplen, dlt, &fcode, filter, 1, 0) < 0)
+    /* The following four packet family unbind/bind commands do nothing on modern (3.8+) kernels.
+        They used to handle binding the netfilter socket to a particular address family. */
+    nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_PF_UNBIND, 0);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        DPE(impl->error, "%s: failed to compile bpf '%s'",
-            __func__, filter);
-        return DAQ_ERROR;
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't unbind from NFQ for AF_INET: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
+    }
+    nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET6, NFQNL_CFG_CMD_PF_UNBIND, 0);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't unbind from NFQ for AF_INET6: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
+    }
+    nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_PF_BIND, 0);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't bind to NFQ for AF_INET: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
+    }
+    nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET6, NFQNL_CFG_CMD_PF_BIND, 0);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't bind to NFQ for AF_INET6: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
     }
 
-    if ( impl->filter )
-        free((void *)impl->filter);
+    /* Now, actually bind to the netfilter queue.  The address family specified is irrelevant. */
+    nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_UNSPEC, NFQNL_CFG_CMD_BIND, nfqc->queue_num);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
+                __func__, nfqc->queue_num, strerror(errno), errno);
+        goto fail;
+    }
 
-    if ( impl->fcode.bf_insns )
-        free(impl->fcode.bf_insns);
+    /*
+     * Set the queue into packet copying mode with a max copying length of our snaplen.
+     * While we're building a configuration message, we might as well tack on our requested
+     * maximum queue length and enable delivery of packets that will be subject to GSO. That
+     * last bit means we'll potentially see packets larger than the device MTU prior to their
+     * trip through the segmentation offload path.  They'll probably show up as truncated.
+     */
+    nlh = nfq_build_cfg_params(nfqc->nlmsg_buf, NFQNL_COPY_PACKET, nfqc->snaplen, nfqc->queue_num);
+    mnl_attr_put_u32(nlh, NFQA_CFG_QUEUE_MAXLEN, htonl(nfqc->queue_maxlen));
+    mnl_attr_put_u32(nlh, NFQA_CFG_FLAGS, htonl(NFQA_CFG_F_GSO));
+    mnl_attr_put_u32(nlh, NFQA_CFG_MASK, htonl(NFQA_CFG_F_GSO));
+    if (nfqc->fail_open)
+    {
+        mnl_attr_put_u32(nlh, NFQA_CFG_FLAGS, htonl(NFQA_CFG_F_FAIL_OPEN));
+        mnl_attr_put_u32(nlh, NFQA_CFG_MASK, htonl(NFQA_CFG_F_FAIL_OPEN));
+    }
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't configure NFQ parameters: %s (%d)",
+                __func__, strerror(errno), errno);
+        goto fail;
+    }
 
-    impl->filter = strdup(filter);
-    impl->fcode = fcode;
+    nfqc->state = DAQ_STATE_INITIALIZED;
+
+    daq_base_api.instance_set_context(nfqc->instance, nfqc);
 
     return DAQ_SUCCESS;
+
+fail:
+    if (nfqc)
+    {
+        if (nfqc->nlsock)
+            mnl_socket_close(nfqc->nlsock);
+        if (nfqc->nlmsg_buf)
+            free(nfqc->nlmsg_buf);
+        destroy_packet_pool(nfqc);
+        free(nfqc);
+    }
+
+    return rval;
 }
 
-//-------------------------------------------------------------------------
-
-static int nfq_daq_start (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    impl->state = DAQ_STATE_STARTED;
-    return DAQ_SUCCESS;
-}
-
-static int nfq_daq_breakloop (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    impl->count = 0;
-    return DAQ_SUCCESS;
-}
-
-static int nfq_daq_stop (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    impl->state = DAQ_STATE_STOPPED;
-    return DAQ_SUCCESS;
-}
-
-static DAQ_State nfq_daq_check_status (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    return impl->state;
-}
-
-static int nfq_daq_get_stats (void* handle, DAQ_Stats_t* stats)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    *stats = impl->stats;
-    return DAQ_SUCCESS;
-}
-
-static void nfq_daq_reset_stats (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    memset(&impl->stats, 0, sizeof(impl->stats));
-}
-
-static int nfq_daq_get_snaplen (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    return impl->snaplen;
-}
-
-static uint32_t nfq_daq_get_capabilities (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    uint32_t caps = DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT
-        | DAQ_CAPA_BREAKLOOP | DAQ_CAPA_UNPRIV_START | DAQ_CAPA_BPF;
-    if ( impl->net ) caps |= DAQ_CAPA_INJECT_RAW;
-    return caps;
-}
-
-static int nfq_daq_get_datalink_type(void *handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    int dlt = IP4(impl) ? DLT_IPV4 : DLT_IPV6;
-    return dlt;
-}
-
-static const char* nfq_daq_get_errbuf (void* handle)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    return (char*)impl->error;
-}
-
-static void nfq_daq_set_errbuf (void* handle, const char* s)
-{
-    NfqImpl* impl = (NfqImpl*)handle;
-    DPE(impl->error, "%s", s ? s : "");
-}
-
-static int nfq_daq_get_device_index(void* handle, const char* device)
+/* Module->set_filter() */
+static int nfq_daq_set_filter(void *handle, const char *filter)
 {
     return DAQ_ERROR_NOTSUP;
 }
 
-//-------------------------------------------------------------------------
+/* Module->start() */
+static int nfq_daq_start(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    nfqc->state = DAQ_STATE_STARTED;
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->inject() */
+static int nfq_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+{
+    /* FIXIT-M Need to figure out how to reimplement inject for NFQ */
+    return DAQ_ERROR_NOTSUP;
+}
+
+/* Module->breakloop() */
+static int nfq_daq_breakloop(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    nfqc->break_loop = true;
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->stop() */
+static int nfq_daq_stop(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    struct nlmsghdr *nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_UNBIND, nfqc->queue_num);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
+                __func__, nfqc->queue_num, strerror(errno), errno);
+        return DAQ_ERROR;
+    }
+    mnl_socket_close(nfqc->nlsock);
+    nfqc->nlsock = NULL;
+
+    nfqc->state = DAQ_STATE_STOPPED;
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->shutdown() */
+static void nfq_daq_shutdown(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    if (nfqc->nlsock)
+        mnl_socket_close(nfqc->nlsock);
+    if (nfqc->nlmsg_buf)
+        free(nfqc->nlmsg_buf);
+    destroy_packet_pool(nfqc);
+    free(nfqc);
+}
+
+/* Module->check_status() */
+static DAQ_State nfq_daq_check_status(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    return nfqc->state;
+}
+
+/* Module->get_stats() */
+static int nfq_daq_get_stats(void *handle, DAQ_Stats_t *stats)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    /* There is no distinction between packets received by the hardware and those we saw. */
+    nfqc->stats.hw_packets_received = nfqc->stats.packets_received;
+
+    memcpy(stats, &nfqc->stats, sizeof(DAQ_Stats_t));
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->reset_stats() */
+static void nfq_daq_reset_stats(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    memset(&nfqc->stats, 0, sizeof(DAQ_Stats_t));
+}
+
+/* Module->get_snaplen() */
+static int nfq_daq_get_snaplen(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    return nfqc->snaplen;
+}
+
+/* Module->get_capabilities() */
+static uint32_t nfq_daq_get_capabilities(void *handle)
+{
+    return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_BREAKLOOP;
+}
+
+/* Module->get_datalink_type() */
+static int nfq_daq_get_datalink_type(void *handle)
+{
+    return DLT_RAW;
+}
+
+/* Module->msg_receive() */
+static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+    unsigned idx = 0;
+
+    *rstat = DAQ_RSTAT_OK;
+    while (idx < max_recv)
+    {
+        /* Make sure that we have a packet descriptor available to populate. */
+        NfqPktDesc *desc = nfqc->pkt_freelist;
+        if (!desc)
+        {
+            *rstat = DAQ_RSTAT_NOBUF;
+            break;
+        }
+
+        ssize_t ret = nl_socket_recv(nfqc, desc->nlmsg_buf, nfqc->nlmsg_bufsize, idx == 0);
+        if (ret < 0)
+        {
+            if (errno == ENOBUFS)
+            {
+                nfqc->stats.hw_packets_dropped++;
+                continue;
+            }
+            else if (errno == EAGAIN || errno == EWOULDBLOCK)
+                *rstat = (idx == 0) ? DAQ_RSTAT_TIMEOUT : DAQ_RSTAT_WOULD_BLOCK;
+            else if (errno == EINTR)
+            {
+                if (!nfqc->break_loop)
+                    continue;
+                *rstat = DAQ_RSTAT_INTERRUPTED;
+            }
+            else
+            {
+                daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Socket receive failed: %d - %s (%d)",
+                        __func__, ret, strerror(errno), errno);
+                *rstat = DAQ_RSTAT_ERROR;
+            }
+            break;
+        }
+        errno = 0;
+        ret = mnl_cb_run(desc->nlmsg_buf, ret, 0, nfqc->portid, process_message_cb, desc);
+        if (ret < 0)
+        {
+            daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Netlink message processing failed: %d - %s (%d)",
+                    __func__, ret, strerror(errno), errno);
+            *rstat = DAQ_RSTAT_ERROR;
+            break;
+        }
+
+        /* Increment the module instance's packet counter. */
+        nfqc->stats.packets_received++;
+
+        msgs[idx] = &desc->msg;
+
+        /* Last, but not least, extract this descriptor from the free list. */
+        nfqc->pkt_freelist = desc->next;
+        desc->next = NULL;
+
+        idx++;
+    }
+
+    return idx;
+}
+
+/* Module->msg_finalize() */
+static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+    NfqPktDesc *desc = (NfqPktDesc *) msg->msg;
+
+    /* Sanitize the verdict. */
+    if (verdict >= MAX_DAQ_VERDICT)
+        verdict = DAQ_VERDICT_PASS;
+    nfqc->stats.verdicts[verdict]++;
+    verdict = verdict_translation_table[verdict];
+
+    /* Send the verdict back to the kernel through netlink */
+    /* FIXIT-L Consider using an iovec for scatter/gather transmission with the new payload as a
+        separate entry. This would avoid a copy and potentially avoid buffer size restrictions.
+        Only as relevant as REPLACE is common. */
+    uint32_t plen = (verdict == DAQ_VERDICT_REPLACE) ? desc->pkthdr.caplen : 0;
+    int nfq_verdict = (verdict == DAQ_VERDICT_PASS || verdict == DAQ_VERDICT_REPLACE) ? NF_ACCEPT : NF_DROP;;
+    struct nlmsghdr *nlh = nfq_build_verdict(nfqc->nlmsg_buf, ntohl(desc->nlph->packet_id), nfqc->queue_num,
+            nfq_verdict, plen, desc->data);
+    if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
+    {
+        daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Couldn't send NFQ verdict: %s (%d)",
+                        __func__, strerror(errno), errno);
+        return DAQ_ERROR;
+    }
+
+    /* Toss the descriptor back on the free list for reuse.
+        Make sure to clear out the netlink message header to show that it is unused. */
+    desc->nlmh = NULL;
+    desc->next = nfqc->pkt_freelist;
+    nfqc->pkt_freelist = desc;
+
+    return DAQ_SUCCESS;
+}
+
+/* Module->packet_header_from_msg() */
+static DAQ_PktHdr_t *nfq_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
+{
+    NfqPktDesc *desc;
+
+    if (msg->type != DAQ_MSG_TYPE_PACKET)
+        return NULL;
+    desc = (NfqPktDesc *) msg->msg;
+    return &desc->pkthdr;
+}
+
+/* Module->packet_data_from_msg() */
+static const uint8_t *nfq_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
+{
+    NfqPktDesc *desc;
+
+    if (msg->type != DAQ_MSG_TYPE_PACKET)
+        return NULL;
+    desc = (NfqPktDesc *) msg->msg;
+    return desc->data;
+}
 
 #ifdef BUILDING_SO
-DAQ_SO_PUBLIC DAQ_Module_t DAQ_MODULE_DATA =
+DAQ_SO_PUBLIC const DAQ_ModuleAPI_t DAQ_MODULE_DATA =
 #else
-DAQ_Module_t nfq_daq_module_data =
+const DAQ_ModuleAPI_t nfq_daq_module_data =
 #endif
 {
-    .api_version = DAQ_API_VERSION,
-    .module_version = DAQ_MOD_VERSION,
-    .name = DAQ_NAME,
-    .type = DAQ_TYPE,
-    .initialize = nfq_daq_initialize,
-    .set_filter = nfq_daq_set_filter,
-    .start = nfq_daq_start,
-    .acquire = nfq_daq_acquire,
-    .inject = nfq_daq_inject,
-    .breakloop = nfq_daq_breakloop,
-    .stop = nfq_daq_stop,
-    .shutdown = nfq_daq_shutdown,
-    .check_status = nfq_daq_check_status,
-    .get_stats = nfq_daq_get_stats,
-    .reset_stats = nfq_daq_reset_stats,
-    .get_snaplen = nfq_daq_get_snaplen,
-    .get_capabilities = nfq_daq_get_capabilities,
-    .get_datalink_type = nfq_daq_get_datalink_type,
-    .get_errbuf = nfq_daq_get_errbuf,
-    .set_errbuf = nfq_daq_set_errbuf,
-    .get_device_index = nfq_daq_get_device_index,
-    .modify_flow = NULL,
-    .hup_prep = NULL,
-    .hup_apply = NULL,
-    .hup_post = NULL,
+    /* .api_version = */ DAQ_MODULE_API_VERSION,
+    /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
+    /* .module_version = */ DAQ_NFQ_VERSION,
+    /* .name = */ "nfq",
+    /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE | DAQ_TYPE_NO_UNPRIV,
+    /* .prepare = */ nfq_daq_prepare,
+    /* .get_variable_descs = */ nfq_daq_get_variable_descs,
+    /* .initialize = */ nfq_daq_initialize,
+    /* .set_filter = */ nfq_daq_set_filter,
+    /* .start = */ nfq_daq_start,
+    /* .inject = */ nfq_daq_inject,
+    /* .breakloop = */ nfq_daq_breakloop,
+    /* .stop = */ nfq_daq_stop,
+    /* .shutdown = */ nfq_daq_shutdown,
+    /* .check_status = */ nfq_daq_check_status,
+    /* .get_stats = */ nfq_daq_get_stats,
+    /* .reset_stats = */ nfq_daq_reset_stats,
+    /* .get_snaplen = */ nfq_daq_get_snaplen,
+    /* .get_capabilities = */ nfq_daq_get_capabilities,
+    /* .get_datalink_type = */ nfq_daq_get_datalink_type,
+    /* .get_device_index = */ NULL,
+    /* .modify_flow = */ NULL,
+    /* .hup_prep = */ NULL,
+    /* .hup_apply = */ NULL,
+    /* .hup_post = */ NULL,
+    /* .dp_add_dc = */ NULL,
+    /* .query_flow = */ NULL,
+    /* .msg_receive = */ nfq_daq_msg_receive,
+    /* .msg_finalize = */ nfq_daq_msg_finalize,
+    /* .packet_header_from_msg = */ nfq_daq_packet_header_from_msg,
+    /* .packet_data_from_msg = */ nfq_daq_packet_data_from_msg,
 };
-

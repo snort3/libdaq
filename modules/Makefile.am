@@ -62,8 +62,8 @@ if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += daq_nfq.la
     daq_nfq_la_SOURCES = daq_nfq.c
     daq_nfq_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_nfq_la_LDFLAGS = -module -export-dynamic -avoid-version -shared @DNET_LDFLAGS@
-    daq_nfq_la_LIBADD = -lnfnetlink -lnetfilter_queue @DNET_LDFLAGS@ $(top_builddir)/sfbpf/libsfbpf.la
+    daq_nfq_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    daq_nfq_la_LIBADD = -lmnl
 endif
     libdaq_static_modules_la_SOURCES += daq_nfq.c
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_NFQ_MODULE

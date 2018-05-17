@@ -140,25 +140,25 @@ if test "x$with_pcap_libraries" != "xno"; then
     PCAP_LDFLAGS="-L${with_pcap_libraries}"
 fi
 
-AC_ARG_WITH(dnet_includes,
-            [  --with-dnet-includes=DIR    dnet include directory],
-            [with_dnet_includes="$withval"], [with_dnet_includes="no"])
-
-AC_ARG_WITH(dnet_libraries,
-            [  --with-dnet-libraries=DIR   dnet library directory],
-            [with_dnet_libraries="$withval"], [with_dnet_libraries="no"])
-
-if test "x$with_dnet_includes" != "xno"; then
-    DNET_CPPFLAGS="-I${with_dnet_includes}"
-else
-    DNET_CPPFLAGS="`dnet-config --cflags 2>/dev/null`"
-fi
-
-if test "x$with_dnet_libraries" != "xno"; then
-    DNET_LDFLAGS="-L${with_dnet_libraries}"
-else
-    DNET_LDFLAGS="`dnet-config --libs 2>/dev/null`"
-fi
+#AC_ARG_WITH(dnet_includes,
+#            [  --with-dnet-includes=DIR    dnet include directory],
+#            [with_dnet_includes="$withval"], [with_dnet_includes="no"])
+#
+#AC_ARG_WITH(dnet_libraries,
+#            [  --with-dnet-libraries=DIR   dnet library directory],
+#            [with_dnet_libraries="$withval"], [with_dnet_libraries="no"])
+#
+#if test "x$with_dnet_includes" != "xno"; then
+#    DNET_CPPFLAGS="-I${with_dnet_includes}"
+#else
+#    DNET_CPPFLAGS="`dnet-config --cflags 2>/dev/null`"
+#fi
+#
+#if test "x$with_dnet_libraries" != "xno"; then
+#    DNET_LDFLAGS="-L${with_dnet_libraries}"
+#else
+#    DNET_LDFLAGS="`dnet-config --libs 2>/dev/null`"
+#fi
 
 AC_ARG_WITH(netmap_includes,
             [  --with-netmap-includes=DIR    netmap include directory],
@@ -223,19 +223,16 @@ AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
 # NFQ Module
-#AC_ARG_ENABLE(nfq-module,
-#              AS_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
-#              [enable_nfq_module="$enableval"], [enable_nfq_module="$DEFAULT_ENABLE"])
-#if test "$enable_nfq_module" = yes; then
-#    AC_CHECK_HEADERS([netinet/in.h libnetfilter_queue/libnetfilter_queue.h], [], [enable_nfq_module=no])
-#    AC_CHECK_HEADER([linux/netfilter.h], [], [enable_nfq_module=no],
-#                    [
-#                        #include <netinet/in.h>
-#                    ])
-#    if test "$enable_nfq_module" = yes; then
-#        STATIC_LIBS="${STATIC_LIBS} -lnfnetlink -lnetfilter_queue -lsfbpf"
-#    fi
-#fi
+AC_ARG_ENABLE(nfq-module,
+              AS_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
+              [enable_nfq_module="$enableval"], [enable_nfq_module="$DEFAULT_ENABLE"])
+if test "$enable_nfq_module" = yes; then
+    AC_CHECK_HEADERS([linux/netfilter.h linux/netfilter/nfnetlink_queue.h libmnl/libmnl.h], [], [enable_nfq_module=no])
+    AC_CHECK_LIB([mnl], [mnl_socket_open], [], [enable_nfq_module=no])
+    if test "$enable_nfq_module" = yes; then
+        STATIC_LIBS="${STATIC_LIBS} -lmnl"
+    fi
+fi
 AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
 
 # PCAP Module
@@ -279,43 +276,43 @@ AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 #fi
 AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 
-if test "$enable_nfq_module" = yes ; then
-    AC_CHECK_HEADERS(dnet.h,,DNET_H="no")
-    AC_CHECK_HEADERS(dumbnet.h,,DUMBNET_H="no")
+#if test "$enable_nfq_module" = yes ; then
+#    AC_CHECK_HEADERS(dnet.h,,DNET_H="no")
+#    AC_CHECK_HEADERS(dumbnet.h,,DUMBNET_H="no")
+#
+#    if test "x$DNET_H" = "xno" -a "x$DUMBNET_H" = "xno"; then
+#        echo
+#        echo "   ERROR!  dnet header not found, go get it from"
+#        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
+#        echo "   options, if you have it installed in an unusual place"
+#        exit
+#    fi
+#
+#    DNET_FOO="${DNET_LDFLAGS}"
+#
+#    AC_CHECK_LIB(dnet, eth_set, ,[DNET="no"], [${DNET_FOO}])
+#    AC_CHECK_LIB(dumbnet, eth_set, ,[DUMBNET="no"], [${DNET_FOO}])
+#
+#    if test "x$DNET" = "xno" -a "x$DUMBNET" = "xno"; then
+#        echo
+#        echo "   ERROR!  dnet library not found, go get it from"
+#        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
+#        echo "   options, if you have it installed in an unusual place"
+#        exit
+#    fi
+#
+#    if test "x$DNET_LDFLAGS" = "x" ; then
+#        if test "x$DNET" = "xno"; then
+#            DNET_LDFLAGS="${DNET_LDPATH} -ldumbnet"
+#        else
+#            DNET_LDFLAGS="${DNET_LDPATH} -ldnet"
+#        fi
+#    fi
+#    #echo "DNET_LDFLAGS=${DNET_LDFLAGS}"
+#    STATIC_LIBS="${STATIC_LIBS} ${DNET_LDFLAGS}"
+#fi
 
-    if test "x$DNET_H" = "xno" -a "x$DUMBNET_H" = "xno"; then
-        echo
-        echo "   ERROR!  dnet header not found, go get it from"
-        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
-        echo "   options, if you have it installed in an unusual place"
-        exit
-    fi
-
-    DNET_FOO="${DNET_LDFLAGS}"
-
-    AC_CHECK_LIB(dnet, eth_set, ,[DNET="no"], [${DNET_FOO}])
-    AC_CHECK_LIB(dumbnet, eth_set, ,[DUMBNET="no"], [${DNET_FOO}])
-
-    if test "x$DNET" = "xno" -a "x$DUMBNET" = "xno"; then
-        echo
-        echo "   ERROR!  dnet library not found, go get it from"
-        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
-        echo "   options, if you have it installed in an unusual place"
-        exit
-    fi
-
-    if test "x$DNET_LDFLAGS" = "x" ; then
-        if test "x$DNET" = "xno"; then
-            DNET_LDFLAGS="${DNET_LDPATH} -ldumbnet"
-        else
-            DNET_LDFLAGS="${DNET_LDPATH} -ldnet"
-        fi
-    fi
-    #echo "DNET_LDFLAGS=${DNET_LDFLAGS}"
-    STATIC_LIBS="${STATIC_LIBS} ${DNET_LDFLAGS}"
-fi
-
-AC_SUBST(DNET_LDFLAGS)
+#AC_SUBST(DNET_LDFLAGS)
 
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
