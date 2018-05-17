@@ -15,10 +15,17 @@ if BUILD_SHARED_MODULES
     daq_afpacket_la_SOURCES = daq_afpacket.c
     daq_afpacket_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
     daq_afpacket_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
-    daq_afpacket_la_LIBADD = $(top_builddir)/sfbpf/libsfbpf.la
+if LIBPCAP_AVAILABLE
+	daq_afpacket_la_CPPFLAGS += $(PCAP_CPPFLAGS)
+	daq_afpacket_la_LDFLAGS += $(PCAP_LDFLAGS)
+    daq_afpacket_la_LIBADD = -lpcap
+endif
 endif
     libdaq_static_modules_la_SOURCES += daq_afpacket.c
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_AFPACKET_MODULE
+if LIBPCAP_AVAILABLE
+	libdaq_static_modules_la_CPPFLAGS += $(PCAP_CPPFLAGS)
+endif
 endif
 
 if BUILD_PCAP_MODULE

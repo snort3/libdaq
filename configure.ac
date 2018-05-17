@@ -140,6 +140,21 @@ if test "x$with_pcap_libraries" != "xno"; then
     PCAP_LDFLAGS="-L${with_pcap_libraries}"
 fi
 
+# Check to see if libpcap is available to be used by modules
+save_CPPFLAGS="$CPPFLAGS"
+save_LDFLAGS="$LDFLAGS"
+CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
+LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
+AC_CHECK_HEADER([pcap.h], [HAVE_PCAP_HEADERS=yes])
+AC_CHECK_LIB([pcap],[pcap_lib_version], [HAVE_PCAP_LIBRARY=yes])
+CPPFLAGS="$save_CPPFLAGS"
+LDFLAGS="$save_LDFLAGS"
+if test "x$HAVE_PCAP_HEADERS" = "xyes" -a "x$HAVE_PCAP_LIBRARY" = "xyes" ; then
+    LIBPCAP_AVAILABLE=yes
+    AC_DEFINE(LIBPCAP_AVAILABLE,1,[Define to 1 if libPCAP is available for use.])
+fi
+AM_CONDITIONAL([LIBPCAP_AVAILABLE], [test "$LIBPCAP_AVAILABLE" = yes])
+
 #AC_ARG_WITH(dnet_includes,
 #            [  --with-dnet-includes=DIR    dnet include directory],
 #            [with_dnet_includes="$withval"], [with_dnet_includes="no"])
@@ -188,8 +203,8 @@ AC_ARG_ENABLE(afpacket-module,
 if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
     AC_CHECK_DECLS([TPACKET2_HDRLEN, PACKET_TX_RING], [], [enable_afpacket_module=no], [[#include <linux/if_packet.h>]])
-    if test "$enable_afpacket_module" = yes; then
-        STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
+    if test "$enable_afpacket_module" = yes -a "$LIBPCAP_AVAILABLE" = yes ; then
+        STATIC_LIBS="${STATIC_LIBS} -lpcap"
     fi
 fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
@@ -199,17 +214,12 @@ AC_ARG_ENABLE(dump-module,
               AS_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
               [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
 if test "$enable_dump_module" = yes; then
-    save_CPPFLAGS="$CPPFLAGS"
-    save_LDFLAGS="$LDFLAGS"
-    CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
-    LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
-    AC_CHECK_HEADER([pcap.h], [], [enable_dump_module=no])
-    AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_dump_module="no"],[])
-    if test "$enable_dump_module" = yes; then
+    if test "$LIBPCAP_AVAILABLE" = yes ; then
         STATIC_LIBS="${STATIC_LIBS} -lpcap"
+    else
+        AC_MSG_WARN([LibPCAP not available, disabling the Dump DAQ module])
+        enable_dump_module=no
     fi
-    CPPFLAGS="$save_CPPFLAGS"
-    LDFLAGS="$save_LDFLAGS"
 fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
@@ -240,17 +250,12 @@ AC_ARG_ENABLE(pcap-module,
               AS_HELP_STRING([--disable-pcap-module],[do not build the bundled PCAP module]),
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
-    save_CPPFLAGS="$CPPFLAGS"
-    save_LDFLAGS="$LDFLAGS"
-    CPPFLAGS="$PCAP_CPPFLAGS $CPPFLAGS"
-    LDFLAGS="$PCAP_LDFLAGS $LDFLAGS"
-    AC_CHECK_HEADER([pcap.h], [], [enable_pcap_module=no])
-    AC_CHECK_LIB([pcap],[pcap_lib_version],,[enable_pcap_module="no"],[])
-    if test "$enable_pcap_module" = yes; then
+    if test "$LIBPCAP_AVAILABLE" = yes ; then
         STATIC_LIBS="${STATIC_LIBS} -lpcap"
+    else
+        AC_MSG_WARN([LibPCAP not available, disabling the PCAP DAQ module])
+        enable_pcap_module=no
     fi
-    CPPFLAGS="$save_CPPFLAGS"
-    LDFLAGS="$save_LDFLAGS"
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 

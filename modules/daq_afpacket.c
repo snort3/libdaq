@@ -43,6 +43,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifdef LIBPCAP_AVAILABLE
+#include <pcap.h>
+#endif
+
 #include "daq_api.h"
 #include "sfbpf.h"
 
@@ -126,7 +130,9 @@ typedef struct _afpacket_context
     AFPacketPktDesc *pkt_freelist;
     AFPacketInstance *instances;
     uint32_t intf_count;
-    struct sfbpf_program fcode;
+#ifdef LIBPCAP_AVAILABLE
+    struct bpf_program fcode;
+#endif
     volatile bool break_loop;
     DAQ_Stats_t stats;
     DAQ_State state;
@@ -628,7 +634,9 @@ static int af_packet_close(AFPacket_Context_t *afpc)
         destroy_instance(instance);
     }
 
-    sfbpf_freecode(&afpc->fcode);
+#ifdef LIBPCAP_AVAILABLE
+    pcap_freecode(&afpc->fcode);
+#endif
 
     afpc->state = DAQ_STATE_STOPPED;
 
@@ -887,8 +895,9 @@ err:
 
 static int afpacket_daq_set_filter(void *handle, const char *filter)
 {
+#ifdef LIBPCAP_AVAILABLE
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    struct sfbpf_program fcode;
+    struct bpf_program fcode;
 
     if (afpc->filter)
         free(afpc->filter);
@@ -900,17 +909,20 @@ static int afpacket_daq_set_filter(void *handle, const char *filter)
         return DAQ_ERROR;
     }
 
-    if (sfbpf_compile(afpc->snaplen, DLT_EN10MB, &fcode, afpc->filter, 1, 0) < 0)
+    if (pcap_compile_nopcap(afpc->snaplen, DLT_EN10MB, &fcode, afpc->filter, 1, PCAP_NETMASK_UNKNOWN) == -1)
     {
         daq_base_api.instance_set_errbuf(afpc->instance, "%s: BPF state machine compilation failed!", __func__);
         return DAQ_ERROR;
     }
 
-    sfbpf_freecode(&afpc->fcode);
+    pcap_freecode(&afpc->fcode);
     afpc->fcode.bf_len = fcode.bf_len;
     afpc->fcode.bf_insns = fcode.bf_insns;
 
     return DAQ_SUCCESS;
+#else
+    return DAQ_ERROR_NOTSUP;
+#endif
 }
 
 static int afpacket_daq_start(void *handle)
@@ -1063,7 +1075,12 @@ static int afpacket_daq_get_snaplen(void *handle)
 
 static uint32_t afpacket_daq_get_capabilities(void *handle)
 {
-    return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT | DAQ_CAPA_UNPRIV_START | DAQ_CAPA_BREAKLOOP | DAQ_CAPA_BPF | DAQ_CAPA_DEVICE_INDEX;
+    uint32_t capabilities = DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT |
+                            DAQ_CAPA_UNPRIV_START | DAQ_CAPA_BREAKLOOP | DAQ_CAPA_DEVICE_INDEX;
+#ifdef LIBPCAP_AVAILABLE
+    capabilities |= DAQ_CAPA_BPF;
+#endif
+    return capabilities;
 }
 
 static int afpacket_daq_get_datalink_type(void *handle)
@@ -1247,15 +1264,17 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
                 tp_snaplen += VLAN_TAG_LEN;
                 tp_len += VLAN_TAG_LEN;
             }
+#ifdef LIBPCAP_AVAILABLE
             /* Check to see if this hits the BPF.  If it does, dispose of it and
                move on to the next packet (transmitting in the inline scenario). */
-            if (afpc->fcode.bf_insns && sfbpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
+            if (afpc->fcode.bf_insns && bpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
             {
                 afpc->stats.packets_filtered++;
                 afpacket_transmit_packet(instance->peer, data, tp_snaplen);
                 entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
                 continue;
             }
+#endif
             /* Populate the packet descriptor, copying the packet data and releasing the packet
                 ring entry back to the kernel for reuse. */
             memcpy(desc->data, data, tp_snaplen);
