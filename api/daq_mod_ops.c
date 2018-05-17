@@ -263,6 +263,9 @@ DAQ_LINKAGE int daq_instance_get_device_index(DAQ_Instance_t *instance, const ch
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
+    if (!instance->module->get_device_index)
+        return DAQ_ERROR_NOTSUP;
+
     if (!device)
     {
         daq_instance_set_errbuf(instance, "No device name to find the index of!");
@@ -315,7 +318,7 @@ DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_t *instance, const DAQ_Pkt
         return DAQ_ERROR_NOCTX;
 
     if (!instance->module->modify_flow)
-        return DAQ_SUCCESS;
+        return DAQ_ERROR_NOTSUP;
 
     return instance->module->modify_flow(instance->context, hdr, modify);
 }
@@ -338,7 +341,7 @@ DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_t *instance, const DAQ_PktHd
         return DAQ_ERROR_NOCTX;
 
     if (!instance->module->dp_add_dc)
-        return DAQ_SUCCESS;
+        return DAQ_ERROR_NOTSUP;
 
     return instance->module->dp_add_dc(instance->context, hdr, dp_key, packet_data, params);
 }

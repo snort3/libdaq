@@ -176,9 +176,8 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     /* Check to make sure that all of the required function pointers are populated. */
     if (!dm->prepare || !dm->initialize || !dm->start || !dm->inject || !dm->breakloop ||
         !dm->stop || !dm->shutdown || !dm->check_status || !dm->get_stats || !dm->reset_stats ||
-        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type ||
-        !dm->get_device_index || !dm->msg_receive || !dm->msg_finalize ||
-        !dm->packet_header_from_msg || !dm->packet_data_from_msg)
+        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type || !dm->msg_receive ||
+        !dm->msg_finalize || !dm->packet_header_from_msg || !dm->packet_data_from_msg)
     {
         fprintf(stderr, "%s: Module definition is missing function pointer(s)!\n", dm->name);
         return DAQ_ERROR;
