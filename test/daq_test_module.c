@@ -1,11 +1,13 @@
-#include <daq_test_module.h>
+#include "daq_test_module.h"
+
+#include <daq_dlt.h>
 
 static int daq_test_prepare(const DAQ_BaseAPI_t *base_api)
 {
     return DAQ_SUCCESS;
 }
 
-static int daq_test_initialize(const DAQ_ModuleConfig_h config, void **ctxt_ptr, char *errbuf, size_t len)
+static int daq_test_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
 {
     return DAQ_SUCCESS;
 }
@@ -60,26 +62,12 @@ static uint32_t daq_test_get_capabilities(void *handle)
 
 static int daq_test_get_datalink_type(void *handle)
 {
-    return DAQ_SUCCESS;
+    return DLT_NULL;
 }
 
-static const char *daq_test_get_errbuf(void *handle)
+static unsigned daq_test_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
-    return DAQ_SUCCESS;
-}
-
-static void daq_test_set_errbuf(void *handle, const char *string)
-{
-}
-
-static int daq_test_get_device_index(void *handle, const char *device)
-{
-    return DAQ_SUCCESS;
-}
-
-static int daq_test_msg_receive(void *handle, const DAQ_Msg_t **msgptr)
-{
-    return DAQ_SUCCESS;
+    return 0;
 }
 
 static int daq_test_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
@@ -120,9 +108,7 @@ DAQ_ModuleAPI_t test_module =
     /* .get_snaplen = */ daq_test_get_snaplen,
     /* .get_capabilities = */ daq_test_get_capabilities,
     /* .get_datalink_type = */ daq_test_get_datalink_type,
-    /* .get_errbuf = */ daq_test_get_errbuf,
-    /* .set_errbuf = */ daq_test_set_errbuf,
-    /* .get_device_index = */ daq_test_get_device_index,
+    /* .get_device_index = */ NULL,
     /* .modify_flow = */ NULL,
     /* .hup_prep = */ NULL,
     /* .hup_apply = */ NULL,
