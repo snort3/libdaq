@@ -2,12 +2,9 @@
  * Copyright (c) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997
  *	The Regents of the University of California.  All rights reserved.
  *
- * Some portions Copyright (C) 2014 Cisco and/or its affiliates. All rights reserved.
- * Some portions Copyright (C) 2010-2013 Sourcefire, Inc.
- *
  * This code is derived from the Stanford/CMU enet packet filter,
  * (net/enet.c) distributed as part of 4.3BSD, and code contributed
- * to Berkeley by Steven McCanne and Van Jacobson both of Lawrence 
+ * to Berkeley by Steven McCanne and Van Jacobson both of Lawrence
  * Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -18,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,18 +32,17 @@
  * SUCH DAMAGE.
  *
  *      @(#)bpf.h       7.1 (Berkeley) 5/7/91
- *
  */
 
 /*
- * This is just the DLT_* definitions as taken from libpcap-1.0.0's bpf.h.
+ * This is just dlt.h lifted from libpcap @ 21ab5f1175655f1bb523764c7d70bc94c1e651b1
  */
 
-#ifndef _SFBPF_DLT_H
-#define _SFBPF_DLT_H
+#ifndef _DAQ_DLT_H
+#define _DAQ_DLT_H
 
 /*
- * Data-link level type codes.
+ * Link-layer header type codes.
  *
  * Do *NOT* add new values to this list without asking
  * "tcpdump-workers@lists.tcpdump.org" for a value.  Otherwise, you run
@@ -59,6 +51,12 @@
  * being able to handle captures with your new DLT_ value, with no hope
  * that they will ever be changed to do so (as that would destroy their
  * ability to read captures using that value for that other purpose).
+ *
+ * See
+ *
+ *	http://www.tcpdump.org/linktypes.html
+ *
+ * for detailed descriptions of some of these link-layer header types.
  */
 
 /*
@@ -111,10 +109,36 @@
 #endif
 
 /*
- * 17 is used for DLT_OLD_PFLOG in OpenBSD;
- *     OBSOLETE: DLT_PFLOG is 117 in OpenBSD now as well. See below.
- * 18 is used for DLT_PFSYNC in OpenBSD; don't use it for anything else.
+ * 17 was used for DLT_PFLOG in OpenBSD; it no longer is.
+ *
+ * It was DLT_LANE8023 in SuSE 6.3, so we defined LINKTYPE_PFLOG
+ * as 117 so that pflog captures would use a link-layer header type
+ * value that didn't collide with any other values.  On all
+ * platforms other than OpenBSD, we defined DLT_PFLOG as 117,
+ * and we mapped between LINKTYPE_PFLOG and DLT_PFLOG.
+ *
+ * OpenBSD eventually switched to using 117 for DLT_PFLOG as well.
+ *
+ * Don't use 17 for anything else.
  */
+
+/*
+ * 18 is used for DLT_PFSYNC in OpenBSD, NetBSD, DragonFly BSD and
+ * macOS; don't use it for anything else.  (FreeBSD uses 121, which
+ * collides with DLT_HHDLC, even though it doesn't use 18 for
+ * anything and doesn't appear to have ever used it for anything.)
+ *
+ * We define it as 18 on those platforms; it is, unfortunately, used
+ * for DLT_CIP in Suse 6.3, so we don't define it as DLT_PFSYNC
+ * in general.  As the packet format for it, like that for
+ * DLT_PFLOG, is not only OS-dependent but OS-version-dependent,
+ * we don't support printing it in tcpdump except on OSes that
+ * have the relevant header files, so it's not that useful on
+ * other platforms.
+ */
+#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+#define DLT_PFSYNC	18
+#endif
 
 #define DLT_ATM_CLIP	19	/* Linux Classical-IP over ATM */
 
@@ -143,9 +167,22 @@
 
 /*
  * Values between 100 and 103 are used in capture file headers as
- * link-layer types corresponding to DLT_ types that differ
- * between platforms; don't use those values for new DLT_ new types.
+ * link-layer header type LINKTYPE_ values corresponding to DLT_ types
+ * that differ between platforms; don't use those values for new DLT_
+ * new types.
  */
+
+/*
+ * Values starting with 104 are used for newly-assigned link-layer
+ * header type values; for those link-layer header types, the DLT_
+ * value returned by pcap_datalink() and passed to pcap_open_dead(),
+ * and the LINKTYPE_ value that appears in capture files, are the
+ * same.
+ *
+ * DLT_MATCHING_MIN is the lowest such value; DLT_MATCHING_MAX is
+ * the highest such value.
+ */
+#define DLT_MATCHING_MIN	104
 
 /*
  * This value was defined by libpcap 0.5; platforms that have defined
@@ -233,15 +270,8 @@
 #define DLT_IPFILTER	116
 
 /*
- * OpenBSD DLT_PFLOG; DLT_PFLOG is 17 in OpenBSD, but that's DLT_LANE8023
- * in SuSE 6.3, so we can't use 17 for it in capture-file headers.
- *
- * XXX: is there a conflict with DLT_PFSYNC 18 as well?
+ * OpenBSD DLT_PFLOG.
  */
-#ifdef __OpenBSD__
-#define DLT_OLD_PFLOG	17
-#define DLT_PFSYNC	18
-#endif
 #define DLT_PFLOG	117
 
 /*
@@ -263,9 +293,70 @@
 #define DLT_AIRONET_HEADER	120
 
 /*
- * Reserved for Siemens HiPath HDLC.
+ * Sigh.
+ *
+ * 121 was reserved for Siemens HiPath HDLC on 2002-01-25, as
+ * requested by Tomas Kukosa.
+ *
+ * On 2004-02-25, a FreeBSD checkin to sys/net/bpf.h was made that
+ * assigned 121 as DLT_PFSYNC.  In current versions, its libpcap
+ * does DLT_ <-> LINKTYPE_ mapping, mapping DLT_PFSYNC to a
+ * LINKTYPE_PFSYNC value of 246, so it should write out DLT_PFSYNC
+ * dump files with 246 as the link-layer header type.  (Earlier
+ * versions might not have done mapping, in which case they would
+ * have written them out with a link-layer header type of 121.)
+ *
+ * OpenBSD, from which pf came, however, uses 18 for DLT_PFSYNC;
+ * its libpcap does no DLT_ <-> LINKTYPE_ mapping, so it would
+ * write out DLT_PFSYNC dump files with use 18 as the link-layer
+ * header type.
+ *
+ * NetBSD, DragonFly BSD, and Darwin also use 18 for DLT_PFSYNC; in
+ * current versions, their libpcaps do DLT_ <-> LINKTYPE_ mapping,
+ * mapping DLT_PFSYNC to a LINKTYPE_PFSYNC value of 246, so they
+ * should write out DLT_PFSYNC dump files with 246 as the link-layer
+ * header type.  (Earlier versions might not have done mapping,
+ * in which case they'd work the same way OpenBSD does, writing
+ * them out with a link-layer header type of 18.)
+ *
+ * We'll define DLT_PFSYNC as:
+ *
+ *    18 on NetBSD, OpenBSD, DragonFly BSD, and Darwin;
+ *
+ *    121 on FreeBSD;
+ *
+ *    246 everywhere else.
+ *
+ * We'll define DLT_HHDLC as 121 on everything except for FreeBSD;
+ * anybody who wants to compile, on FreeBSD, code that uses DLT_HHDLC
+ * is out of luck.
+ *
+ * We'll define LINKTYPE_PFSYNC as 246 on *all* platforms, so that
+ * savefiles written using *this* code won't use 18 or 121 for PFSYNC,
+ * they'll all use 246.
+ *
+ * Code that uses pcap_datalink() to determine the link-layer header
+ * type of a savefile won't, when built and run on FreeBSD, be able
+ * to distinguish between LINKTYPE_PFSYNC and LINKTYPE_HHDLC capture
+ * files, as pcap_datalink() will give 121 for both of them.  Code
+ * that doesn't, such as the code in Wireshark, will be able to
+ * distinguish between them.
+ *
+ * FreeBSD's libpcap won't map a link-layer header type of 18 - i.e.,
+ * DLT_PFSYNC files from OpenBSD and possibly older versions of NetBSD,
+ * DragonFly BSD, and macOS - to DLT_PFSYNC, so code built with FreeBSD's
+ * libpcap won't treat those files as DLT_PFSYNC files.
+ *
+ * Other libpcaps won't map a link-layer header type of 121 to DLT_PFSYNC;
+ * this means they can read DLT_HHDLC files, if any exist, but won't
+ * treat pcap files written by any older versions of FreeBSD libpcap that
+ * didn't map to 246 as DLT_PFSYNC files.
  */
+#ifdef __FreeBSD__
+#define DLT_PFSYNC		121
+#else
 #define DLT_HHDLC		121
+#endif
 
 /*
  * This is for RFC 2625 IP-over-Fibre Channel.
@@ -293,7 +384,7 @@
  */
 #define DLT_SUNATM		123	/* Solaris+SunATM */
 
-/* 
+/*
  * Reserved as per request from Kent Dahlgren <kent@praesum.com>
  * for private use.
  */
@@ -463,7 +554,7 @@
 #define DLT_JUNIPER_MONITOR     164
 
 /*
- * Reserved for BACnet MS/TP.
+ * BACnet MS/TP frames.
  */
 #define DLT_BACNET_MS_TP	165
 
@@ -536,7 +627,7 @@
 
 /*
  * Juniper-private data link type, as per request from
- * Hannes Gredler <hannes@juniper.net>. 
+ * Hannes Gredler <hannes@juniper.net>.
  * The DLT_ are used for prepending meta-information
  * like interface index, interface name
  * before standard Ethernet, PPP, Frelay & C-HDLC Frames
@@ -553,7 +644,7 @@
 
 /*
  * Juniper-private data link type, as per request from
- * Hannes Gredler <hannes@juniper.net>. 
+ * Hannes Gredler <hannes@juniper.net>.
  * The DLT_ is used for internal communication with a
  * voice Adapter Card (PIC)
  */
@@ -576,9 +667,23 @@
 #define DLT_A653_ICM            185
 
 /*
- * USB packets, beginning with a USB setup header; requested by
- * Paolo Abeni <paolo.abeni@email.it>.
+ * This used to be "USB packets, beginning with a USB setup header;
+ * requested by Paolo Abeni <paolo.abeni@email.it>."
+ *
+ * However, that header didn't work all that well - it left out some
+ * useful information - and was abandoned in favor of the DLT_USB_LINUX
+ * header.
+ *
+ * This is now used by FreeBSD for its BPF taps for USB; that has its
+ * own headers.  So it is written, so it is done.
+ *
+ * For source-code compatibility, we also define DLT_USB to have this
+ * value.  We do it numerically so that, if code that includes this
+ * file (directly or indirectly) also includes an OS header that also
+ * defines DLT_USB as 186, we don't get a redefinition warning.
+ * (NetBSD 7 does that.)
  */
+#define DLT_USB_FREEBSD		186
 #define DLT_USB			186
 
 /*
@@ -628,7 +733,7 @@
 
 /*
  * Juniper-private data link type, as per request from
- * Hannes Gredler <hannes@juniper.net>. 
+ * Hannes Gredler <hannes@juniper.net>.
  * The DLT_ is used for internal communication with a
  * integrated service module (ISM).
  */
@@ -637,8 +742,15 @@
 /*
  * IEEE 802.15.4, exactly as it appears in the spec (no padding, no
  * nothing); requested by Mikko Saarnivala <mikko.saarnivala@sensinode.com>.
+ * For this one, we expect the FCS to be present at the end of the frame;
+ * if the frame has no FCS, DLT_IEEE802_15_4_NOFCS should be used.
+ *
+ * We keep the name DLT_IEEE802_15_4 as an alias for backwards
+ * compatibility, but, again, this should *only* be used for 802.15.4
+ * frames that include the FCS.
  */
-#define DLT_IEEE802_15_4	195
+#define DLT_IEEE802_15_4_WITHFCS	195
+#define DLT_IEEE802_15_4		DLT_IEEE802_15_4_WITHFCS
 
 /*
  * Various link-layer types, with a pseudo-header, for SITA
@@ -669,7 +781,7 @@
 
 /*
  * Juniper-private data link type, as per request from
- * Hannes Gredler <hannes@juniper.net>. 
+ * Hannes Gredler <hannes@juniper.net>.
  * The DLT_ is used for capturing data on a secure tunnel interface.
  */
 #define DLT_JUNIPER_ST          200
@@ -761,11 +873,11 @@
  */
 #define DLT_IEEE802_15_4_NONASK_PHY	215
 
-/* 
+/*
  * David Gibson <david@gibson.dropbear.id.au> requested this for
  * captures from the Linux kernel /dev/input/eventN devices. This
  * is used to communicate keystrokes and mouse movements from the
- * Linux kernel to display systems, such as Xorg. 
+ * Linux kernel to display systems, such as Xorg.
  */
 #define DLT_LINUX_EVDEV		216
 
@@ -843,14 +955,14 @@
  * the pseudo-header is:
  *
  * struct dl_ipnetinfo {
- *     u_int8_t   dli_version;
- *     u_int8_t   dli_family;
- *     u_int16_t  dli_htype;
- *     u_int32_t  dli_pktlen;
- *     u_int32_t  dli_ifindex;
- *     u_int32_t  dli_grifindex;
- *     u_int32_t  dli_zsrc;
- *     u_int32_t  dli_zdst;
+ *     uint8_t   dli_version;
+ *     uint8_t   dli_family;
+ *     uint16_t  dli_htype;
+ *     uint32_t  dli_pktlen;
+ *     uint32_t  dli_ifindex;
+ *     uint32_t  dli_grifindex;
+ *     uint32_t  dli_zsrc;
+ *     uint32_t  dli_zdst;
  * };
  *
  * dli_version is 2 for the current version of the pseudo-header.
@@ -882,23 +994,394 @@
  * An IPv4 or IPv6 datagram follows the pseudo-header; dli_family indicates
  * which of those it is.
  */
-#define DLT_IPNET			226
+#define DLT_IPNET		226
 
 /*
  * CAN (Controller Area Network) frames, with a pseudo-header as supplied
- * by Linux SocketCAN.  See Documentation/networking/can.txt in the Linux
- * source.
+ * by Linux SocketCAN, and with multi-byte numerical fields in that header
+ * in big-endian byte order.
+ *
+ * See Documentation/networking/can.txt in the Linux source.
  *
  * Requested by Felix Obenhuber <felix@obenhuber.de>.
  */
-#define DLT_CAN_SOCKETCAN		227
+#define DLT_CAN_SOCKETCAN	227
 
 /*
  * Raw IPv4/IPv6; different from DLT_RAW in that the DLT_ value specifies
  * whether it's v4 or v6.  Requested by Darren Reed <Darren.Reed@Sun.COM>.
  */
-#define DLT_IPV4			228
-#define DLT_IPV6			229
+#define DLT_IPV4		228
+#define DLT_IPV6		229
+
+/*
+ * IEEE 802.15.4, exactly as it appears in the spec (no padding, no
+ * nothing), and with no FCS at the end of the frame; requested by
+ * Jon Smirl <jonsmirl@gmail.com>.
+ */
+#define DLT_IEEE802_15_4_NOFCS	230
+
+/*
+ * Raw D-Bus:
+ *
+ *	http://www.freedesktop.org/wiki/Software/dbus
+ *
+ * messages:
+ *
+ *	http://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-messages
+ *
+ * starting with the endianness flag, followed by the message type, etc.,
+ * but without the authentication handshake before the message sequence:
+ *
+ *	http://dbus.freedesktop.org/doc/dbus-specification.html#auth-protocol
+ *
+ * Requested by Martin Vidner <martin@vidner.net>.
+ */
+#define DLT_DBUS		231
+
+/*
+ * Juniper-private data link type, as per request from
+ * Hannes Gredler <hannes@juniper.net>.
+ */
+#define DLT_JUNIPER_VS			232
+#define DLT_JUNIPER_SRX_E2E		233
+#define DLT_JUNIPER_FIBRECHANNEL	234
+
+/*
+ * DVB-CI (DVB Common Interface for communication between a PC Card
+ * module and a DVB receiver).  See
+ *
+ *	http://www.kaiser.cx/pcap-dvbci.html
+ *
+ * for the specification.
+ *
+ * Requested by Martin Kaiser <martin@kaiser.cx>.
+ */
+#define DLT_DVB_CI		235
+
+/*
+ * Variant of 3GPP TS 27.010 multiplexing protocol (similar to, but
+ * *not* the same as, 27.010).  Requested by Hans-Christoph Schemmel
+ * <hans-christoph.schemmel@cinterion.com>.
+ */
+#define DLT_MUX27010		236
+
+/*
+ * STANAG 5066 D_PDUs.  Requested by M. Baris Demiray
+ * <barisdemiray@gmail.com>.
+ */
+#define DLT_STANAG_5066_D_PDU	237
+
+/*
+ * Juniper-private data link type, as per request from
+ * Hannes Gredler <hannes@juniper.net>.
+ */
+#define DLT_JUNIPER_ATM_CEMIC	238
+
+/*
+ * NetFilter LOG messages
+ * (payload of netlink NFNL_SUBSYS_ULOG/NFULNL_MSG_PACKET packets)
+ *
+ * Requested by Jakub Zawadzki <darkjames-ws@darkjames.pl>
+ */
+#define DLT_NFLOG		239
+
+/*
+ * Hilscher Gesellschaft fuer Systemautomation mbH link-layer type
+ * for Ethernet packets with a 4-byte pseudo-header and always
+ * with the payload including the FCS, as supplied by their
+ * netANALYZER hardware and software.
+ *
+ * Requested by Holger P. Frommer <HPfrommer@hilscher.com>
+ */
+#define DLT_NETANALYZER		240
+
+/*
+ * Hilscher Gesellschaft fuer Systemautomation mbH link-layer type
+ * for Ethernet packets with a 4-byte pseudo-header and FCS and
+ * with the Ethernet header preceded by 7 bytes of preamble and
+ * 1 byte of SFD, as supplied by their netANALYZER hardware and
+ * software.
+ *
+ * Requested by Holger P. Frommer <HPfrommer@hilscher.com>
+ */
+#define DLT_NETANALYZER_TRANSPARENT	241
+
+/*
+ * IP-over-InfiniBand, as specified by RFC 4391.
+ *
+ * Requested by Petr Sumbera <petr.sumbera@oracle.com>.
+ */
+#define DLT_IPOIB		242
+
+/*
+ * MPEG-2 transport stream (ISO 13818-1/ITU-T H.222.0).
+ *
+ * Requested by Guy Martin <gmsoft@tuxicoman.be>.
+ */
+#define DLT_MPEG_2_TS		243
+
+/*
+ * ng4T GmbH's UMTS Iub/Iur-over-ATM and Iub/Iur-over-IP format as
+ * used by their ng40 protocol tester.
+ *
+ * Requested by Jens Grimmer <jens.grimmer@ng4t.com>.
+ */
+#define DLT_NG40		244
+
+/*
+ * Pseudo-header giving adapter number and flags, followed by an NFC
+ * (Near-Field Communications) Logical Link Control Protocol (LLCP) PDU,
+ * as specified by NFC Forum Logical Link Control Protocol Technical
+ * Specification LLCP 1.1.
+ *
+ * Requested by Mike Wakerly <mikey@google.com>.
+ */
+#define DLT_NFC_LLCP		245
+
+/*
+ * 246 is used as LINKTYPE_PFSYNC; do not use it for any other purpose.
+ *
+ * DLT_PFSYNC has different values on different platforms, and all of
+ * them collide with something used elsewhere.  On platforms that
+ * don't already define it, define it as 246.
+ */
+#if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__DragonFly__) && !defined(__APPLE__)
+#define DLT_PFSYNC		246
+#endif
+
+/*
+ * Raw InfiniBand packets, starting with the Local Routing Header.
+ *
+ * Requested by Oren Kladnitsky <orenk@mellanox.com>.
+ */
+#define DLT_INFINIBAND		247
+
+/*
+ * SCTP, with no lower-level protocols (i.e., no IPv4 or IPv6).
+ *
+ * Requested by Michael Tuexen <Michael.Tuexen@lurchi.franken.de>.
+ */
+#define DLT_SCTP		248
+
+/*
+ * USB packets, beginning with a USBPcap header.
+ *
+ * Requested by Tomasz Mon <desowin@gmail.com>
+ */
+#define DLT_USBPCAP		249
+
+/*
+ * Schweitzer Engineering Laboratories "RTAC" product serial-line
+ * packets.
+ *
+ * Requested by Chris Bontje <chris_bontje@selinc.com>.
+ */
+#define DLT_RTAC_SERIAL		250
+
+/*
+ * Bluetooth Low Energy air interface link-layer packets.
+ *
+ * Requested by Mike Kershaw <dragorn@kismetwireless.net>.
+ */
+#define DLT_BLUETOOTH_LE_LL	251
+
+/*
+ * DLT type for upper-protocol layer PDU saves from wireshark.
+ *
+ * the actual contents are determined by two TAGs stored with each
+ * packet:
+ *   EXP_PDU_TAG_LINKTYPE          the link type (LINKTYPE_ value) of the
+ *				   original packet.
+ *
+ *   EXP_PDU_TAG_PROTO_NAME        the name of the wireshark dissector
+ * 				   that can make sense of the data stored.
+ */
+#define DLT_WIRESHARK_UPPER_PDU	252
+
+/*
+ * DLT type for the netlink protocol (nlmon devices).
+ */
+#define DLT_NETLINK		253
+
+/*
+ * Bluetooth Linux Monitor headers for the BlueZ stack.
+ */
+#define DLT_BLUETOOTH_LINUX_MONITOR	254
+
+/*
+ * Bluetooth Basic Rate/Enhanced Data Rate baseband packets, as
+ * captured by Ubertooth.
+ */
+#define DLT_BLUETOOTH_BREDR_BB	255
+
+/*
+ * Bluetooth Low Energy link layer packets, as captured by Ubertooth.
+ */
+#define DLT_BLUETOOTH_LE_LL_WITH_PHDR	256
+
+/*
+ * PROFIBUS data link layer.
+ */
+#define DLT_PROFIBUS_DL		257
+
+/*
+ * Apple's DLT_PKTAP headers.
+ *
+ * Sadly, the folks at Apple either had no clue that the DLT_USERn values
+ * are for internal use within an organization and partners only, and
+ * didn't know that the right way to get a link-layer header type is to
+ * ask tcpdump.org for one, or knew and didn't care, so they just
+ * used DLT_USER2, which causes problems for everything except for
+ * their version of tcpdump.
+ *
+ * So I'll just give them one; hopefully this will show up in a
+ * libpcap release in time for them to get this into 10.10 Big Sur
+ * or whatever Mavericks' successor is called.  LINKTYPE_PKTAP
+ * will be 258 *even on macOS*; that is *intentional*, so that
+ * PKTAP files look the same on *all* OSes (different OSes can have
+ * different numerical values for a given DLT_, but *MUST NOT* have
+ * different values for what goes in a file, as files can be moved
+ * between OSes!).
+ *
+ * When capturing, on a system with a Darwin-based OS, on a device
+ * that returns 149 (DLT_USER2 and Apple's DLT_PKTAP) with this
+ * version of libpcap, the DLT_ value for the pcap_t  will be DLT_PKTAP,
+ * and that will continue to be DLT_USER2 on Darwin-based OSes. That way,
+ * binary compatibility with Mavericks is preserved for programs using
+ * this version of libpcap.  This does mean that if you were using
+ * DLT_USER2 for some capture device on macOS, you can't do so with
+ * this version of libpcap, just as you can't with Apple's libpcap -
+ * on macOS, they define DLT_PKTAP to be DLT_USER2, so programs won't
+ * be able to distinguish between PKTAP and whatever you were using
+ * DLT_USER2 for.
+ *
+ * If the program saves the capture to a file using this version of
+ * libpcap's pcap_dump code, the LINKTYPE_ value in the file will be
+ * LINKTYPE_PKTAP, which will be 258, even on Darwin-based OSes.
+ * That way, the file will *not* be a DLT_USER2 file.  That means
+ * that the latest version of tcpdump, when built with this version
+ * of libpcap, and sufficiently recent versions of Wireshark will
+ * be able to read those files and interpret them correctly; however,
+ * Apple's version of tcpdump in OS X 10.9 won't be able to handle
+ * them.  (Hopefully, Apple will pick up this version of libpcap,
+ * and the corresponding version of tcpdump, so that tcpdump will
+ * be able to handle the old LINKTYPE_USER2 captures *and* the new
+ * LINKTYPE_PKTAP captures.)
+ */
+#ifdef __APPLE__
+#define DLT_PKTAP	DLT_USER2
+#else
+#define DLT_PKTAP	258
+#endif
+
+/*
+ * Ethernet packets preceded by a header giving the last 6 octets
+ * of the preamble specified by 802.3-2012 Clause 65, section
+ * 65.1.3.2 "Transmit".
+ */
+#define DLT_EPON	259
+
+/*
+ * IPMI trace packets, as specified by Table 3-20 "Trace Data Block Format"
+ * in the PICMG HPM.2 specification.
+ */
+#define DLT_IPMI_HPM_2	260
+
+/*
+ * per  Joshua Wright <jwright@hasborg.com>, formats for Zwave captures.
+ */
+#define DLT_ZWAVE_R1_R2  261
+#define DLT_ZWAVE_R3     262
+
+/*
+ * per Steve Karg <skarg@users.sourceforge.net>, formats for Wattstopper
+ * Digital Lighting Management room bus serial protocol captures.
+ */
+#define DLT_WATTSTOPPER_DLM     263
+
+/*
+ * ISO 14443 contactless smart card messages.
+ */
+#define DLT_ISO_14443	264
+
+/*
+ * Radio data system (RDS) groups.  IEC 62106.
+ * Per Jonathan Brucker <jonathan.brucke@gmail.com>.
+ */
+#define DLT_RDS		265
+
+/*
+ * USB packets, beginning with a Darwin (macOS, etc.) header.
+ */
+#define DLT_USB_DARWIN	266
+
+/*
+ * OpenBSD DLT_OPENFLOW.
+ */
+#define DLT_OPENFLOW	267
+
+/*
+ * SDLC frames containing SNA PDUs.
+ */
+#define DLT_SDLC	268
+
+/*
+ * per "Selvig, Bjorn" <b.selvig@ti.com> used for
+ * TI protocol sniffer.
+ */
+#define DLT_TI_LLN_SNIFFER	269
+
+/*
+ * per: Erik de Jong <erikdejong at gmail.com> for
+ *   https://github.com/eriknl/LoRaTap/releases/tag/v0.1
+ */
+#define DLT_LORATAP             270
+
+/*
+ * per: Stefanha at gmail.com for
+ *   http://lists.sandelman.ca/pipermail/tcpdump-workers/2017-May/000772.html
+ * and: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/vsockmon.h
+ * for: http://qemu-project.org/Features/VirtioVsock
+ */
+#define DLT_VSOCK               271
+
+/*
+ * Nordic Semiconductor Bluetooth LE sniffer.
+ */
+#define DLT_NORDIC_BLE		272
+
+/*
+ * Excentis DOCSIS 3.1 RF sniffer (XRA-31)
+ *   per: bruno.verstuyft at excentis.com
+ *        http://www.xra31.com/xra-header
+ */
+#define DLT_DOCSIS31_XRA31	273
+
+/*
+ * mPackets, as specified by IEEE 802.3br Figure 99-4, starting
+ * with the preamble and always ending with a CRC field.
+ */
+#define DLT_ETHERNET_MPACKET	274
+
+/*
+ * DisplayPort AUX channel monitoring data as specified by VESA
+ * DisplayPort(DP) Standard preceeded by a pseudo-header.
+ *    per dirk.eibach at gdsys.cc
+ */
+#define DLT_DISPLAYPORT_AUX	275
+
+/*
+ * In case the code that includes this file (directly or indirectly)
+ * has also included OS files that happen to define DLT_MATCHING_MAX,
+ * with a different value (perhaps because that OS hasn't picked up
+ * the latest version of our DLT definitions), we undefine the
+ * previous value of DLT_MATCHING_MAX.
+ */
+#ifdef DLT_MATCHING_MAX
+#undef DLT_MATCHING_MAX
+#endif
+#define DLT_MATCHING_MAX	275	/* highest value in the "matching" range */
 
 /*
  * DLT and savefile link type values are split into a class and
@@ -919,4 +1402,4 @@
 #define	DLT_NETBSD_RAWAF_AF(x)	((x) & 0x0000ffff)
 #define	DLT_IS_NETBSD_RAWAF(x)	(DLT_CLASS(x) == DLT_CLASS_NETBSD_RAWAF)
 
-#endif /* _SFBPF_DLT_H */
+#endif /* !defined(_DAQ_DLT_H) */

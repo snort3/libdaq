@@ -12,7 +12,7 @@ URL: http://www.snort.org/
 Version: %{version}
 
 BuildRoot: /tmp/daqrpm-%{version}
-BuildRequires: autoconf, automake, flex, libpcap-devel
+BuildRequires: autoconf, automake, libpcap-devel
 
 %description
 Data Acquisition library for Snort.
@@ -34,15 +34,12 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root)
 %{_includedir}/daq.h
-%{_includedir}/daq_common.h
-%{_includedir}/sfbpf_dlt.h
 %{_includedir}/daq_api.h
-%{_includedir}/sfbpf.h
+%{_includedir}/daq_common.h
+%{_includedir}/daq_dlt.h
 %{_libdir}/libdaq_static_modules.la
 %{_libdir}/libdaq_static_modules.a
-%{_libdir}/libsfbpf.a
 %{_libdir}/libdaq.so
-%{_libdir}/libsfbpf.la
 %{_libdir}/libdaq.la
 %{_libdir}/daq
 %{_libdir}/daq/daq_dump.so
@@ -53,11 +50,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/daq/daq_pcap.la
 %{_libdir}/daq/daq_ipfw.so
 %{_libdir}/daq/daq_afpacket.so
-%{_libdir}/libsfbpf.so.0.0.1
-%{_libdir}/libsfbpf.so.0
 %{_libdir}/libdaq_static.la
 %{_libdir}/libdaq.so.2.0.4
-%{_libdir}/libsfbpf.so
 %{_libdir}/libdaq.a
 %{_libdir}/libdaq_static.a
 %{_libdir}/libdaq.so.2

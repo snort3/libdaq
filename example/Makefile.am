@@ -1,5 +1,5 @@
 
-AM_CFLAGS = -Wall -I$(top_srcdir)/api -I$(top_srcdir)/sfbpf
+AM_CFLAGS = -Wall -I$(top_srcdir)/api
 
 bin_PROGRAMS = daqtest daqtest-static
 

@@ -33,9 +33,8 @@
 
 #include <libmnl/libmnl.h>
 
-#include <sfbpf_dlt.h>
-
 #include "daq_api.h"
+#include "daq_dlt.h"
 
 #define DAQ_NFQ_VERSION 8
 

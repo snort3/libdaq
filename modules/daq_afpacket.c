@@ -45,10 +45,11 @@
 
 #ifdef LIBPCAP_AVAILABLE
 #include <pcap.h>
+#else
+#include "daq_dlt.h"
 #endif
 
 #include "daq_api.h"
-#include "sfbpf.h"
 
 #define DAQ_AFPACKET_VERSION 6
 

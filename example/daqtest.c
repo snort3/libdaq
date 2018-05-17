@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 #include <daq.h>
-#include <sfbpf.h>
+#include <daq_dlt.h>
 
 typedef enum
 {

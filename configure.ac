@@ -9,7 +9,7 @@ m4_define([daq_version], [daq_major_version.daq_minor_version.daq_patch_version]
 AC_PREREQ([2.69])
 AC_INIT([daq],[daq_version],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_SRCDIR([sfbpf/gencode.h])
+AC_CONFIG_SRCDIR([api/daq.h])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
 
@@ -74,52 +74,6 @@ if test "$enable_ipv6" != "no"; then
             fi
         ])
 fi
-
-# Flex/Bison tests shamelessly stolen from libpcap
-
-#
-# Look for {f}lex.
-#
-AC_PROG_LEX
-if test "$LEX" = ":"; then
-    AC_MSG_ERROR([Neither flex nor lex was found.])
-fi
-
-#
-# Make sure {f}lex supports the -P, --header-file, and --nounput flags
-# and supports processing our scanner.l.
-#
-AC_CACHE_CHECK([for capable lex], sfbpf_cv_capable_lex,
-    if $LEX -P sfbpf_ --header-file=/dev/null --nounput -t $srcdir/sfbpf/scanner.l > /dev/null 2>&1; then
-        sfbpf_cv_capable_lex=yes
-    else
-        sfbpf_cv_capable_lex=insufficient
-    fi)
-if test $sfbpf_cv_capable_lex = insufficient ; then
-    AC_MSG_ERROR([$LEX is insufficient to compile libsfbpf.
- libsfbpf requires Flex 2.5.31 or later, or a compatible version of lex.])
-fi
-
-#
-# Look for yacc/bison/byacc.
-#
-AC_PROG_YACC
-
-#
-# Make sure it supports the -p flag and supports processing our
-# grammar.y.
-#
-AC_CACHE_CHECK([for capable yacc/bison], sfbpf_cv_capable_yacc,
-    if $YACC -p sfbpf_ -o /dev/null $srcdir/sfbpf/grammar.y >/dev/null 2>&1; then
-        sfbpf_cv_capable_yacc=yes
-    else
-        sfbpf_cv_capable_yacc=insufficient
-    fi)
-if test $sfbpf_cv_capable_yacc = insufficient ; then
-    AC_MSG_ERROR([$YACC is insufficient to compile libsfbpf.
- libsfbpf requires Bison, Berkeley YACC, or another YACC compatible with them.])
-fi
-
 
 save_LIBS=${LIBS}
 
@@ -369,7 +323,6 @@ AC_CONFIG_FILES([Makefile
                  example/Makefile
                  modules/Makefile
                  modules/daq-modules-config
-                 sfbpf/Makefile
                  test/Makefile])
 AC_OUTPUT
 

@@ -1,4 +1,4 @@
-include_HEADERS = daq.h daq_api.h daq_common.h daq_version.h
+include_HEADERS = daq.h daq_api.h daq_common.h daq_dlt.h daq_version.h
 noinst_HEADERS = daq_api_internal.h
 
 lib_LTLIBRARIES = libdaq.la
