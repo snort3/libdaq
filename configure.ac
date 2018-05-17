@@ -24,6 +24,9 @@ AC_PROG_SED
 
 LT_INIT
 
+# Initialize pkg-config since we are installing a .pc file
+PKG_INSTALLDIR
+
 # Enable visibility if we can
 gl_VISIBILITY
 AM_CPPFLAGS="$AM_CPPFLAGS $CFLAG_VISIBILITY"
@@ -323,7 +326,9 @@ AC_CONFIG_FILES([Makefile
                  example/Makefile
                  modules/Makefile
                  modules/daq-modules-config
-                 test/Makefile])
+                 test/Makefile
+                 libdaq.pc
+                 ])
 AC_OUTPUT
 
 AC_MSG_RESULT([
