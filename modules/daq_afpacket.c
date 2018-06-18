@@ -836,8 +836,10 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_CPU;
             else if (!strcmp(varValue, "rollover"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_ROLLOVER;
+#ifdef PACKET_FANOUT_RND
             else if (!strcmp(varValue, "rnd"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_RND;
+#endif
 #ifdef PACKET_FANOUT_QM
             else if (!strcmp(varValue, "qm"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_QM;
