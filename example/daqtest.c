@@ -1367,10 +1367,19 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    if ((rval = daq_instance_start(instance)) != 0)
+    if ((rval = daq_instance_start(instance)) != DAQ_SUCCESS)
     {
         fprintf(stderr, "Could not start DAQ module: (%d: %s)\n", rval, daq_instance_get_error(instance));
         return -1;
+    }
+
+    DAQ_MsgPoolInfo_t mpool_info;
+    if (daq_instance_get_msg_pool_info(instance, &mpool_info) == DAQ_SUCCESS)
+    {
+        printf("Message Pool Info:\n");
+        printf("  Size: %u\n", mpool_info.size);
+        printf("  Available: %u\n", mpool_info.available);
+        printf("  Memory Usage: %zu\n", mpool_info.mem_size);
     }
 
     dlt = daq_instance_get_datalink_type(instance);

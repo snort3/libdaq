@@ -38,8 +38,8 @@
 
 #define DAQ_NFQ_VERSION 8
 
-#define DEFAULT_POOL_SIZE 16
-#define DEFAULT_QUEUE_MAXLEN 1024   // Based on NFQNL_QMAX_DEFAULT from nfnetlnk_queue_core.c
+#define NFQ_DEFAULT_POOL_SIZE   16
+#define DEFAULT_QUEUE_MAXLEN    1024   // Based on NFQNL_QMAX_DEFAULT from nfnetlnk_queue_core.c
 
 typedef struct _nfq_pkt_desc
 {
@@ -52,12 +52,18 @@ typedef struct _nfq_pkt_desc
     struct _nfq_pkt_desc *next;
 } NfqPktDesc;
 
+typedef struct _nfq_msg_pool
+{
+    NfqPktDesc *pool;
+    NfqPktDesc *freelist;
+    DAQ_MsgPoolInfo_t info;
+} NfqMsgPool;
+
 typedef struct _nfq_context
 {
     /* Configuration */
     unsigned queue_num;
     int snaplen;
-    unsigned pool_size;
     int timeout;
     unsigned queue_maxlen;
     bool fail_open;
@@ -66,8 +72,7 @@ typedef struct _nfq_context
     DAQ_Instance_h instance;
     DAQ_State state;
     DAQ_Stats_t stats;
-    NfqPktDesc *pool;
-    NfqPktDesc *pkt_freelist;
+    NfqMsgPool pool;
     char *nlmsg_buf;
     size_t nlmsg_bufsize;
     struct mnl_socket *nlsock;
@@ -101,29 +106,34 @@ static DAQ_BaseAPI_t daq_base_api;
 
 static void destroy_packet_pool(Nfq_Context_t *nfqc)
 {
-    if (nfqc->pool)
+    NfqMsgPool *pool = &nfqc->pool;
+    if (pool->pool)
     {
-        while (nfqc->pool_size > 0)
-            free(nfqc->pool[--nfqc->pool_size].nlmsg_buf);
-        free(nfqc->pool);
-        nfqc->pool = NULL;
+        while (pool->info.size > 0)
+            free(pool->pool[--pool->info.size].nlmsg_buf);
+        free(pool->pool);
+        pool->pool = NULL;
     }
-    nfqc->pkt_freelist = NULL;
+    pool->freelist = NULL;
+    pool->info.available = 0;
+    pool->info.mem_size = 0;
 }
 
 static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
 {
-    nfqc->pool = calloc(sizeof(NfqPktDesc), size);
-    if (!nfqc->pool)
+    NfqMsgPool *pool = &nfqc->pool;
+    pool->pool = calloc(sizeof(NfqPktDesc), size);
+    if (!pool->pool)
     {
         daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
                 __func__, sizeof(NfqPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
-    while (nfqc->pool_size < size)
+    pool->info.mem_size = sizeof(NfqPktDesc) * size;
+    while (pool->info.size < size)
     {
         /* Allocate netlink message receive buffer and set up descriptor */
-        NfqPktDesc *desc = &nfqc->pool[nfqc->pool_size];
+        NfqPktDesc *desc = &pool->pool[pool->info.size];
         desc->nlmsg_buf = malloc(nfqc->nlmsg_bufsize);
         if (!desc->nlmsg_buf)
         {
@@ -131,6 +141,7 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
                     __func__, nfqc->nlmsg_bufsize);
             return DAQ_ERROR_NOMEM;
         }
+        pool->info.mem_size += nfqc->nlmsg_bufsize;
 
         /* Initialize non-zero invariant packet header fields. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
@@ -142,11 +153,12 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
         msg->msg = desc;
 
         /* Place it on the free list */
-        desc->next = nfqc->pkt_freelist;
-        nfqc->pkt_freelist = desc;
+        desc->next = nfqc->pool.freelist;
+        nfqc->pool.freelist = desc;
 
-        nfqc->pool_size++;
+        pool->info.size++;
     }
+    pool->info.available = pool->info.size;
     return DAQ_SUCCESS;
 }
 
@@ -434,7 +446,8 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
     }
 
     /* Netlink message buffer length must be determined prior to creating packet pool */
-    if (create_packet_pool(nfqc, DEFAULT_POOL_SIZE) != DAQ_SUCCESS)
+    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(config);
+    if ((rval = create_packet_pool(nfqc, pool_size ? pool_size : NFQ_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
         goto fail;
 
     /* Open the netfilter netlink socket */
@@ -699,7 +712,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
     while (idx < max_recv)
     {
         /* Make sure that we have a packet descriptor available to populate. */
-        NfqPktDesc *desc = nfqc->pkt_freelist;
+        NfqPktDesc *desc = nfqc->pool.freelist;
         if (!desc)
         {
             *rstat = DAQ_RSTAT_NOBUF;
@@ -746,8 +759,9 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
         msgs[idx] = &desc->msg;
 
         /* Last, but not least, extract this descriptor from the free list. */
-        nfqc->pkt_freelist = desc->next;
+        nfqc->pool.freelist = desc->next;
         desc->next = NULL;
+        nfqc->pool.info.available--;
 
         idx++;
     }
@@ -785,8 +799,9 @@ static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
     /* Toss the descriptor back on the free list for reuse.
         Make sure to clear out the netlink message header to show that it is unused. */
     desc->nlmh = NULL;
-    desc->next = nfqc->pkt_freelist;
-    nfqc->pkt_freelist = desc;
+    desc->next = nfqc->pool.freelist;
+    nfqc->pool.freelist = desc;
+    nfqc->pool.info.available++;
 
     return DAQ_SUCCESS;
 }
@@ -811,6 +826,15 @@ static const uint8_t *nfq_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t
         return NULL;
     desc = (NfqPktDesc *) msg->msg;
     return desc->data;
+}
+
+static int nfq_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    *info = nfqc->pool.info;
+
+    return DAQ_SUCCESS;
 }
 
 #ifdef BUILDING_SO
@@ -850,4 +874,5 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .msg_finalize = */ nfq_daq_msg_finalize,
     /* .packet_header_from_msg = */ nfq_daq_packet_header_from_msg,
     /* .packet_data_from_msg = */ nfq_daq_packet_data_from_msg,
+    /* .get_msg_pool_info = */ nfq_daq_get_msg_pool_info,
 };

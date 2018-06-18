@@ -119,5 +119,6 @@ DAQ_ModuleAPI_t test_module =
     /* .msg_finalize = */ daq_test_msg_finalize,
     /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
     /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
+    /* .get_msg_pool_info = */ NULL,
 };
 

@@ -381,6 +381,20 @@ DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_t *ins
     return instance->module->packet_data_from_msg(instance->context, msg);
 }
 
+DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info)
+{
+    if (!instance)
+        return DAQ_ERROR_NOCTX;
+
+    if (!info)
+        return DAQ_ERROR_INVAL;
+
+    if (!instance->module->get_msg_pool_info)
+        return DAQ_ERROR_NOTSUP;
+
+    return instance->module->get_msg_pool_info(instance->context, info);
+}
+
 
 /*
  * Functions that apply to DAQ modules themselves go here.

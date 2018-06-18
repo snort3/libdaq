@@ -62,6 +62,8 @@ DAQ_LINKAGE int daq_module_config_set_snaplen(DAQ_ModuleConfig_h modcfg, int sna
 DAQ_LINKAGE int daq_module_config_get_snaplen(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_h modcfg, unsigned timeout);
 DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_h modcfg);
+DAQ_LINKAGE int daq_module_config_set_msg_pool_size(DAQ_ModuleConfig_h modcfg, uint32_t num_msgs);
+DAQ_LINKAGE uint32_t daq_module_config_get_msg_pool_size(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_h modcfg, DAQ_Mode mode);
 DAQ_LINKAGE DAQ_Mode daq_module_config_get_mode(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_variable(DAQ_ModuleConfig_h modcfg, const char *key, const char *value);
@@ -109,5 +111,6 @@ DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const uns
 DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
 DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
 DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
+DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info);
 
 #endif /* _DAQ_H */

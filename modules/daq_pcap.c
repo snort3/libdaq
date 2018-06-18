@@ -42,7 +42,7 @@
 
 #define DAQ_PCAP_VERSION 4
 
-#define DEFAULT_POOL_SIZE 16
+#define PCAP_DEFAULT_POOL_SIZE 16
 #define DAQ_PCAP_ROLLOVER_LIM 1000000000 //Check for rollover every billionth packet
 
 typedef struct _pcap_pkt_desc
@@ -53,13 +53,19 @@ typedef struct _pcap_pkt_desc
     struct _pcap_pkt_desc *next;
 } PcapPktDesc;
 
+typedef struct _pcap_msg_pool
+{
+    PcapPktDesc *pool;
+    PcapPktDesc *freelist;
+    DAQ_MsgPoolInfo_t info;
+} PcapMsgPool;
+
 typedef struct _pcap_context
 {
     /* Configuration */
     char *device;
     char *filter_string;
     int snaplen;
-    unsigned pool_size;
     bool promisc_mode;
     bool immediate_mode;
     int timeout;
@@ -70,8 +76,7 @@ typedef struct _pcap_context
     DAQ_Stats_t stats;
     DAQ_State state;
     char pcap_errbuf[PCAP_ERRBUF_SIZE];
-    PcapPktDesc *pool;
-    PcapPktDesc *pkt_freelist;
+    PcapMsgPool pool;
     pcap_t *handle;
     FILE *fp;
     uint32_t netmask;
@@ -98,29 +103,34 @@ static DAQ_BaseAPI_t daq_base_api;
 
 static void destroy_packet_pool(Pcap_Context_t *context)
 {
-    if (context->pool)
+    PcapMsgPool *pool = &context->pool;
+    if (pool->pool)
     {
-        while (context->pool_size > 0)
-            free(context->pool[--context->pool_size].data);
-        free(context->pool);
-        context->pool = NULL;
+        while (pool->info.size > 0)
+            free(pool->pool[--pool->info.size].data);
+        free(pool->pool);
+        pool->pool = NULL;
     }
-    context->pkt_freelist = NULL;
+    pool->freelist = NULL;
+    pool->info.available = 0;
+    pool->info.mem_size = 0;
 }
 
 static int create_packet_pool(Pcap_Context_t *context, unsigned size)
 {
-    context->pool = calloc(sizeof(PcapPktDesc), size);
-    if (!context->pool)
+    PcapMsgPool *pool = &context->pool;
+    pool->pool = calloc(sizeof(PcapPktDesc), size);
+    if (!pool->pool)
     {
         daq_base_api.instance_set_errbuf(context->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
                 __func__, sizeof(PcapPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
-    while (context->pool_size < size)
+    pool->info.mem_size = sizeof(PcapPktDesc) * size;
+    while (pool->info.size < size)
     {
         /* Allocate packet data and set up descriptor */
-        PcapPktDesc *desc = &context->pool[context->pool_size];
+        PcapPktDesc *desc = &pool->pool[pool->info.size];
         desc->data = malloc(context->snaplen);
         if (!desc->data)
         {
@@ -128,6 +138,7 @@ static int create_packet_pool(Pcap_Context_t *context, unsigned size)
                     __func__, context->snaplen);
             return DAQ_ERROR_NOMEM;
         }
+        pool->info.mem_size += context->snaplen;
 
         /* Initialize non-zero invariant packet header fields. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
@@ -141,11 +152,12 @@ static int create_packet_pool(Pcap_Context_t *context, unsigned size)
         msg->msg = desc;
 
         /* Place it on the free list */
-        desc->next = context->pkt_freelist;
-        context->pkt_freelist = desc;
+        desc->next = pool->freelist;
+        pool->freelist = desc;
 
-        context->pool_size++;
+        pool->info.size++;
     }
+    pool->info.available = pool->info.size;
     return DAQ_SUCCESS;
 }
 
@@ -245,7 +257,8 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
         daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
 
-    int rval = create_packet_pool(context, DEFAULT_POOL_SIZE);
+    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(config);
+    int rval = create_packet_pool(context, pool_size ? pool_size : PCAP_DEFAULT_POOL_SIZE);
     if (rval != DAQ_SUCCESS)
     {
         destroy_packet_pool(context);
@@ -567,7 +580,7 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
     {
         /* Make sure that we have a packet descriptor available to populate *before*
             calling into libpcap. */
-        PcapPktDesc *desc = context->pkt_freelist;
+        PcapPktDesc *desc = context->pool.freelist;
         if (!desc)
         {
             *rstat = DAQ_RSTAT_NOBUF;
@@ -634,8 +647,9 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
         msgs[idx] = &desc->msg;
 
         /* Last, but not least, extract this descriptor from the free list. */
-        context->pkt_freelist = desc->next;
+        context->pool.freelist = desc->next;
         desc->next = NULL;
+        context->pool.info.available--;
     }
 
     return idx;
@@ -652,8 +666,9 @@ static int pcap_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     context->stats.verdicts[verdict]++;
 
     /* Toss the descriptor back on the free list for reuse. */
-    desc->next = context->pkt_freelist;
-    context->pkt_freelist = desc;
+    desc->next = context->pool.freelist;
+    context->pool.freelist = desc;
+    context->pool.info.available++;
 
     return DAQ_SUCCESS;
 }
@@ -676,6 +691,15 @@ static const uint8_t *pcap_daq_packet_data_from_msg(void *handle, const DAQ_Msg_
         return NULL;
     desc = (PcapPktDesc *) msg->msg;
     return desc->data;
+}
+
+static int pcap_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
+{
+    Pcap_Context_t *context = (Pcap_Context_t *) handle;
+
+    *info = context->pool.info;
+
+    return DAQ_SUCCESS;
 }
 
 #ifdef BUILDING_SO
@@ -715,4 +739,5 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .msg_finalize = */ pcap_daq_msg_finalize,
     /* .packet_header_from_msg = */ pcap_daq_packet_header_from_msg,
     /* .packet_data_from_msg = */ pcap_daq_packet_data_from_msg,
+    /* .get_msg_pool_info = */ pcap_daq_get_msg_pool_info,
 };

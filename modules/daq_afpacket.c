@@ -53,9 +53,9 @@
 
 #define DAQ_AFPACKET_VERSION 6
 
-#define DEFAULT_POOL_SIZE 16
+#define AF_PACKET_DEFAULT_POOL_SIZE      16
 #define AF_PACKET_DEFAULT_BUFFER_SIZE   128
-#define AF_PACKET_MAX_INTERFACES    32
+#define AF_PACKET_MAX_INTERFACES         32
 
 union thdr
 {
@@ -112,13 +112,19 @@ typedef struct _af_packet_pkt_desc
     struct _af_packet_pkt_desc *next;
 } AFPacketPktDesc;
 
+typedef struct _af_packet_msg_pool
+{
+    AFPacketPktDesc *pool;
+    AFPacketPktDesc *freelist;
+    DAQ_MsgPoolInfo_t info;
+} AFPacketMsgPool;
+
 typedef struct _afpacket_context
 {
     /* Configuration */
     char *device;
     char *filter;
     int snaplen;
-    unsigned pool_size;
     int timeout;
     uint32_t size;
 #ifdef PACKET_FANOUT
@@ -127,8 +133,7 @@ typedef struct _afpacket_context
     bool debug;
     /* State */
     DAQ_Instance_h instance;
-    AFPacketPktDesc *pool;
-    AFPacketPktDesc *pkt_freelist;
+    AFPacketMsgPool pool;
     AFPacketInstance *instances;
     uint32_t intf_count;
 #ifdef LIBPCAP_AVAILABLE
@@ -160,29 +165,34 @@ static DAQ_BaseAPI_t daq_base_api;
 
 static void destroy_packet_pool(AFPacket_Context_t *afpc)
 {
-    if (afpc->pool)
+    AFPacketMsgPool *pool = &afpc->pool;
+    if (pool->pool)
     {
-        while (afpc->pool_size > 0)
-            free(afpc->pool[--afpc->pool_size].data);
-        free(afpc->pool);
-        afpc->pool = NULL;
+        while (pool->info.size > 0)
+            free(pool->pool[--pool->info.size].data);
+        free(pool->pool);
+        pool->pool = NULL;
     }
-    afpc->pkt_freelist = NULL;
+    pool->freelist = NULL;
+    pool->info.available = 0;
+    pool->info.mem_size = 0;
 }
 
 static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
 {
-    afpc->pool = calloc(sizeof(AFPacketPktDesc), size);
-    if (!afpc->pool)
+    AFPacketMsgPool *pool = &afpc->pool;
+    pool->pool = calloc(sizeof(AFPacketPktDesc), size);
+    if (!pool->pool)
     {
         daq_base_api.instance_set_errbuf(afpc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
                 __func__, sizeof(AFPacketPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
-    while (afpc->pool_size < size)
+    pool->info.mem_size = sizeof(AFPacketPktDesc) * size;
+    while (pool->info.size < size)
     {
         /* Allocate packet data and set up descriptor */
-        AFPacketPktDesc *desc = &afpc->pool[afpc->pool_size];
+        AFPacketPktDesc *desc = &pool->pool[pool->info.size];
         desc->data = malloc(afpc->snaplen);
         if (!desc->data)
         {
@@ -190,6 +200,7 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
                     __func__, afpc->snaplen);
             return DAQ_ERROR_NOMEM;
         }
+        pool->info.mem_size += afpc->snaplen;
 
         /* Initialize non-zero invariant packet header fields. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
@@ -201,11 +212,12 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
         msg->msg = desc;
 
         /* Place it on the free list */
-        desc->next = afpc->pkt_freelist;
-        afpc->pkt_freelist = desc;
+        desc->next = pool->freelist;
+        pool->freelist = desc;
 
-        afpc->pool_size++;
+        pool->info.size++;
     }
+    pool->info.available = pool->info.size;
     return DAQ_SUCCESS;
 }
 
@@ -725,7 +737,9 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
     }
 
     afpc->snaplen = daq_base_api.module_config_get_snaplen(config);
-    afpc->timeout = (daq_base_api.module_config_get_timeout(config) > 0) ? (int) daq_base_api.module_config_get_timeout(config) : -1;
+    afpc->timeout = (int) daq_base_api.module_config_get_timeout(config);
+    if (afpc->timeout == 0)
+        afpc->timeout = -1;
 
     dev = afpc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') ||
@@ -789,7 +803,8 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
         goto err;
     }
 
-    if (create_packet_pool(afpc, DEFAULT_POOL_SIZE) != DAQ_SUCCESS)
+    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(config);
+    if ((rval = create_packet_pool(afpc, pool_size ? pool_size : AF_PACKET_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
         goto err;
 
     /*
@@ -873,8 +888,6 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
     afpc->size = size / num_rings;
 
     afpc->curr_instance = afpc->instances;
-
-    afpc->pool = malloc(afpc->snaplen);
 
     afpc->state = DAQ_STATE_INITIALIZED;
 
@@ -1181,7 +1194,7 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
     for (idx = 0; idx < max_recv; idx++)
     {
         /* Make sure that we have a packet descriptor available to populate. */
-        AFPacketPktDesc *desc = afpc->pkt_freelist;
+        AFPacketPktDesc *desc = afpc->pool.freelist;
         if (!desc)
         {
             *rstat = DAQ_RSTAT_NOBUF;
@@ -1301,8 +1314,9 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
             */
 
             /* Last, but not least, extract this descriptor from the free list and insert it in message vector. */
-            afpc->pkt_freelist = desc->next;
+            afpc->pool.freelist = desc->next;
             desc->next = NULL;
+            afpc->pool.info.available--;
             msgs[idx] = &desc->msg;
 
             break;
@@ -1341,8 +1355,9 @@ static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Ver
         afpacket_transmit_packet(desc->instance->peer, desc->data, desc->length);
 
     /* Toss the descriptor back on the free list for reuse. */
-    desc->next = afpc->pkt_freelist;
-    afpc->pkt_freelist = desc;
+    desc->next = afpc->pool.freelist;
+    afpc->pool.freelist = desc;
+    afpc->pool.info.available++;
 
     return DAQ_SUCCESS;
 }
@@ -1365,6 +1380,15 @@ static const uint8_t *afpacket_daq_packet_data_from_msg(void *handle, const DAQ_
         return NULL;
     desc = (AFPacketPktDesc *) msg->msg;
     return desc->data;
+}
+
+static int afpacket_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
+{
+    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+
+    *info = afpc->pool.info;
+
+    return DAQ_SUCCESS;
 }
 
 #ifdef BUILDING_SO
@@ -1403,5 +1427,6 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .msg_receive = */ afpacket_daq_msg_receive,
     /* .msg_finalize = */ afpacket_daq_msg_finalize,
     /* .packet_header_from_msg = */ afpacket_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ afpacket_daq_packet_data_from_msg
+    /* .packet_data_from_msg = */ afpacket_daq_packet_data_from_msg,
+    /* .get_msg_pool_info = */ afpacket_daq_get_msg_pool_info,
 };

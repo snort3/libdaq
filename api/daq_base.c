@@ -221,6 +221,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     base_api.module_config_get_input = daq_module_config_get_input;
     base_api.module_config_get_snaplen = daq_module_config_get_snaplen;
     base_api.module_config_get_timeout = daq_module_config_get_timeout;
+    base_api.module_config_get_msg_pool_size = daq_module_config_get_msg_pool_size;
     base_api.module_config_get_mode = daq_module_config_get_mode;
     base_api.module_config_get_variable = daq_module_config_get_variable;
     base_api.module_config_first_variable = daq_module_config_first_variable;

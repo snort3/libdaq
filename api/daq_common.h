@@ -429,6 +429,13 @@ typedef struct _daq_stats
     uint64_t verdicts[MAX_DAQ_VERDICT]; /* Counters of packets handled per-verdict. */
 } DAQ_Stats_t;
 
+typedef struct _daq_msg_pool_info
+{
+    uint32_t size;
+    uint32_t available;
+    size_t mem_size;
+} DAQ_MsgPoolInfo_t;
+
 #define DAQ_DP_TUNNEL_TYPE_NON_TUNNEL 0
 #define DAQ_DP_TUNNEL_TYPE_GTP_TUNNEL 1
 #define DAQ_DP_TUNNEL_TYPE_MPLS_TUNNEL 2

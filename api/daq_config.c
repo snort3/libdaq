@@ -46,12 +46,13 @@ typedef struct _daq_dict
 typedef struct _daq_module_config
 {
     struct _daq_module_config *next;
-    const DAQ_ModuleAPI_t *module;     /* Module that will be instantiated with this configuration */
-    char *input;            /* Name of the interface(s) or file to be opened */
-    int snaplen;            /* Maximum packet capture length */
-    unsigned timeout;       /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
-    DAQ_Mode mode;          /* Module mode (DAQ_MODE_*) */
-    DAQ_Dict_t variables;   /* Dictionary of arbitrary key[:value] string pairs */
+    const DAQ_ModuleAPI_t *module;  /* Module that will be instantiated with this configuration */
+    char *input;                    /* Name of the interface(s) or file to be opened */
+    int snaplen;                    /* Maximum packet capture length */
+    unsigned timeout;               /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
+    DAQ_Mode mode;                  /* Module mode (DAQ_MODE_*) */
+    uint32_t msg_pool_size;         /* Size of the message pool to create (quantity) */
+    DAQ_Dict_t variables;           /* Dictionary of arbitrary key[:value] string pairs */
 } DAQ_ModuleConfig_t;
 
 typedef struct _daq_config
@@ -255,6 +256,24 @@ DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_t *modcfg)
     return 0;
 }
 
+DAQ_LINKAGE int daq_module_config_set_msg_pool_size(DAQ_ModuleConfig_h modcfg, uint32_t num_msgs)
+{
+    if (!modcfg)
+        return DAQ_ERROR_INVAL;
+
+    modcfg->msg_pool_size = num_msgs;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE uint32_t daq_module_config_get_msg_pool_size(DAQ_ModuleConfig_h modcfg)
+{
+    if (modcfg)
+        return modcfg->msg_pool_size;
+
+    return 0;
+}
+
 DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_t *modcfg, DAQ_Mode mode)
 {
     if (!modcfg)
@@ -409,7 +428,7 @@ DAQ_LINKAGE void daq_module_config_destroy(DAQ_ModuleConfig_t *modcfg)
 
 
 /*
- * DAQ Configuration Functions
+ * DAQ (Top-level) Configuration Functions
  */
 
 DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr)

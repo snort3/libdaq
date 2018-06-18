@@ -516,6 +516,7 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .msg_receive = */ dump_daq_msg_receive,
     /* .msg_finalize = */ dump_daq_msg_finalize,
     /* .packet_header_from_msg = */ dump_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ dump_daq_packet_data_from_msg
+    /* .packet_data_from_msg = */ dump_daq_packet_data_from_msg,
+    /* .get_msg_pool_info = */ NULL,
 };
 

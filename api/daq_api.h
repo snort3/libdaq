@@ -36,6 +36,7 @@ typedef struct _daq_base_api
     const char *(*module_config_get_input) (DAQ_ModuleConfig_h modcfg);
     int (*module_config_get_snaplen) (DAQ_ModuleConfig_h modcfg);
     unsigned (*module_config_get_timeout) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*module_config_get_msg_pool_size) (DAQ_ModuleConfig_h modcfg);
     DAQ_Mode (*module_config_get_mode) (DAQ_ModuleConfig_h modcfg);
     const char *(*module_config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
     int (*module_config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
@@ -121,6 +122,9 @@ typedef struct _daq_module_api
     int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
     DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
     const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);
+
+    /* Query message pool info */
+    int (*get_msg_pool_info) (void *handle, DAQ_MsgPoolInfo_t *info);
 } DAQ_ModuleAPI_t;
 
 #define DAQ_ERRBUF_SIZE 256
