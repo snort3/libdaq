@@ -147,9 +147,13 @@ static int create_packet_pool(Pcap_Context_t *context, unsigned size)
         pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
         pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
 
+        /* Initialize non-zero invariant message header fields. */
         DAQ_Msg_t *msg = &desc->msg;
         msg->type = DAQ_MSG_TYPE_PACKET;
-        msg->msg = desc;
+        msg->hdr_len = sizeof(desc->pkthdr);
+        msg->hdr = &desc->pkthdr;
+        msg->data = desc->data;
+        msg->priv = desc;
 
         /* Place it on the free list */
         desc->next = pool->freelist;
@@ -436,7 +440,7 @@ fail:
     return DAQ_ERROR;
 }
 
-static int pcap_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+static int pcap_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     Pcap_Context_t *context = (Pcap_Context_t *) handle;
 
@@ -639,17 +643,21 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
         /* Populate the packet descriptor */
         memcpy(desc->data, data, pcaphdr->caplen);
 
+        /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */
+        DAQ_Msg_t *msg = &desc->msg;
+        msg->data_len = pcaphdr->caplen;
+
+        /* Then, set up the DAQ packet header. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
-        pkthdr->caplen = pcaphdr->caplen;
         pkthdr->pktlen = pcaphdr->len;
         pkthdr->ts = pcaphdr->ts;
 
-        msgs[idx] = &desc->msg;
-
-        /* Last, but not least, extract this descriptor from the free list. */
+        /* Last, but not least, extract this descriptor from the free list and 
+            place the message in the return vector. */
         context->pool.freelist = desc->next;
         desc->next = NULL;
         context->pool.info.available--;
+        msgs[idx] = &desc->msg;
     }
 
     return idx;
@@ -658,7 +666,7 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
 static int pcap_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
     Pcap_Context_t *context = (Pcap_Context_t *) handle;
-    PcapPktDesc *desc = (PcapPktDesc *) msg->msg;
+    PcapPktDesc *desc = (PcapPktDesc *) msg->priv;
 
     /* Sanitize the verdict. */
     if (verdict >= MAX_DAQ_VERDICT)
@@ -671,26 +679,6 @@ static int pcap_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     context->pool.info.available++;
 
     return DAQ_SUCCESS;
-}
-
-static DAQ_PktHdr_t *pcap_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    PcapPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (PcapPktDesc *) msg->msg;
-    return &desc->pkthdr;
-}
-
-static const uint8_t *pcap_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    PcapPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (PcapPktDesc *) msg->msg;
-    return desc->data;
 }
 
 static int pcap_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
@@ -737,7 +725,5 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .query_flow = */ NULL,
     /* .msg_receive = */ pcap_daq_msg_receive,
     /* .msg_finalize = */ pcap_daq_msg_finalize,
-    /* .packet_header_from_msg = */ pcap_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ pcap_daq_packet_data_from_msg,
     /* .get_msg_pool_info = */ pcap_daq_get_msg_pool_info,
 };

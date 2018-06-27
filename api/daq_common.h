@@ -97,6 +97,7 @@ typedef enum
 
 typedef const struct _daq_module_api *DAQ_Module_h;
 typedef struct _daq_instance *DAQ_Instance_h;
+typedef const struct _daq_msg *DAQ_Msg_h;
 
 typedef enum
 {
@@ -107,13 +108,23 @@ typedef enum
     DAQ_MSG_TYPE_VPN_LOGIN,     /* VPN login info */
     DAQ_MSG_TYPE_VPN_LOGOUT,    /* VPN logout info */
     DAQ_MSG_TYPE_HA_STATE,      /* HA State blob */
-    MAX_DAQ_MSG_TYPE
+    LAST_BUILTIN_DAQ_MSG_TYPE = 1024,   /* End of reserved space for "official" DAQ message types.
+                                           Any externally defined message types should be larger than this. */
+    MAX_DAQ_MSG_TYPE = UINT16_MAX
 } DAQ_MsgType;
+
+/* NOTE: The internals of this message structure are only visible for performance reasons and
+    for use by DAQ modules.  Applications should use the pseudo-opaque DAQ_Msg_h and the inline
+    accessor functions (daq_msg_*) from daq.h. */
 
 typedef struct _daq_msg
 {
-    DAQ_MsgType type;
-    void *msg;
+    DAQ_MsgType type;           /* Message type (one of DAQ_MsgType or from the user-defined range). */
+    size_t hdr_len;             /* Length of the header structure pointed to by 'hdr'. */
+    void *hdr;                  /* Pointer to the message header structure for this message. */
+    uint32_t data_len;          /* Length of the data pointed to by 'data'.  Should be 0 if 'data' is NULL. */
+    void *data;                 /* Pointer to the variable-length message data. (Optional) */
+    void *priv;                 /* Pointer to module instance's private data for this message. (Optional) */
 } DAQ_Msg_t;
 
 #define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x000001 /* The DAQ module reports that the checksum for this packet is good. */
@@ -188,8 +199,7 @@ typedef struct _daq_pkt_decode_data
 typedef struct _daq_pkt_hdr
 {
     struct timeval ts;          /* Timestamp */
-    uint32_t caplen;            /* Length of the portion present */
-    uint32_t pktlen;            /* Length of this packet (off wire) */
+    uint32_t pktlen;            /* Original length of this packet (off wire) */
     uint16_t address_space_id;  /* Unique ID of the address space */
     int32_t ingress_index;      /* Index of the inbound interface. */
     int32_t egress_index;       /* Index of the outbound interface. */

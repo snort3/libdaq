@@ -55,7 +55,7 @@ typedef struct
     void *wrapped_context;
 
     // but write all output packets here
-    pcap_dumper_t *dump;
+    pcap_dumper_t *dumper;
     char *pcap_filename;
 
     // and write other textual output here
@@ -203,28 +203,31 @@ static void dump_daq_shutdown (void *handle)
     free(dc);
 }
 
-static int dump_daq_inject (void *handle, const DAQ_PktHdr_t* hdr, const uint8_t* data, uint32_t len, int reverse)
+static int dump_daq_inject (void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
 {
     DumpContext *dc = (DumpContext*)handle;
+    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
 
     if (dc->text_out)
     {
         fprintf(dc->text_out, "%cI: %lu.%lu(%u): %u\n", reverse ? 'R' : 'F',
-                (unsigned long) hdr->ts.tv_sec, (unsigned long) hdr->ts.tv_usec, hdr->caplen, len);
+                (unsigned long) hdr->ts.tv_sec, (unsigned long) hdr->ts.tv_usec, msg->data_len, len);
         hexdump(dc->text_out, data, len, "    ");
         fprintf(dc->text_out, "\n");
     }
 
-    if (dc->dump)
+    if (dc->dumper)
     {
-        // copy the original header to get the same
-        // timestamps but overwrite the lengths
-        DAQ_PktHdr_t h = *hdr;
+        struct pcap_pkthdr phdr;
 
-        h.pktlen = h.caplen = len;
-        pcap_dump((u_char*)dc->dump, (struct pcap_pkthdr*)&h, data);
+        // Reuse the timestamp from the original packet for the injected packet
+        phdr.ts = hdr->ts;
+        phdr.caplen = len;
+        phdr.len = len;
 
-        if (ferror(pcap_dump_file(dc->dump)))
+        pcap_dump((u_char*)dc->dumper, &phdr, data);
+
+        if (ferror(pcap_dump_file(dc->dumper)))
         {
             daq_base_api.instance_set_errbuf(dc->instance, "inject can't write to dump file");
             return DAQ_ERROR;
@@ -254,8 +257,8 @@ static int dump_daq_start(void* handle)
         pcap_t* pcap;
 
         pcap = pcap_open_dead(dlt, snaplen);
-        dc->dump = pcap ? pcap_dump_open(pcap, pcap_filename) : NULL;
-        if (!dc->dump)
+        dc->dumper = pcap ? pcap_dump_open(pcap, pcap_filename) : NULL;
+        if (!dc->dumper)
         {
             dc->wrapped_module->stop(dc->wrapped_context);
             daq_base_api.instance_set_errbuf(dc->instance, "can't open dump file");
@@ -288,10 +291,10 @@ static int dump_daq_stop (void* handle)
     if (err)
         return err;
 
-    if (dc->dump)
+    if (dc->dumper)
     {
-        pcap_dump_close(dc->dump);
-        dc->dump = NULL;
+        pcap_dump_close(dc->dumper);
+        dc->dumper = NULL;
     }
 
     if (dc->text_out)
@@ -372,30 +375,32 @@ static int dump_daq_get_device_index(void *handle, const char *device)
     return dc->wrapped_module->get_device_index(dc->wrapped_context, device);
 }
 
-static int dump_daq_modify_flow(void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify)
+static int dump_daq_modify_flow(void *handle, const DAQ_Msg_t *msg, const DAQ_ModFlow_t *modify)
 {
     DumpContext* dc = (DumpContext*)handle;
 
     if (dc->text_out)
     {
+        const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
         fprintf(dc->text_out, "MF: %lu.%lu(%u): %d %u \n", (unsigned long) hdr->ts.tv_sec,
-                (unsigned long) hdr->ts.tv_usec, hdr->caplen, modify->type, modify->length);
+                (unsigned long) hdr->ts.tv_usec, msg->data_len, modify->type, modify->length);
         hexdump(dc->text_out, modify->value, modify->length, "    ");
     }
     return DAQ_SUCCESS;
 }
 
-static int dump_daq_dp_add_dc(void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+static int dump_daq_dp_add_dc(void *handle, const DAQ_Msg_t *msg, DAQ_DP_key_t *dp_key,
                                 const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
 {
     DumpContext* dc = (DumpContext*)handle;
 
     if (dc->text_out)
     {
+        const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
         char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
 
         fprintf(dc->text_out, "DP: %lu.%lu(%u):\n", (unsigned long) hdr->ts.tv_sec,
-                (unsigned long) hdr->ts.tv_usec, hdr->caplen);
+                (unsigned long) hdr->ts.tv_usec, msg->data_len);
         if (dp_key->src_af == AF_INET)
             inet_ntop(AF_INET, &dp_key->sa.src_ip4, src_addr_str, sizeof(src_addr_str));
         else
@@ -439,43 +444,29 @@ static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     dc->stats.verdicts[verdict]++;
     if (msg->type == DAQ_MSG_TYPE_PACKET)
     {
-        DAQ_PktHdr_t *hdr = dc->wrapped_module->packet_header_from_msg(dc->wrapped_context, msg);
-        const uint8_t *data = dc->wrapped_module->packet_data_from_msg(dc->wrapped_context, msg);
+        DAQ_PktHdr_t *hdr = (DAQ_PktHdr_t *) msg->hdr;
+        const uint8_t *data = msg->data;
 
-        if (dc->dump && s_fwd[verdict])
+        if (dc->dumper && s_fwd[verdict])
         {
             struct pcap_pkthdr pcap_hdr;
 
             pcap_hdr.ts = hdr->ts;
-            pcap_hdr.caplen = hdr->caplen;
+            pcap_hdr.caplen = msg->data_len;
             pcap_hdr.len = hdr->pktlen;
-            pcap_dump((u_char *) dc->dump, &pcap_hdr, data);
+            pcap_dump((u_char *) dc->dumper, &pcap_hdr, data);
         }
 
         if (dc->text_out)
         {
             fprintf(dc->text_out, "PV: %lu.%lu(%u): %s\n", (unsigned long) hdr->ts.tv_sec,
-                    (unsigned long) hdr->ts.tv_usec, hdr->caplen, daq_verdict_strings[verdict]);
+                    (unsigned long) hdr->ts.tv_usec, msg->data_len, daq_verdict_strings[verdict]);
             if (verdict == DAQ_VERDICT_REPLACE)
-                hexdump(dc->text_out, data, hdr->caplen, "    ");
+                hexdump(dc->text_out, data, msg->data_len, "    ");
         }
     }
 
     return dc->wrapped_module->msg_finalize(dc->wrapped_context, msg, verdict);
-}
-
-static DAQ_PktHdr_t *dump_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->packet_header_from_msg(dc->wrapped_context, msg);
-}
-
-static const uint8_t *dump_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->packet_data_from_msg(dc->wrapped_context, msg);
 }
 
 //-------------------------------------------------------------------------
@@ -515,8 +506,6 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .query_flow = */ NULL,
     /* .msg_receive = */ dump_daq_msg_receive,
     /* .msg_finalize = */ dump_daq_msg_finalize,
-    /* .packet_header_from_msg = */ dump_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ dump_daq_packet_data_from_msg,
     /* .get_msg_pool_info = */ NULL,
 };
 

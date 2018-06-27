@@ -17,7 +17,7 @@ static int daq_test_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-static int daq_test_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+static int daq_test_inject(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     return DAQ_SUCCESS;
 }
@@ -75,16 +75,6 @@ static int daq_test_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     return DAQ_SUCCESS;
 }
 
-static DAQ_PktHdr_t *daq_test_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    return NULL;
-}
-
-static const uint8_t *daq_test_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    return NULL;
-}
-
 
 DAQ_ModuleAPI_t test_module =
 {
@@ -117,8 +107,6 @@ DAQ_ModuleAPI_t test_module =
     /* .query_flow = */ NULL,
     /* .msg_receive = */ daq_test_msg_receive,
     /* .msg_finalize = */ daq_test_msg_finalize,
-    /* .packet_header_from_msg = */ daq_test_packet_header_from_msg,
-    /* .packet_data_from_msg = */ daq_test_packet_data_from_msg,
     /* .get_msg_pool_info = */ NULL,
 };
 

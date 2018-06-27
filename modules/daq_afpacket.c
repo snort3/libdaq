@@ -207,9 +207,13 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
         pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
         pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
 
+        /* Initialize non-zero invariant message header fields. */
         DAQ_Msg_t *msg = &desc->msg;
         msg->type = DAQ_MSG_TYPE_PACKET;
-        msg->msg = desc;
+        msg->hdr_len = sizeof(desc->pkthdr);
+        msg->hdr = &desc->pkthdr;
+        msg->data = desc->data;
+        msg->priv = desc;
 
         /* Place it on the free list */
         desc->next = pool->freelist;
@@ -994,9 +998,10 @@ static inline int afpacket_transmit_packet(AFPacketInstance *egress, const uint8
     return DAQ_SUCCESS;
 }
 
-static int afpacket_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+static int afpacket_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
     AFPacketInstance *egress;
     int rval;
 
@@ -1298,11 +1303,14 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
             desc->instance = instance;
             desc->length = tp_snaplen;
 
+            /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */
+            DAQ_Msg_t *msg = &desc->msg;
+            msg->data_len = tp_len;
+
             /* Then, set up the DAQ packet header. */
             DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
             pkthdr->ts.tv_sec = tp_sec;
             pkthdr->ts.tv_usec = tp_usec;
-            pkthdr->caplen = tp_snaplen;
             pkthdr->pktlen = tp_len;
             pkthdr->ingress_index = instance->index;
             pkthdr->egress_index = instance->peer ? instance->peer->index : DAQ_PKTHDR_UNKNOWN;
@@ -1315,7 +1323,8 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
                 flow_id (0)
             */
 
-            /* Last, but not least, extract this descriptor from the free list and insert it in message vector. */
+            /* Last, but not least, extract this descriptor from the free list and 
+                place the message in the return vector. */
             afpc->pool.freelist = desc->next;
             desc->next = NULL;
             afpc->pool.info.available--;
@@ -1346,7 +1355,7 @@ static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
 static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    AFPacketPktDesc *desc = (AFPacketPktDesc *) msg->msg;
+    AFPacketPktDesc *desc = (AFPacketPktDesc *) msg->priv;
 
     /* Sanitize and enact the verdict. */
     if (verdict >= MAX_DAQ_VERDICT)
@@ -1362,26 +1371,6 @@ static int afpacket_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Ver
     afpc->pool.info.available++;
 
     return DAQ_SUCCESS;
-}
-
-static DAQ_PktHdr_t *afpacket_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    AFPacketPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (AFPacketPktDesc *) msg->msg;
-    return &desc->pkthdr;
-}
-
-static const uint8_t *afpacket_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    AFPacketPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (AFPacketPktDesc *) msg->msg;
-    return desc->data;
 }
 
 static int afpacket_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
@@ -1428,7 +1417,5 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .query_flow = */ NULL,
     /* .msg_receive = */ afpacket_daq_msg_receive,
     /* .msg_finalize = */ afpacket_daq_msg_finalize,
-    /* .packet_header_from_msg = */ afpacket_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ afpacket_daq_packet_data_from_msg,
     /* .get_msg_pool_info = */ afpacket_daq_get_msg_pool_info,
 };

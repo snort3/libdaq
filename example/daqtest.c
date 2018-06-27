@@ -72,6 +72,7 @@ typedef struct _DAQTestConfig
 
 typedef struct _DAQTestPacket
 {
+    DAQ_Msg_h msg;
     const DAQ_PktHdr_t *hdr;
     const uint8_t *packet;
     const struct ether_header *eth;
@@ -392,7 +393,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 reply = forge_icmp_reply(dtp);
                 reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + ntohs(dtp->ip->tot_len);
                 printf("Injecting forged ICMP reply back to source! (%zu bytes)\n", reply_len);
-                rc = daq_instance_inject(instance, dtp->hdr, reply, reply_len, 1);
+                rc = daq_instance_inject(instance, dtp->msg, reply, reply_len, 1);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
@@ -426,7 +427,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             if (dtp->eth)
             {
                 printf("Injecting cloned ICMP packet.\n");
-                rc = daq_instance_inject(instance, dtp->hdr, dtp->packet, dtp->hdr->caplen, 0);
+                rc = daq_instance_inject(instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
@@ -517,7 +518,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     reply = forge_etharp_reply(dtp, local_mac_addr);
     reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(struct ether_arp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
-    if (daq_instance_inject(instance, dtp->hdr, reply, reply_len, 1))
+    if (daq_instance_inject(instance, dtp->msg, reply, reply_len, 1))
         printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(instance));
     free(reply);
 
@@ -598,7 +599,7 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
     print_mac(dtp->eth->ether_shost);
     printf(" -> ");
     print_mac(dtp->eth->ether_dhost);
-    printf(" (%.4hX) (%u bytes)\n", ntohs(dtp->eth->ether_type), dtp->hdr->pktlen);
+    printf(" (%.4hX) (%u bytes)\n", ntohs(dtp->eth->ether_type), daq_msg_get_data_len(dtp->msg));
     if (dtp->vlan_tags > 0)
     {
         uint16_t ether_type;
@@ -775,7 +776,6 @@ static void decode_raw(DAQTestPacket *dtp, const uint8_t *cursor)
 
 static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_PktHdr_t *hdr)
 {
-    memset(dtp, 0, sizeof(*dtp));
     dtp->hdr = hdr;
     dtp->packet = packet;
     switch (dlt)
@@ -791,14 +791,10 @@ static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_P
     }
 }
 
-static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
+static DAQ_Verdict handle_packet_message(DAQ_Msg_h msg)
 {
-    DAQ_PktHdr_t *hdr;
-    DAQTestPacket dtp;
-    const uint8_t *data;
-
-    hdr = daq_instance_packet_header_from_msg(instance, msg);
-    data = daq_instance_packet_data_from_msg(instance, msg);
+    const DAQ_PktHdr_t *hdr = daq_msg_get_pkthdr(msg);
+    const uint8_t *data = daq_msg_get_data(msg);
 
     packet_count++;
 
@@ -809,8 +805,8 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
         return dtc.default_verdict;
 
     printf("\nGot Packet! Size = %u/%u, Ingress = %d (Group = %d), Egress = %d (Group = %d), Addr Space ID = %u",
-            hdr->caplen, hdr->pktlen, hdr->ingress_index, hdr->ingress_group, hdr->egress_index, hdr->egress_group,
-            hdr->address_space_id);
+            daq_msg_get_data_len(msg), hdr->pktlen, hdr->ingress_index, hdr->ingress_group,
+            hdr->egress_index, hdr->egress_group, hdr->address_space_id);
     if (hdr->flags & DAQ_PKT_FLAG_OPAQUE_IS_VALID)
         printf(", Opaque = %u", hdr->opaque);
     if (hdr->flags & DAQ_PKT_FLAG_FLOWID_IS_VALID)
@@ -861,10 +857,10 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
     if (hdr->ingress_index < 0 && dtc.dump_unknown_ingress)
     {
         printf("Dumping packet data for packet with unknown ingress:\n");
-        print_hex_dump(data, hdr->caplen);
+        print_hex_dump(data, daq_msg_get_data_len(msg));
     }
     else if (dtc.dump_packets)
-        print_hex_dump(data, hdr->caplen);
+        print_hex_dump(data, daq_msg_get_data_len(msg));
 
     if (dtc.modify_opaque_value)
     {
@@ -873,19 +869,22 @@ static DAQ_Verdict handle_packet_message(const DAQ_Msg_t *msg)
         modify.type = DAQ_MODFLOW_TYPE_OPAQUE;
         modify.length = sizeof(uint32_t);
         modify.value = &packet_count;
-        daq_instance_modify_flow(instance, hdr, &modify);
+        daq_instance_modify_flow(instance, msg, &modify);
     }
 
+    DAQTestPacket dtp;
+    memset(&dtp, 0, sizeof(dtp));
+    dtp.msg = msg;
     decode_packet(&dtp, data, hdr);
 
     return process_packet(&dtp);
 }
 
-static void handle_flow_stats_message(const DAQ_Msg_t *msg)
+static void handle_flow_stats_message(DAQ_Msg_h msg)
 {
-    Flow_Stats_t *stats = (Flow_Stats_t *) msg->msg;
+    const Flow_Stats_t *stats = (const Flow_Stats_t *) daq_msg_get_hdr(msg);
     char addr_str[INET6_ADDRSTRLEN];
-    struct in6_addr* tmpIp;
+    const struct in6_addr* tmpIp;
 
     meta_count++;
 
@@ -904,7 +903,7 @@ static void handle_flow_stats_message(const DAQ_Msg_t *msg)
     printf("  VLAN: %hu\n", stats->vlan_tag);
     printf("  Opaque: %u\n", stats->opaque);
     printf("  Initiator:\n");
-    tmpIp = (struct in6_addr*)stats->initiatorIp;
+    tmpIp = (const struct in6_addr*)stats->initiatorIp;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
         inet_ntop(AF_INET6, tmpIp, addr_str, sizeof(addr_str));
     else
@@ -917,7 +916,7 @@ static void handle_flow_stats_message(const DAQ_Msg_t *msg)
     if (msg->type == DAQ_MSG_TYPE_EOF)
         printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->initiatorBytes, stats->initiatorPkts);
     printf("  Responder:\n");
-    tmpIp = (struct in6_addr*)stats->responderIp;
+    tmpIp = (const struct in6_addr*)stats->responderIp;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
         inet_ntop(AF_INET6, tmpIp, addr_str, sizeof(addr_str));
     else
@@ -1399,7 +1398,7 @@ int main(int argc, char *argv[])
     max_recv = timeout_count = 0;
     while (notdone && (!cfg->packet_limit || packet_count < cfg->packet_limit))
     {
-        const DAQ_Msg_t *msgs[16];
+        DAQ_Msg_h msgs[16];
         DAQ_RecvStatus rstat;
         unsigned num_recv;
 
@@ -1410,7 +1409,7 @@ int main(int argc, char *argv[])
 
         for (unsigned idx = 0; idx < num_recv; idx++)
         {
-            const DAQ_Msg_t *msg = msgs[idx];
+            DAQ_Msg_h msg = msgs[idx];
             DAQ_Verdict verdict = DAQ_VERDICT_PASS;
             switch (msg->type)
             {

@@ -144,13 +144,13 @@ DAQ_LINKAGE int daq_instance_start(DAQ_Instance_t *instance)
     return instance->module->start(instance->context);
 }
 
-DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr,
+DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, DAQ_Msg_h msg,
                                         const uint8_t *packet_data, uint32_t len, int reverse)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
-    if (!hdr)
+    if (!msg)
     {
         daq_instance_set_errbuf(instance, "No originating packet header specified!");
         return DAQ_ERROR_INVAL;
@@ -162,7 +162,7 @@ DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, const DAQ_PktHdr_t
         return DAQ_ERROR_INVAL;
     }
 
-    return instance->module->inject(instance->context, hdr, packet_data, len, reverse);
+    return instance->module->inject(instance->context, msg, packet_data, len, reverse);
 }
 
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_t *instance)
@@ -312,7 +312,7 @@ DAQ_LINKAGE int daq_instance_hup_post(DAQ_Instance_t *instance, void *old_config
     return instance->module->hup_post(instance->context, old_config);
 }
 
-DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify)
+DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_t *instance, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
@@ -320,10 +320,10 @@ DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_t *instance, const DAQ_Pkt
     if (!instance->module->modify_flow)
         return DAQ_ERROR_NOTSUP;
 
-    return instance->module->modify_flow(instance->context, hdr, modify);
+    return instance->module->modify_flow(instance->context, msg, modify);
 }
 
-DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query)
+DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_t *instance, DAQ_Msg_h msg, DAQ_QueryFlow_t *query)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
@@ -331,10 +331,10 @@ DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_t *instance, const DAQ_PktH
     if (!instance->module->query_flow)
         return DAQ_ERROR_NOTSUP;
 
-    return instance->module->query_flow(instance->context, hdr, query);
+    return instance->module->query_flow(instance->context, msg, query);
 }
 
-DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_t *instance, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_t *instance, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
                                         const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
 {
     if (!instance)
@@ -343,7 +343,7 @@ DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_t *instance, const DAQ_PktHd
     if (!instance->module->dp_add_dc)
         return DAQ_ERROR_NOTSUP;
 
-    return instance->module->dp_add_dc(instance->context, hdr, dp_key, packet_data, params);
+    return instance->module->dp_add_dc(instance->context, msg, dp_key, packet_data, params);
 }
 
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
@@ -363,22 +363,6 @@ DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_t *instance, const DAQ_Ms
         return DAQ_ERROR_NOCTX;
 
     return instance->module->msg_finalize(instance->context, msg, verdict);
-}
-
-DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(DAQ_Instance_t *instance, const DAQ_Msg_t *msg)
-{
-    if (!instance)
-        return NULL;
-
-    return instance->module->packet_header_from_msg(instance->context, msg);
-}
-
-DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_t *instance, const DAQ_Msg_t *msg)
-{
-    if (!instance)
-        return NULL;
-
-    return instance->module->packet_data_from_msg(instance->context, msg);
 }
 
 DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info)

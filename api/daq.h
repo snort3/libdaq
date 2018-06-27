@@ -87,7 +87,7 @@ DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);
 DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
 DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);
-DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data,
+DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_Msg_h msg, const uint8_t *packet_data,
                                         uint32_t len, int reverse);
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
@@ -100,17 +100,46 @@ DAQ_LINKAGE uint32_t daq_instance_get_capabilities(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_datalink_type(DAQ_Instance_h instance);
 DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_device_index(DAQ_Instance_h instance, const char *device);
-DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
-DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
+DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_h instance, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
+DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_h instance, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
 DAQ_LINKAGE int daq_instance_hup_prep(DAQ_Instance_h instance, void **new_config);
 DAQ_LINKAGE int daq_instance_hup_apply(DAQ_Instance_h instance, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_instance_hup_post(DAQ_Instance_h instance, void *old_config);
-DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_h instance, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_h instance, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
                                         const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
 DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
-DAQ_LINKAGE DAQ_PktHdr_t *daq_instance_packet_header_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
-DAQ_LINKAGE const uint8_t *daq_instance_packet_data_from_msg(DAQ_Instance_h instance, const DAQ_Msg_t *msg);
 DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info);
+
+/* DAQ Message convenience functions */
+static inline DAQ_MsgType daq_msg_get_type(DAQ_Msg_h msg)
+{
+    return msg->type;
+}
+
+static inline size_t daq_msg_get_hdr_len(DAQ_Msg_h msg)
+{
+    return msg->hdr_len;
+}
+
+static inline const void *daq_msg_get_hdr(DAQ_Msg_h msg)
+{
+    return msg->hdr;
+}
+
+static inline const DAQ_PktHdr_t *daq_msg_get_pkthdr(DAQ_Msg_h msg)
+{
+    return (const DAQ_PktHdr_t *) msg->hdr;
+}
+
+static inline uint32_t daq_msg_get_data_len(DAQ_Msg_h msg)
+{
+    return msg->data_len;
+}
+
+static inline void *daq_msg_get_data(DAQ_Msg_h msg)
+{
+    return msg->data;
+}
 
 #endif /* _DAQ_H */

@@ -48,7 +48,6 @@ typedef struct _nfq_pkt_desc
     uint8_t *nlmsg_buf;
     const struct nlmsghdr *nlmh;
     struct nfqnl_msg_packet_hdr *nlph;
-    uint8_t *data;
     struct _nfq_pkt_desc *next;
 } NfqPktDesc;
 
@@ -148,9 +147,12 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
         pkthdr->ingress_group = DAQ_PKTHDR_UNKNOWN;
         pkthdr->egress_group = DAQ_PKTHDR_UNKNOWN;
 
+        /* Initialize non-zero invariant message header fields. */
         DAQ_Msg_t *msg = &desc->msg;
         msg->type = DAQ_MSG_TYPE_PACKET;
-        msg->msg = desc;
+        msg->hdr_len = sizeof(desc->pkthdr);
+        msg->hdr = &desc->pkthdr;
+        msg->priv = desc;
 
         /* Place it on the free list */
         desc->next = nfqc->pool.freelist;
@@ -320,14 +322,17 @@ static int process_message_cb(const struct nlmsghdr *nlh, void *data)
     /* Populate the packet descriptor */
     desc->nlmh = nlh;
     desc->nlph = mnl_attr_get_payload(attr[NFQA_PACKET_HDR]);
-    desc->data = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
+
+    /* Set up the DAQ message and packet headers.  Most fields are prepopulated and unchanging. */
+    DAQ_Msg_t *msg = &desc->msg;
+    msg->data = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
 
     DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
     pkthdr->pktlen = mnl_attr_get_payload_len(attr[NFQA_PAYLOAD]);
     if (attr[NFQA_CAP_LEN])
-        pkthdr->caplen = ntohl(mnl_attr_get_u32(attr[NFQA_CAP_LEN]));
+        msg->data_len = ntohl(mnl_attr_get_u32(attr[NFQA_CAP_LEN]));
     else
-        pkthdr->caplen = pkthdr->pktlen;
+        msg->data_len = pkthdr->pktlen;
     /*
      * FIXIT-M Implement getting timestamps from the message if it happens to have that attribute
     if (attr[NFQA_TIMESTAMP])
@@ -604,7 +609,7 @@ static int nfq_daq_start(void *handle)
 }
 
 /* Module->inject() */
-static int nfq_daq_inject(void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse)
+static int nfq_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     /* FIXIT-M Need to figure out how to reimplement inject for NFQ */
     return DAQ_ERROR_NOTSUP;
@@ -756,12 +761,12 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
         /* Increment the module instance's packet counter. */
         nfqc->stats.packets_received++;
 
-        msgs[idx] = &desc->msg;
-
-        /* Last, but not least, extract this descriptor from the free list. */
+        /* Last, but not least, extract this descriptor from the free list and
+            place the message in the return vector. */
         nfqc->pool.freelist = desc->next;
         desc->next = NULL;
         nfqc->pool.info.available--;
+        msgs[idx] = &desc->msg;
 
         idx++;
     }
@@ -773,7 +778,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
 static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
     Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
-    NfqPktDesc *desc = (NfqPktDesc *) msg->msg;
+    NfqPktDesc *desc = (NfqPktDesc *) msg->priv;
 
     /* Sanitize the verdict. */
     if (verdict >= MAX_DAQ_VERDICT)
@@ -785,10 +790,10 @@ static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
     /* FIXIT-L Consider using an iovec for scatter/gather transmission with the new payload as a
         separate entry. This would avoid a copy and potentially avoid buffer size restrictions.
         Only as relevant as REPLACE is common. */
-    uint32_t plen = (verdict == DAQ_VERDICT_REPLACE) ? desc->pkthdr.caplen : 0;
+    uint32_t plen = (verdict == DAQ_VERDICT_REPLACE) ? msg->data_len : 0;
     int nfq_verdict = (verdict == DAQ_VERDICT_PASS || verdict == DAQ_VERDICT_REPLACE) ? NF_ACCEPT : NF_DROP;;
     struct nlmsghdr *nlh = nfq_build_verdict(nfqc->nlmsg_buf, ntohl(desc->nlph->packet_id), nfqc->queue_num,
-            nfq_verdict, plen, desc->data);
+            nfq_verdict, plen, msg->data);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
         daq_base_api.instance_set_errbuf(nfqc->instance, "%s: Couldn't send NFQ verdict: %s (%d)",
@@ -804,28 +809,6 @@ static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
     nfqc->pool.info.available++;
 
     return DAQ_SUCCESS;
-}
-
-/* Module->packet_header_from_msg() */
-static DAQ_PktHdr_t *nfq_daq_packet_header_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    NfqPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (NfqPktDesc *) msg->msg;
-    return &desc->pkthdr;
-}
-
-/* Module->packet_data_from_msg() */
-static const uint8_t *nfq_daq_packet_data_from_msg(void *handle, const DAQ_Msg_t *msg)
-{
-    NfqPktDesc *desc;
-
-    if (msg->type != DAQ_MSG_TYPE_PACKET)
-        return NULL;
-    desc = (NfqPktDesc *) msg->msg;
-    return desc->data;
 }
 
 static int nfq_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
@@ -872,7 +855,5 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .query_flow = */ NULL,
     /* .msg_receive = */ nfq_daq_msg_receive,
     /* .msg_finalize = */ nfq_daq_msg_finalize,
-    /* .packet_header_from_msg = */ nfq_daq_packet_header_from_msg,
-    /* .packet_data_from_msg = */ nfq_daq_packet_data_from_msg,
     /* .get_msg_pool_info = */ nfq_daq_get_msg_pool_info,
 };

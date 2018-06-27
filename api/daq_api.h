@@ -74,8 +74,8 @@ typedef struct _daq_module_api
     int (*set_filter) (void *handle, const char *filter);
     /* Complete device opening and begin queuing packets if they have not been already. */
     int (*start) (void *handle);
-    /* Inject a new packet going either the same or opposite direction as the specified packet. */
-    int (*inject) (void *handle, const DAQ_PktHdr_t *hdr, const uint8_t *packet_data, uint32_t len, int reverse);
+    /* Inject a new packet going either the same or opposite direction as the specified message. */
+    int (*inject) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
     /* Force breaking out of the acquisition loop after the current iteration. */
     int (*breakloop) (void *handle);
     /* Stop queuing packets, if possible */
@@ -97,7 +97,7 @@ typedef struct _daq_module_api
     /* Return the index of the given named device if possible. */
     int (*get_device_index) (void *handle, const char *device);
     /* Modify a flow */
-    int (*modify_flow) (void *handle, const DAQ_PktHdr_t *hdr, const DAQ_ModFlow_t *modify);
+    int (*modify_flow) (void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
     /* Read new configuration */
     int (*hup_prep) (void *handle, void **new_config);
     /* Swap new and old configuration */
@@ -113,15 +113,13 @@ typedef struct _daq_module_api
      * @param [in] params      Parameters to control the PST/EFT entry.
      * @return                 Error code of the API. 0 - success.
      */
-    int (*dp_add_dc) (void *handle, const DAQ_PktHdr_t *hdr, DAQ_DP_key_t *dp_key,
+    int (*dp_add_dc) (void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
                       const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
     /* Query a flow */
-    int (*query_flow) (void *handle, const DAQ_PktHdr_t *hdr, DAQ_QueryFlow_t *query);
+    int (*query_flow) (void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
 
     unsigned (*msg_receive) (void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
     int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
-    DAQ_PktHdr_t * (*packet_header_from_msg) (void *handle, const DAQ_Msg_t *msg);
-    const uint8_t * (*packet_data_from_msg) (void *handle, const DAQ_Msg_t *msg);
 
     /* Query message pool info */
     int (*get_msg_pool_info) (void *handle, DAQ_MsgPoolInfo_t *info);
