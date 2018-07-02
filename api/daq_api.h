@@ -24,7 +24,7 @@
 
 #include <daq_common.h>
 
-#define DAQ_BASE_API_VERSION    0x00010001
+#define DAQ_BASE_API_VERSION    0x00030001
 
 typedef struct _daq_base_api
 {
@@ -48,7 +48,7 @@ typedef struct _daq_base_api
     void (*instance_set_errbuf) (DAQ_Instance_h instance, const char *format, ...);
 } DAQ_BaseAPI_t;
 
-#define DAQ_MODULE_API_VERSION    0x00010004
+#define DAQ_MODULE_API_VERSION    0x00030001
 
 typedef struct _daq_module_api
 {

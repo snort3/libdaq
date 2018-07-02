@@ -25,8 +25,6 @@
 #include <stdio.h>
 #include <daq_common.h>
 
-#define DAQ_VERSION 3
-
 /* Library version information functions. */
 DAQ_LINKAGE uint32_t daq_version_number(void);
 DAQ_LINKAGE const char *daq_version_string(void);
