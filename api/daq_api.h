@@ -50,6 +50,30 @@ typedef struct _daq_base_api
 
 #define DAQ_MODULE_API_VERSION    0x00030001
 
+typedef int (*daq_module_set_filter_func) (void *handle, const char *filter);
+typedef int (*daq_module_start_func) (void *handle);
+typedef int (*daq_module_inject_func) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
+typedef int (*daq_module_breakloop_func) (void *handle);
+typedef int (*daq_module_stop_func) (void *handle);
+typedef void (*daq_module_shutdown_func) (void *handle);
+typedef DAQ_State (*daq_module_check_status_func) (void *handle);
+typedef int (*daq_module_get_stats_func) (void *handle, DAQ_Stats_t *stats);
+typedef void (*daq_module_reset_stats_func) (void *handle);
+typedef int (*daq_module_get_snaplen_func) (void *handle);
+typedef uint32_t (*daq_module_get_capabilities_func) (void *handle);
+typedef int (*daq_module_get_datalink_type_func) (void *handle);
+typedef int (*daq_module_get_device_index_func) (void *handle, const char *device);
+typedef int (*daq_module_modify_flow_func) (void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
+typedef int (*daq_module_hup_prep_func) (void *handle, void **new_config);
+typedef int (*daq_module_hup_apply_func) (void *handle, void *new_config, void **old_config);
+typedef int (*daq_module_hup_post_func) (void *handle, void *old_config);
+typedef int (*daq_module_dp_add_dc_func) (void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
+        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
+typedef int (*daq_module_query_flow_func) (void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
+typedef unsigned (*daq_module_msg_receive_func) (void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
+typedef int (*daq_module_msg_finalize_func) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
+typedef int (*daq_module_get_msg_pool_info_func) (void *handle, DAQ_MsgPoolInfo_t *info);
+
 typedef struct _daq_module_api
 {
     /* The version of the API this module implements. */
@@ -71,39 +95,41 @@ typedef struct _daq_module_api
        This should not start queuing packets for the application. */
     int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_Instance_h instance);
     /* Set the module's BPF based on the given string */
-    int (*set_filter) (void *handle, const char *filter);
+    daq_module_set_filter_func set_filter;
     /* Complete device opening and begin queuing packets if they have not been already. */
-    int (*start) (void *handle);
+    daq_module_start_func start;
     /* Inject a new packet going either the same or opposite direction as the specified message. */
-    int (*inject) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
+    daq_module_inject_func inject;
     /* Force breaking out of the acquisition loop after the current iteration. */
-    int (*breakloop) (void *handle);
+    daq_module_breakloop_func breakloop;
     /* Stop queuing packets, if possible */
-    int (*stop) (void *handle);
+    daq_module_stop_func stop;
     /* Close the device and clean up */
-    void (*shutdown) (void *handle);
+    daq_module_shutdown_func shutdown;
     /* Get the status of the module (one of DAQ_STATE_*). */
-    DAQ_State (*check_status) (void *handle);
+    daq_module_check_status_func check_status;
     /* Populates the <stats> structure with the current DAQ stats.  These stats are cumulative. */
-    int (*get_stats) (void *handle, DAQ_Stats_t *stats);
+    daq_module_get_stats_func get_stats;
     /* Resets the DAQ module's internal stats. */
-    void (*reset_stats) (void *handle);
+    daq_module_reset_stats_func reset_stats;
     /* Return the configured snaplen */
-    int (*get_snaplen) (void *handle);
+    daq_module_get_snaplen_func get_snaplen;
     /* Return a bitfield of the device's capabilities */
-    uint32_t (*get_capabilities) (void *handle);
+    daq_module_get_capabilities_func get_capabilities;
     /* Return the instance's Data Link Type */
-    int (*get_datalink_type) (void *handle);
+    daq_module_get_datalink_type_func get_datalink_type;
     /* Return the index of the given named device if possible. */
-    int (*get_device_index) (void *handle, const char *device);
+    daq_module_get_device_index_func get_device_index;
     /* Modify a flow */
-    int (*modify_flow) (void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
+    daq_module_modify_flow_func modify_flow;
+    /* Query a flow */
+    daq_module_query_flow_func query_flow;
     /* Read new configuration */
-    int (*hup_prep) (void *handle, void **new_config);
+    daq_module_hup_prep_func hup_prep;
     /* Swap new and old configuration */
-    int (*hup_apply) (void *handle, void *new_config, void **old_config);
+    daq_module_hup_apply_func hup_apply;
     /* Destroy old configuration */
-    int (*hup_post) (void *handle, void *old_config);
+    daq_module_hup_post_func hup_post;
     /** DAQ API to program a FST/EFT entry for dynamic protocol data channel
      *
      * @param [in] handle      DAQ module handle
@@ -113,16 +139,13 @@ typedef struct _daq_module_api
      * @param [in] params      Parameters to control the PST/EFT entry.
      * @return                 Error code of the API. 0 - success.
      */
-    int (*dp_add_dc) (void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
-                      const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
-    /* Query a flow */
-    int (*query_flow) (void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
+    daq_module_dp_add_dc_func dp_add_dc;
 
-    unsigned (*msg_receive) (void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
-    int (*msg_finalize) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
+    daq_module_msg_receive_func msg_receive;
+    daq_module_msg_finalize_func msg_finalize;
 
     /* Query message pool info */
-    int (*get_msg_pool_info) (void *handle, DAQ_MsgPoolInfo_t *info);
+    daq_module_get_msg_pool_info_func get_msg_pool_info;
 } DAQ_ModuleAPI_t;
 
 #define DAQ_ERRBUF_SIZE 256
@@ -141,5 +164,8 @@ inline void DPE(char *var, char *fmt, ...)
 #else
 #define DPE(var, ...) snprintf(var, sizeof(var), __VA_ARGS__)
 #endif
+
+typedef struct _daq_instance_api {
+} DAQ_InstanceAPI_t;
 
 #endif /* _DAQ_API_H */
