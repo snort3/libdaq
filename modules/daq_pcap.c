@@ -229,7 +229,7 @@ static int pcap_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(pcap_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     Pcap_Context_t *context;
     const char *varKey, *varValue;
@@ -298,7 +298,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
     context->hwupdate_count = 0;
     context->state = DAQ_STATE_INITIALIZED;
 
-    daq_base_api.instance_set_context(context->instance, context);
+    *ctxt_ptr = context;
 
     return DAQ_SUCCESS;
 }

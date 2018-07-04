@@ -39,6 +39,12 @@
 #define DAQ_DUMP_PCAP_FILE "inline-out.pcap"
 #define DAQ_DUMP_TEXT_FILE "inline-out.txt"
 
+#define CALL_SUBAPI_NOARGS(ctxt, fname) \
+    ctxt->subapi.fname.func(ctxt->subapi.fname.context)
+
+#define CALL_SUBAPI(ctxt, fname, ...) \
+    ctxt->subapi.fname.func(ctxt->subapi.fname.context, __VA_ARGS__)
+
 typedef enum {
     DUMP_OUTPUT_NONE = 0x0,
     DUMP_OUTPUT_PCAP = 0x1,
@@ -50,9 +56,8 @@ typedef struct
 {
     DAQ_Instance_h instance;
 
-    // delegate most stuff to the wrapped module
-    const DAQ_ModuleAPI_t *wrapped_module;
-    void *wrapped_context;
+    // delegate most stuff to downstream
+    DAQ_InstanceAPI_t subapi;
 
     // but write all output packets here
     pcap_dumper_t *dumper;
@@ -107,7 +112,7 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(dump_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     DAQ_ModuleConfig_h subconfig;
     DumpContext *dc;
@@ -173,8 +178,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
         daq_base_api.module_config_next_variable(config, &varKey, &varValue);
     }
 
-    dc->wrapped_module = daq_base_api.module_config_get_module(subconfig);
-    rval = dc->wrapped_module->initialize(subconfig, instance);
+    rval = daq_base_api.module_instantiate(subconfig, instance);
     if (rval != DAQ_SUCCESS)
     {
         if (dc->pcap_filename)
@@ -184,18 +188,18 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
         free(dc);
         return rval;
     }
+    daq_base_api.modinst_resolve_subapi(modinst, &dc->subapi);
 
-    dc->wrapped_context = daq_base_api.instance_get_context(instance);
-    daq_base_api.instance_set_context(instance, dc);
+    *ctxt_ptr = dc;
 
     return DAQ_SUCCESS;
 }
 
-static void dump_daq_shutdown (void *handle)
+static void dump_daq_shutdown(void *handle)
 {
     DumpContext *dc = (DumpContext *) handle;
 
-    dc->wrapped_module->shutdown(dc->wrapped_context);
+    CALL_SUBAPI_NOARGS(dc, shutdown);
     if (dc->pcap_filename)
         free(dc->pcap_filename);
     if (dc->text_filename)
@@ -203,9 +207,9 @@ static void dump_daq_shutdown (void *handle)
     free(dc);
 }
 
-static int dump_daq_inject (void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
+static int dump_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
 {
-    DumpContext *dc = (DumpContext*)handle;
+    DumpContext *dc = (DumpContext*) handle;
     const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
 
     if (dc->text_out)
@@ -241,15 +245,14 @@ static int dump_daq_inject (void *handle, const DAQ_Msg_t *msg, const uint8_t *d
 
 static int dump_daq_start(void* handle)
 {
-    DumpContext *dc = (DumpContext*)handle;
-    int dlt, snaplen, rval;
+    DumpContext *dc = (DumpContext*) handle;
 
-    rval = dc->wrapped_module->start(dc->wrapped_context);
+    int rval = CALL_SUBAPI_NOARGS(dc, start);
     if (rval != DAQ_SUCCESS)
         return rval;
 
-    dlt = dc->wrapped_module->get_datalink_type(dc->wrapped_context);
-    snaplen = dc->wrapped_module->get_snaplen(dc->wrapped_context);
+    int dlt = CALL_SUBAPI_NOARGS(dc, get_datalink_type);
+    int snaplen = CALL_SUBAPI_NOARGS(dc, get_snaplen);
 
     if (dc->output_type & DUMP_OUTPUT_PCAP)
     {
@@ -260,7 +263,7 @@ static int dump_daq_start(void* handle)
         dc->dumper = pcap ? pcap_dump_open(pcap, pcap_filename) : NULL;
         if (!dc->dumper)
         {
-            dc->wrapped_module->stop(dc->wrapped_context);
+            CALL_SUBAPI_NOARGS(dc, stop);
             daq_base_api.instance_set_errbuf(dc->instance, "can't open dump file");
             return DAQ_ERROR;
         }
@@ -274,7 +277,7 @@ static int dump_daq_start(void* handle)
         dc->text_out = fopen(text_filename, "w");
         if (!dc->text_out)
         {
-            dc->wrapped_module->stop(dc->wrapped_context);
+            CALL_SUBAPI_NOARGS(dc, stop);
             daq_base_api.instance_set_errbuf(dc->instance, "can't open text output file");
             return DAQ_ERROR;
         }
@@ -285,11 +288,11 @@ static int dump_daq_start(void* handle)
 
 static int dump_daq_stop (void* handle)
 {
-    DumpContext *dc = (DumpContext*)handle;
-    int err = dc->wrapped_module->stop(dc->wrapped_context);
+    DumpContext *dc = (DumpContext*) handle;
+    int rval = CALL_SUBAPI_NOARGS(dc, stop);
 
-    if (err)
-        return err;
+    if (rval != DAQ_SUCCESS)
+        return rval;
 
     if (dc->dumper)
     {
@@ -309,75 +312,37 @@ static int dump_daq_stop (void* handle)
 //-------------------------------------------------------------------------
 // these methods are delegated to the pcap daq
 
-static int dump_daq_set_filter (void* handle, const char* filter)
+static int dump_daq_get_stats(void* handle, DAQ_Stats_t* stats)
 {
-    DumpContext *dc = (DumpContext*)handle;
-    return dc->wrapped_module->set_filter(dc->wrapped_context, filter);
-}
+    DumpContext *dc = (DumpContext*) handle;
+    int rval = CALL_SUBAPI(dc, get_stats, stats);
 
-static int dump_daq_breakloop (void* handle)
-{
-    DumpContext *dc = (DumpContext*)handle;
-    return dc->wrapped_module->breakloop(dc->wrapped_context);
-}
-
-static DAQ_State dump_daq_check_status (void* handle)
-{
-    DumpContext *dc = (DumpContext*)handle;
-    return dc->wrapped_module->check_status(dc->wrapped_context);
-}
-
-static int dump_daq_get_stats (void* handle, DAQ_Stats_t* stats)
-{
-    DumpContext *dc = (DumpContext*)handle;
-    int ret = dc->wrapped_module->get_stats(dc->wrapped_context, stats);
-    int i;
-
-    for (i = 0; i < MAX_DAQ_VERDICT; i++)
+    /* Use our own concept of verdict and injected packet stats */
+    for (int i = 0; i < MAX_DAQ_VERDICT; i++)
         stats->verdicts[i] = dc->stats.verdicts[i];
-
     stats->packets_injected = dc->stats.packets_injected;
-    return ret;
+
+    return rval;
 }
 
-static void dump_daq_reset_stats (void* handle)
+static void dump_daq_reset_stats(void* handle)
 {
-    DumpContext *dc = (DumpContext*)handle;
-    dc->wrapped_module->reset_stats(dc->wrapped_context);
+    DumpContext *dc = (DumpContext*) handle;
+    CALL_SUBAPI_NOARGS(dc, reset_stats);
     memset(&dc->stats, 0, sizeof(dc->stats));
 }
 
-static int dump_daq_get_snaplen (void* handle)
+static uint32_t dump_daq_get_capabilities(void* handle)
 {
-    DumpContext *dc = (DumpContext*)handle;
-    return dc->wrapped_module->get_snaplen(dc->wrapped_context);
-}
-
-static uint32_t dump_daq_get_capabilities (void* handle)
-{
-    DumpContext *dc = (DumpContext*)handle;
-    uint32_t caps = dc->wrapped_module->get_capabilities(dc->wrapped_context);
+    DumpContext *dc = (DumpContext*) handle;
+    uint32_t caps = CALL_SUBAPI_NOARGS(dc, get_capabilities);
     caps |= DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT;
     return caps;
 }
 
-static int dump_daq_get_datalink_type (void *handle)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->get_datalink_type(dc->wrapped_context);
-}
-
-static int dump_daq_get_device_index(void *handle, const char *device)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->get_device_index(dc->wrapped_context, device);
-}
-
 static int dump_daq_modify_flow(void *handle, const DAQ_Msg_t *msg, const DAQ_ModFlow_t *modify)
 {
-    DumpContext* dc = (DumpContext*)handle;
+    DumpContext* dc = (DumpContext*) handle;
 
     if (dc->text_out)
     {
@@ -392,7 +357,7 @@ static int dump_daq_modify_flow(void *handle, const DAQ_Msg_t *msg, const DAQ_Mo
 static int dump_daq_dp_add_dc(void *handle, const DAQ_Msg_t *msg, DAQ_DP_key_t *dp_key,
                                 const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
 {
-    DumpContext* dc = (DumpContext*)handle;
+    DumpContext* dc = (DumpContext*) handle;
 
     if (dc->text_out)
     {
@@ -415,13 +380,6 @@ static int dump_daq_dp_add_dc(void *handle, const DAQ_Msg_t *msg, DAQ_DP_key_t *
                 dp_key->vlan_id, dp_key->vlan_cnots, params ? params->flags : 0, params ? params->timeout_ms : 0);
     }
     return DAQ_SUCCESS;
-}
-
-static unsigned dump_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
-{
-    DumpContext *dc = (DumpContext *) handle;
-
-    return dc->wrapped_module->msg_receive(dc->wrapped_context, max_recv, msgs, rstat);
 }
 
 static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
@@ -466,7 +424,7 @@ static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
         }
     }
 
-    return dc->wrapped_module->msg_finalize(dc->wrapped_context, msg, verdict);
+    return CALL_SUBAPI(dc, msg_finalize, msg, verdict);
 }
 
 //-------------------------------------------------------------------------
@@ -485,26 +443,26 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .prepare = */ dump_daq_prepare,
     /* .get_variable_descs = */ dump_daq_get_variable_descs,
     /* .initialize = */ dump_daq_initialize,
-    /* .set_filter = */ dump_daq_set_filter,
+    /* .set_filter = */ NULL,
     /* .start = */ dump_daq_start,
     /* .inject = */ dump_daq_inject,
-    /* .breakloop = */ dump_daq_breakloop,
+    /* .breakloop = */ NULL,
     /* .stop = */ dump_daq_stop,
     /* .shutdown = */ dump_daq_shutdown,
-    /* .check_status = */ dump_daq_check_status,
+    /* .check_status = */ NULL,
     /* .get_stats = */ dump_daq_get_stats,
     /* .reset_stats = */ dump_daq_reset_stats,
-    /* .get_snaplen = */ dump_daq_get_snaplen,
+    /* .get_snaplen = */ NULL,
     /* .get_capabilities = */ dump_daq_get_capabilities,
-    /* .get_datalink_type = */ dump_daq_get_datalink_type,
-    /* .get_device_index = */ dump_daq_get_device_index,
+    /* .get_datalink_type = */ NULL,
+    /* .get_device_index = */ NULL,
     /* .modify_flow = */ dump_daq_modify_flow,
     /* .query_flow = */ NULL,
     /* .hup_prep = */ NULL,
     /* .hup_apply = */ NULL,
     /* .hup_post = */ NULL,
     /* .dp_add_dc = */ dump_daq_dp_add_dc,
-    /* .msg_receive = */ dump_daq_msg_receive,
+    /* .msg_receive = */ NULL,
     /* .msg_finalize = */ dump_daq_msg_finalize,
     /* .get_msg_pool_info = */ NULL,
 };

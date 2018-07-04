@@ -711,7 +711,7 @@ static int afpacket_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_t
     return sizeof(afpacket_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     AFPacket_Context_t *afpc;
     AFPacketInstance *afi;
@@ -897,7 +897,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
 
     afpc->state = DAQ_STATE_INITIALIZED;
 
-    daq_base_api.instance_set_context(afpc->instance, afpc);
+    *ctxt_ptr = afpc;
 
     return DAQ_SUCCESS;
 

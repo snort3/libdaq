@@ -380,7 +380,7 @@ static int nfq_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 }
 
 /* Module->initialize() */
-static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     Nfq_Context_t *nfqc;
     int rval = DAQ_ERROR;
@@ -574,7 +574,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
 
     nfqc->state = DAQ_STATE_INITIALIZED;
 
-    daq_base_api.instance_set_context(nfqc->instance, nfqc);
+    *ctxt_ptr = nfqc;
 
     return DAQ_SUCCESS;
 

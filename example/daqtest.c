@@ -1342,7 +1342,11 @@ int main(int argc, char *argv[])
                 return rval;
             }
         }
-        daq_config_push_module_config(config, modcfg);
+        if ((rval = daq_config_push_module_config(config, modcfg)) != DAQ_SUCCESS)
+        {
+            fprintf(stderr, "Error pushing DAQ module configuration for '%s' onto the DAQ config! (%d)\n", dtmc->module_name, rval);
+            return rval;
+        }
     }
 
     if ((rval = daq_instance_initialize(config, &instance, errbuf, sizeof(errbuf))) != 0)

@@ -174,10 +174,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     }
 
     /* Check to make sure that all of the required function pointers are populated. */
-    if (!dm->prepare || !dm->initialize || !dm->start || !dm->inject || !dm->breakloop ||
-        !dm->stop || !dm->shutdown || !dm->check_status || !dm->get_stats || !dm->reset_stats ||
-        !dm->get_snaplen || !dm->get_capabilities || !dm->get_datalink_type || !dm->msg_receive ||
-        !dm->msg_finalize)
+    if (!dm->prepare || !dm->get_variable_descs || !dm->initialize)
     {
         fprintf(stderr, "%s: Module definition is missing function pointer(s)!\n", dm->name);
         return DAQ_ERROR;
@@ -217,7 +214,6 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     /* Prepare the DAQ module for future use. */
     base_api.api_version = DAQ_BASE_API_VERSION;
     base_api.api_size = sizeof(DAQ_BaseAPI_t);
-    base_api.module_config_get_module = daq_module_config_get_module;
     base_api.module_config_get_input = daq_module_config_get_input;
     base_api.module_config_get_snaplen = daq_module_config_get_snaplen;
     base_api.module_config_get_timeout = daq_module_config_get_timeout;
@@ -227,8 +223,8 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     base_api.module_config_first_variable = daq_module_config_first_variable;
     base_api.module_config_next_variable = daq_module_config_next_variable;
     base_api.module_config_get_next = daq_module_config_get_next;
-    base_api.instance_set_context = daq_instance_set_context;
-    base_api.instance_get_context = daq_instance_get_context;
+    base_api.module_instantiate = daq_module_instantiate;
+    base_api.modinst_resolve_subapi = daq_modinst_resolve_subapi;
     base_api.instance_set_errbuf = daq_instance_set_errbuf;
     if ((rval = dm->prepare(&base_api)) != DAQ_SUCCESS)
     {
