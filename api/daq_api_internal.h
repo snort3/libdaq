@@ -25,8 +25,10 @@ inline void DEBUG(char *fmt, ...)
 #define DEBUG(...) do { if (daq_verbosity > 0) { printf(__VA_ARGS__); } } while (0)
 #endif
 
-void daq_instance_set_errbuf(DAQ_Instance_h instance, const char *format, ...);
+DAQ_Config_h daq_module_config_get_config(DAQ_ModuleConfig_h modcfg);
 int daq_module_instantiate(DAQ_ModuleConfig_h modcfg, DAQ_Instance_h instance);
+DAQ_Instance_h daq_modinst_get_instance(DAQ_ModuleInstance_h modinst);
 void daq_modinst_resolve_subapi(DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
+void daq_instance_set_errbuf(DAQ_Instance_h instance, const char *format, ...);
 
 #endif /* _DAQ_API_INTERNAL_H */

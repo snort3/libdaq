@@ -7,7 +7,13 @@ static int daq_test_prepare(const DAQ_BaseAPI_t *base_api)
     return DAQ_SUCCESS;
 }
 
-static int daq_test_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance)
+static int daq_test_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
+{
+    *var_desc_table = NULL;
+    return 0;
+}
+
+static int daq_test_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     return DAQ_SUCCESS;
 }
@@ -84,7 +90,7 @@ DAQ_ModuleAPI_t test_module =
     /* .name = */ TEST_MODULE_NAME,
     /* .type = */ TEST_MODULE_TYPE,
     /* .prepare = */ daq_test_prepare,
-    /* .get_variable_descs = */ NULL,
+    /* .get_variable_descs = */ daq_test_get_variable_descs,
     /* .initialize = */ daq_test_initialize,
     /* .set_filter = */ NULL,
     /* .start = */ daq_test_start,

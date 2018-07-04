@@ -46,10 +46,8 @@ typedef struct _daq_dict
 typedef struct _daq_module_config
 {
     struct _daq_module_config *next;
+    struct _daq_config *config;     /* Backreference to the configuration this is contained within */
     const DAQ_ModuleAPI_t *module;  /* Module that will be instantiated with this configuration */
-    char *input;                    /* Name of the interface(s) or file to be opened */
-    int snaplen;                    /* Maximum packet capture length */
-    unsigned timeout;               /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_Mode mode;                  /* Module mode (DAQ_MODE_*) */
     uint32_t msg_pool_size;         /* Size of the message pool to create (quantity) */
     DAQ_Dict_t variables;           /* Dictionary of arbitrary key[:value] string pairs */
@@ -57,6 +55,9 @@ typedef struct _daq_module_config
 
 typedef struct _daq_config
 {
+    char *input;                    /* Name of the interface(s) or file to be opened */
+    int snaplen;                    /* Maximum packet capture length */
+    unsigned timeout;               /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_ModuleConfig_t *module_configs;
     DAQ_ModuleConfig_t *iterator;
 } DAQ_Config_t;
@@ -183,77 +184,17 @@ DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_t **modcfgptr, const DAQ_
     return DAQ_SUCCESS;
 }
 
+DAQ_Config_t *daq_module_config_get_config(DAQ_ModuleConfig_t *modcfg)
+{
+    return modcfg->config;
+}
+
 DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_module_config_get_module(DAQ_ModuleConfig_t *modcfg)
 {
     if (!modcfg)
         return NULL;
 
     return modcfg->module;
-}
-
-DAQ_LINKAGE int daq_module_config_set_input(DAQ_ModuleConfig_t *modcfg, const char *input)
-{
-    if (!modcfg)
-        return DAQ_ERROR_INVAL;
-
-    if (modcfg->input)
-    {
-        free(modcfg->input);
-        modcfg->input = NULL;
-    }
-
-    if (input)
-    {
-        modcfg->input = strdup(input);
-        if (!modcfg->input)
-            return DAQ_ERROR_NOMEM;
-    }
-
-    return DAQ_SUCCESS;
-}
-
-DAQ_LINKAGE const char *daq_module_config_get_input(DAQ_ModuleConfig_t *modcfg)
-{
-    if (modcfg)
-        return modcfg->input;
-
-    return NULL;
-}
-
-DAQ_LINKAGE int daq_module_config_set_snaplen(DAQ_ModuleConfig_t *modcfg, int snaplen)
-{
-    if (!modcfg)
-        return DAQ_ERROR_INVAL;
-
-    modcfg->snaplen = snaplen;
-
-    return DAQ_SUCCESS;
-}
-
-DAQ_LINKAGE int daq_module_config_get_snaplen(DAQ_ModuleConfig_t *modcfg)
-{
-    if (modcfg)
-        return modcfg->snaplen;
-
-    return 0;
-}
-
-DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_t *modcfg, unsigned timeout)
-{
-    if (!modcfg)
-        return DAQ_ERROR_INVAL;
-
-    modcfg->timeout = timeout;
-
-    return DAQ_SUCCESS;
-}
-
-DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_t *modcfg)
-{
-    if (modcfg)
-        return modcfg->timeout;
-
-    return 0;
 }
 
 DAQ_LINKAGE int daq_module_config_set_msg_pool_size(DAQ_ModuleConfig_h modcfg, uint32_t num_msgs)
@@ -421,7 +362,6 @@ DAQ_LINKAGE void daq_module_config_destroy(DAQ_ModuleConfig_t *modcfg)
     if (!modcfg)
         return;
 
-    free(modcfg->input);
     daq_module_config_clear_variables(modcfg);
     free(modcfg);
 }
@@ -447,6 +387,71 @@ DAQ_LINKAGE int daq_config_new(DAQ_Config_t **cfgptr)
     return DAQ_SUCCESS;
 }
 
+DAQ_LINKAGE int daq_config_set_input(DAQ_Config_t *cfg, const char *input)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    if (cfg->input)
+    {
+        free(cfg->input);
+        cfg->input = NULL;
+    }
+
+    if (input)
+    {
+        cfg->input = strdup(input);
+        if (!cfg->input)
+            return DAQ_ERROR_NOMEM;
+    }
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_t *cfg)
+{
+    if (cfg)
+        return cfg->input;
+
+    return NULL;
+}
+
+DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_t *cfg, int snaplen)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    cfg->snaplen = snaplen;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE int daq_config_get_snaplen(DAQ_Config_t *cfg)
+{
+    if (cfg)
+        return cfg->snaplen;
+
+    return 0;
+}
+
+DAQ_LINKAGE int daq_config_set_timeout(DAQ_Config_t *cfg, unsigned timeout)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    cfg->timeout = timeout;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE unsigned daq_config_get_timeout(DAQ_Config_t *cfg)
+{
+    if (cfg)
+        return cfg->timeout;
+
+    return 0;
+}
+
 DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_t *cfg, DAQ_ModuleConfig_t *modcfg)
 {
     if (!cfg || !modcfg)
@@ -463,6 +468,7 @@ DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_t *cfg, DAQ_ModuleConfi
             return DAQ_ERROR_INVAL;
         modcfg->next = cfg->module_configs;
     }
+    modcfg->config = cfg;
     cfg->module_configs = modcfg;
     cfg->iterator = NULL;
 
@@ -480,6 +486,7 @@ DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_pop_module_config(DAQ_Config_t *cfg)
     cfg->module_configs = modcfg->next;
     cfg->iterator = NULL;
 
+    modcfg->config = NULL;
     modcfg->next = NULL;
 
     return modcfg;
@@ -517,5 +524,6 @@ DAQ_LINKAGE void daq_config_destroy(DAQ_Config_t *cfg)
         cfg->module_configs = modcfg->next;
         daq_module_config_destroy(modcfg);
     }
+    free(cfg->input);
     free(cfg);
 }

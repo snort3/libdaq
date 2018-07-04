@@ -42,11 +42,8 @@ typedef struct _DAQTestModuleConfig
 {
     struct _DAQTestModuleConfig *next;
     char *module_name;
-    char *input;
     char **variables;
     unsigned int num_variables;
-    unsigned timeout;
-    int snaplen;
     DAQ_Mode mode;
 } DAQTestModuleConfig;
 
@@ -56,6 +53,9 @@ typedef struct _DAQTestConfig
     const char **module_paths;
     unsigned int num_module_paths;
     DAQTestModuleConfig *module_configs;
+    char *input;
+    unsigned timeout;
+    int snaplen;
     char *filter;
     unsigned long packet_limit;
     unsigned long timeout_limit;
@@ -992,7 +992,6 @@ static DAQTestModuleConfig *daqtest_module_config_new(void)
     }
 
     /* Some default values. */
-    dtmc->snaplen = 1518;
     dtmc->mode = DAQ_MODE_PASSIVE;
 
     return dtmc;
@@ -1008,6 +1007,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
     /* Clear configuration and initialize to defaults. */
     memset(cfg, 0, sizeof(DAQTestConfig));
+    cfg->snaplen = 1518;
     cfg->default_verdict = DAQ_VERDICT_PASS;
     cfg->ping_action = PING_ACTION_PASS;
     cfg->module_configs = daqtest_module_config_new();
@@ -1089,7 +1089,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 exit(0);
 
             case 'i':
-                dtmc->input = optarg;
+                cfg->input = optarg;
                 break;
 
             case 'l':
@@ -1150,7 +1150,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 's':
                 errno = 0;
-                dtmc->snaplen = strtoul(optarg, &endptr, 10);
+                cfg->snaplen = strtoul(optarg, &endptr, 10);
                 if (*endptr != '\0' || errno != 0)
                 {
                     fprintf(stderr, "Invalid snap length specified: %s\n\n", optarg);
@@ -1160,7 +1160,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 't':
                 errno = 0;
-                dtmc->timeout = strtoul(optarg, &endptr, 10);
+                cfg->timeout = strtoul(optarg, &endptr, 10);
                 if (*endptr != '\0' || errno != 0)
                 {
                     fprintf(stderr, "Invalid receive timeout specified: %s\n\n", optarg);
@@ -1218,34 +1218,36 @@ static void print_config(DAQTestConfig *cfg)
     char addr_str[INET_ADDRSTRLEN];
     unsigned int i;
 
-    for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
+    printf("[Config]\n");
+    printf("  Input: %s\n", cfg->input);
+    printf("  Snaplen: %hu\n", cfg->snaplen);
+    printf("  Timeout: %ums (Allowance: ", cfg->timeout);
+    if (cfg->timeout_limit)
+        printf("%lu)\n", cfg->timeout_limit);
+    else
+        printf("Unlimited)\n");
+    printf("  Module Stack:\n");
+    for (dtmc = cfg->module_configs, i = 0; dtmc; dtmc = dtmc->next, i++)
     {
-        printf("[%s]\n", dtmc->module_name);
-        printf("  Input: %s\n", dtmc->input);
-        printf("  Mode: %s\n", daq_mode_string(dtmc->mode));
-        printf("  Snaplen: %hu\n", dtmc->snaplen);
-        printf("  Timeout: %ums (Allowance: ", dtmc->timeout);
-        if (cfg->timeout_limit)
-            printf("%lu)\n", cfg->timeout_limit);
-        else
-            printf("Unlimited)\n");
+        printf("    %u: [%s]\n", i, dtmc->module_name);
+        printf("      Mode: %s\n", daq_mode_string(dtmc->mode));
         if (dtmc->variables)
         {
-            printf("  Variables:\n");
+            printf("      Variables:\n");
             for (i = 0; i < dtmc->num_variables; i++)
-                printf("    %s\n", dtmc->variables[i]);
+                printf("        %s\n", dtmc->variables[i]);
         }
     }
-    printf("Packet Count: ");
+    printf("  Packet Count: ");
     if (cfg->packet_limit)
         printf("%lu\n", cfg->packet_limit);
     else
         printf("Unlimited\n");
-    printf("Default Verdict: %s\n", daq_verdict_string(cfg->default_verdict));
-    printf("Ping Action: %s\n", ping_action_strings[cfg->ping_action]);
+    printf("  Default Verdict: %s\n", daq_verdict_string(cfg->default_verdict));
+    printf("  Ping Action: %s\n", ping_action_strings[cfg->ping_action]);
     if (cfg->ip_addrs)
     {
-        printf("Handling ARPs for:\n");
+        printf("  Handling ARPs for:\n");
         for (ip = cfg->ip_addrs; ip; ip = ip->next)
         {
             inet_ntop(AF_INET, &ip->addr, addr_str, sizeof(addr_str));
@@ -1253,11 +1255,11 @@ static void print_config(DAQTestConfig *cfg)
         }
     }
     if (cfg->delay > 0)
-        printf("Delaying packets by %lu milliseconds.\n", cfg->delay);
+        printf("  Delaying packets by %lu milliseconds.\n", cfg->delay);
     if (cfg->modify_opaque_value)
-        printf("Modifying the opaque value of flows to be the current packet count.\n");
+        printf("  Modifying the opaque value of flows to be the current packet count.\n");
     if (cfg->performance_mode)
-        printf("In performance mode, no decoding will be done!\n");
+        printf("  In performance mode, no decoding will be done!\n");
 }
 
 int main(int argc, char *argv[])
@@ -1279,7 +1281,7 @@ int main(int argc, char *argv[])
     if ((rval = parse_command_line(argc, argv, cfg)) != 0)
         return rval;
 
-    if ((!cfg->module_configs->input || !cfg->module_configs->module_name) && !cfg->list_and_exit)
+    if ((!cfg->input || !cfg->module_configs->module_name) && !cfg->list_and_exit)
     {
         usage();
         return -1;
@@ -1305,6 +1307,10 @@ int main(int argc, char *argv[])
         return rval;
     }
 
+    daq_config_set_input(config, cfg->input);
+    daq_config_set_snaplen(config, cfg->snaplen);
+    daq_config_set_timeout(config, cfg->timeout);
+
     for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
     {
         module = daq_find_module(dtmc->module_name);
@@ -1320,9 +1326,6 @@ int main(int argc, char *argv[])
             return rval;
         }
 
-        daq_module_config_set_input(modcfg, dtmc->input);
-        daq_module_config_set_snaplen(modcfg, dtmc->snaplen);
-        daq_module_config_set_timeout(modcfg, dtmc->timeout);
         daq_module_config_set_mode(modcfg, dtmc->mode);
 
         for (i = 0; i < dtmc->num_variables; i++)

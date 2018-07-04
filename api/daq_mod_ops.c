@@ -45,6 +45,7 @@
 typedef struct _daq_module_instance
 {
     struct _daq_module_instance *next;
+    struct _daq_instance *instance;     // Backreference to the DAQ instance that this is a part of
     const DAQ_ModuleAPI_t *module;
     void *context;
 } DAQ_ModuleInstance_t;
@@ -122,6 +123,12 @@ static void daq_instance_destroy(DAQ_Instance_t *instance)
 /*
  * Base API functions that apply to an instantiated configuration go here.
  */
+
+DAQ_Instance_t *daq_modinst_get_instance(DAQ_ModuleInstance_t *modinst)
+{
+    return modinst->instance;
+}
+
 void daq_modinst_resolve_subapi(DAQ_ModuleInstance_t *modinst, DAQ_InstanceAPI_t *api)
 {
     resolve_instance_api(api, modinst->next, false);
@@ -146,6 +153,7 @@ int daq_module_instantiate(DAQ_ModuleConfig_h modcfg, DAQ_Instance_t *instance)
         return DAQ_ERROR_NOMEM;
     }
 
+    modinst->instance = instance;
     modinst->module = daq_module_config_get_module(modcfg);
 
     /* Add this module instance to the bottom of the stack */
@@ -158,7 +166,7 @@ int daq_module_instantiate(DAQ_ModuleConfig_h modcfg, DAQ_Instance_t *instance)
     else
         instance->module_instances = modinst;
 
-    return modinst->module->initialize(modcfg, instance, modinst, &modinst->context);
+    return modinst->module->initialize(modcfg, modinst, &modinst->context);
 }
 
 

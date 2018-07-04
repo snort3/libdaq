@@ -380,10 +380,12 @@ static int nfq_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
 }
 
 /* Module->initialize() */
-static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     Nfq_Context_t *nfqc;
     int rval = DAQ_ERROR;
+
+    DAQ_Instance_h instance = daq_base_api.modinst_get_instance(modinst);
 
     nfqc = calloc(1, sizeof(Nfq_Context_t));
     if (!nfqc)
@@ -395,19 +397,20 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
 
     nfqc->queue_maxlen = DEFAULT_QUEUE_MAXLEN;
 
+    DAQ_Config_h cfg = daq_base_api.module_config_get_config(modcfg);
     char *endptr;
     errno = 0;
-    nfqc->queue_num = strtoul(daq_base_api.module_config_get_input(config), &endptr, 10);
+    nfqc->queue_num = strtoul(daq_base_api.config_get_input(cfg), &endptr, 10);
     if (*endptr != '\0' || errno != 0)
     {
         daq_base_api.instance_set_errbuf(instance, "%s: Invalid queue number specified: '%s'",
-                __func__, daq_base_api.module_config_get_input(config));
+                __func__, daq_base_api.config_get_input(cfg));
         rval = DAQ_ERROR_INVAL;
         goto fail;
     }
 
     const char *varKey, *varValue;
-    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "debug"))
@@ -427,10 +430,10 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
             }
         }
 
-        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(modcfg, &varKey, &varValue);
     }
 
-    nfqc->snaplen = daq_base_api.module_config_get_snaplen(config);
+    nfqc->snaplen = daq_base_api.config_get_snaplen(cfg);
 
     /* Largest desired packet payload plus netlink data overhead - this is probably overkill
         (the libnetfilter_queue example inexplicably halves MNL_SOCKET_BUFFER_SIZE), but it
@@ -451,7 +454,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
     }
 
     /* Netlink message buffer length must be determined prior to creating packet pool */
-    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(config);
+    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(modcfg);
     if ((rval = create_packet_pool(nfqc, pool_size ? pool_size : NFQ_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
         goto fail;
 
@@ -467,7 +470,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h in
     nfqc->nlsock_fd = mnl_socket_get_fd(nfqc->nlsock);
 
     /* Implement the requested timeout by way of the receive timeout on the netlink socket */
-    nfqc->timeout = daq_base_api.module_config_get_timeout(config);
+    nfqc->timeout = daq_base_api.config_get_timeout(cfg);
     if (nfqc->timeout)
     {
         struct timeval tv;

@@ -73,79 +73,67 @@ static int daq_config_teardown(void **state)
 
 #define TEST_INPUT_STRING   "input"
 #define TEST_INPUT_STRING2  "input2"
-static void test_module_input(void **state)
+static void test_input(void **state)
 {
     DAQ_Config_h cfg = *state;
-    DAQ_ModuleConfig_h modcfg;
     int rval;
 
-    modcfg = daq_config_top_module_config(cfg);
-    assert_non_null(modcfg);
-
     /* NULL config test */
-    rval = daq_module_config_set_input(NULL, TEST_INPUT_STRING);
+    rval = daq_config_set_input(NULL, TEST_INPUT_STRING);
     assert_int_equal(rval, DAQ_ERROR_INVAL);
-    assert_null(daq_module_config_get_input(NULL));
+    assert_null(daq_config_get_input(NULL));
 
     /* Fresh configuration */
-    assert_null(daq_module_config_get_input(modcfg));
+    assert_null(daq_config_get_input(cfg));
 
     /* Set and get */
-    rval = daq_module_config_set_input(modcfg, TEST_INPUT_STRING);
+    rval = daq_config_set_input(cfg, TEST_INPUT_STRING);
     assert_int_equal(rval, DAQ_SUCCESS);
-    assert_string_equal(daq_module_config_get_input(modcfg), TEST_INPUT_STRING);
+    assert_string_equal(daq_config_get_input(cfg), TEST_INPUT_STRING);
 
-    rval = daq_module_config_set_input(modcfg, TEST_INPUT_STRING2);
+    rval = daq_config_set_input(cfg, TEST_INPUT_STRING2);
     assert_int_equal(rval, DAQ_SUCCESS);
-    assert_string_equal(daq_module_config_get_input(modcfg), TEST_INPUT_STRING2);
+    assert_string_equal(daq_config_get_input(cfg), TEST_INPUT_STRING2);
 }
 
 #define TEST_SNAPLEN    1337
-static void test_module_snaplen(void **state)
+static void test_snaplen(void **state)
 {
     DAQ_Config_h cfg = *state;
-    DAQ_ModuleConfig_h modcfg;
     int rval;
 
-    modcfg = daq_config_top_module_config(cfg);
-    assert_non_null(modcfg);
-
     /* NULL config test */
-    rval = daq_module_config_set_snaplen(NULL, TEST_SNAPLEN);
+    rval = daq_config_set_snaplen(NULL, TEST_SNAPLEN);
     assert_int_equal(rval, DAQ_ERROR_INVAL);
-    assert_int_equal(daq_module_config_get_snaplen(NULL), 0);
+    assert_int_equal(daq_config_get_snaplen(NULL), 0);
 
     /* Fresh configuration */
-    assert_int_equal(daq_module_config_get_snaplen(modcfg), 0);
+    assert_int_equal(daq_config_get_snaplen(cfg), 0);
 
     /* Set and get */
-    rval = daq_module_config_set_snaplen(modcfg, TEST_SNAPLEN);
+    rval = daq_config_set_snaplen(cfg, TEST_SNAPLEN);
     assert_int_equal(rval, DAQ_SUCCESS);
-    assert_int_equal(daq_module_config_get_snaplen(modcfg), TEST_SNAPLEN);
+    assert_int_equal(daq_config_get_snaplen(cfg), TEST_SNAPLEN);
 }
 
 #define TEST_TIMEOUT    1337
-static void test_module_timeout(void **state)
+static void test_timeout(void **state)
 {
     DAQ_Config_h cfg = *state;
-    DAQ_ModuleConfig_h modcfg;
     int rval;
 
-    modcfg = daq_config_top_module_config(cfg);
-    assert_non_null(modcfg);
-
     /* NULL config test */
-    rval = daq_module_config_set_timeout(NULL, TEST_TIMEOUT);
+    rval = daq_config_set_timeout(NULL, TEST_TIMEOUT);
     assert_int_equal(rval, DAQ_ERROR_INVAL);
-    assert_int_equal(daq_module_config_get_timeout(NULL), 0);
+    assert_int_equal(daq_config_get_timeout(NULL), 0);
 
     /* Fresh configuration */
-    assert_int_equal(daq_module_config_get_timeout(modcfg), 0);
+    assert_int_equal(daq_config_get_timeout(cfg), 0);
 
     /* Set and get */
-    rval = daq_module_config_set_timeout(modcfg, TEST_TIMEOUT);
+    rval = daq_config_set_timeout(cfg, TEST_TIMEOUT);
     assert_int_equal(rval, DAQ_SUCCESS);
-    assert_int_equal(daq_module_config_get_timeout(modcfg), TEST_TIMEOUT);
+    assert_int_equal(daq_config_get_timeout(cfg), TEST_TIMEOUT);
 }
 
 static void test_module_mode(void **state)
@@ -266,9 +254,9 @@ int main(void)
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_no_config),
         cmocka_unit_test(test_no_module_config),
-        cmocka_unit_test_setup_teardown(test_module_input, daq_config_bringup, daq_config_teardown),
-        cmocka_unit_test_setup_teardown(test_module_snaplen, daq_config_bringup, daq_config_teardown),
-        cmocka_unit_test_setup_teardown(test_module_timeout, daq_config_bringup, daq_config_teardown),
+        cmocka_unit_test_setup_teardown(test_input, daq_config_bringup, daq_config_teardown),
+        cmocka_unit_test_setup_teardown(test_snaplen, daq_config_bringup, daq_config_teardown),
+        cmocka_unit_test_setup_teardown(test_timeout, daq_config_bringup, daq_config_teardown),
         cmocka_unit_test_setup_teardown(test_module_mode, daq_config_bringup, daq_config_teardown),
         cmocka_unit_test_setup_teardown(test_module_variables, daq_config_bringup, daq_config_teardown),
     };

@@ -54,12 +54,6 @@ DAQ_LINKAGE int daq_module_get_variable_descs(DAQ_Module_h module, const DAQ_Var
 /* DAQ Module Configuration Functions */
 DAQ_LINKAGE int daq_module_config_new(DAQ_ModuleConfig_h *modcfgptr, DAQ_Module_h module);
 DAQ_LINKAGE DAQ_Module_h daq_module_config_get_module(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_input(DAQ_ModuleConfig_h modcfg, const char *input);
-DAQ_LINKAGE const char *daq_module_config_get_input(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_snaplen(DAQ_ModuleConfig_h modcfg, int snaplen);
-DAQ_LINKAGE int daq_module_config_get_snaplen(DAQ_ModuleConfig_h modcfg);
-DAQ_LINKAGE int daq_module_config_set_timeout(DAQ_ModuleConfig_h modcfg, unsigned timeout);
-DAQ_LINKAGE unsigned daq_module_config_get_timeout(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_msg_pool_size(DAQ_ModuleConfig_h modcfg, uint32_t num_msgs);
 DAQ_LINKAGE uint32_t daq_module_config_get_msg_pool_size(DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_h modcfg, DAQ_Mode mode);
@@ -75,6 +69,12 @@ DAQ_LINKAGE void daq_module_config_destroy(DAQ_ModuleConfig_h modcfg);
 
 /* DAQ Configuration Functions */
 DAQ_LINKAGE int daq_config_new(DAQ_Config_h *cfgptr);
+DAQ_LINKAGE int daq_config_set_input(DAQ_Config_h cfg, const char *input);
+DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_h cfg, int snaplen);
+DAQ_LINKAGE int daq_config_get_snaplen(DAQ_Config_h cfg);
+DAQ_LINKAGE int daq_config_set_timeout(DAQ_Config_h cfg, unsigned timeout);
+DAQ_LINKAGE unsigned daq_config_get_timeout(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_h cfg, DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_pop_module_config(DAQ_Config_h cfg);
 DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_top_module_config(DAQ_Config_h cfg);

@@ -214,9 +214,10 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     /* Prepare the DAQ module for future use. */
     base_api.api_version = DAQ_BASE_API_VERSION;
     base_api.api_size = sizeof(DAQ_BaseAPI_t);
-    base_api.module_config_get_input = daq_module_config_get_input;
-    base_api.module_config_get_snaplen = daq_module_config_get_snaplen;
-    base_api.module_config_get_timeout = daq_module_config_get_timeout;
+    base_api.config_get_input = daq_config_get_input;
+    base_api.config_get_snaplen = daq_config_get_snaplen;
+    base_api.config_get_timeout = daq_config_get_timeout;
+    base_api.module_config_get_config = daq_module_config_get_config;
     base_api.module_config_get_msg_pool_size = daq_module_config_get_msg_pool_size;
     base_api.module_config_get_mode = daq_module_config_get_mode;
     base_api.module_config_get_variable = daq_module_config_get_variable;
@@ -224,6 +225,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     base_api.module_config_next_variable = daq_module_config_next_variable;
     base_api.module_config_get_next = daq_module_config_get_next;
     base_api.module_instantiate = daq_module_instantiate;
+    base_api.modinst_get_instance = daq_modinst_get_instance;
     base_api.modinst_resolve_subapi = daq_modinst_resolve_subapi;
     base_api.instance_set_errbuf = daq_instance_set_errbuf;
     if ((rval = dm->prepare(&base_api)) != DAQ_SUCCESS)

@@ -112,14 +112,16 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(dump_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     DAQ_ModuleConfig_h subconfig;
     DumpContext *dc;
     const char *varKey, *varValue;
     int rval;
 
-    subconfig = daq_base_api.module_config_get_next(config);
+    DAQ_Instance_h instance = daq_base_api.modinst_get_instance(modinst);
+
+    subconfig = daq_base_api.module_config_get_next(modcfg);
     if (!subconfig)
     {
         daq_base_api.instance_set_errbuf(instance, "%s: No submodule configuration provided", __func__);
@@ -135,7 +137,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
     dc->instance = instance;
     dc->output_type = DUMP_OUTPUT_PCAP;
 
-    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
+    daq_base_api.module_config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "file"))
@@ -175,7 +177,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h i
                 return DAQ_ERROR_INVAL;
             }
         }
-        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(modcfg, &varKey, &varValue);
     }
 
     rval = daq_base_api.module_instantiate(subconfig, instance);

@@ -84,10 +84,12 @@ typedef struct _daq_base_api
     /* Sanity/Version checking */
     uint32_t api_version;
     uint32_t api_size;
+    /* Configuration accessors */
+    const char *(*config_get_input) (DAQ_Config_h cfg);
+    int (*config_get_snaplen) (DAQ_Config_h cfg);
+    unsigned (*config_get_timeout) (DAQ_Config_h cfg);
     /* Instance configuration accessors */
-    const char *(*module_config_get_input) (DAQ_ModuleConfig_h modcfg);
-    int (*module_config_get_snaplen) (DAQ_ModuleConfig_h modcfg);
-    unsigned (*module_config_get_timeout) (DAQ_ModuleConfig_h modcfg);
+    DAQ_Config_h (*module_config_get_config) (DAQ_ModuleConfig_h modcfg);
     unsigned (*module_config_get_msg_pool_size) (DAQ_ModuleConfig_h modcfg);
     DAQ_Mode (*module_config_get_mode) (DAQ_ModuleConfig_h modcfg);
     const char *(*module_config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
@@ -97,6 +99,7 @@ typedef struct _daq_base_api
     /* Module operations */
     int (*module_instantiate) (DAQ_ModuleConfig_h modcfg, DAQ_Instance_h instance);
     /* Module instance operations */
+    DAQ_Instance_h (*modinst_get_instance) (DAQ_ModuleInstance_h modinst);
     void (*modinst_resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
     /* Instance operations */
     void (*instance_set_errbuf) (DAQ_Instance_h instance, const char *format, ...);
@@ -124,7 +127,7 @@ typedef struct _daq_module_api
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
-    int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h, void **ctxt_ptr);
+    int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_ModuleInstance_h modinst, void **ctxt_ptr);
     /* Set the module's BPF based on the given string */
     daq_module_set_filter_func set_filter;
     /* Complete device opening and begin queuing packets if they have not been already. */

@@ -711,17 +711,18 @@ static int afpacket_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_t
     return sizeof(afpacket_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance_h instance, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int afpacket_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     AFPacket_Context_t *afpc;
     AFPacketInstance *afi;
-    const char *varKey, *varValue, *size_str = NULL;
+    const char *size_str = NULL;
     char *name1, *name2, *dev;
     char intf[IFNAMSIZ];
-    uint32_t size;
     size_t len;
     int num_rings, num_intfs = 0;
     int rval = DAQ_ERROR;
+
+    DAQ_Instance_h instance = daq_base_api.modinst_get_instance(modinst);
 
     afpc = calloc(1, sizeof(AFPacket_Context_t));
     if (!afpc)
@@ -732,7 +733,8 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
     }
     afpc->instance = instance;
 
-    afpc->device = strdup(daq_base_api.module_config_get_input(config));
+    DAQ_Config_h cfg = daq_base_api.module_config_get_config(modcfg);
+    afpc->device = strdup(daq_base_api.config_get_input(cfg));
     if (!afpc->device)
     {
         daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the device string!", __func__);
@@ -740,14 +742,14 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
         goto err;
     }
 
-    afpc->snaplen = daq_base_api.module_config_get_snaplen(config);
-    afpc->timeout = (int) daq_base_api.module_config_get_timeout(config);
+    afpc->snaplen = daq_base_api.config_get_snaplen(cfg);
+    afpc->timeout = (int) daq_base_api.config_get_timeout(cfg);
     if (afpc->timeout == 0)
         afpc->timeout = -1;
 
     dev = afpc->device;
     if (*dev == ':' || ((len = strlen(dev)) > 0 && *(dev + len - 1) == ':') ||
-            (daq_base_api.module_config_get_mode(config) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
+            (daq_base_api.module_config_get_mode(modcfg) == DAQ_MODE_PASSIVE && strstr(dev, "::")))
     {
         daq_base_api.instance_set_errbuf(instance, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
         goto err;
@@ -777,7 +779,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
             afi->next = afpc->instances;
             afpc->instances = afi;
             num_intfs++;
-            if (daq_base_api.module_config_get_mode(config) != DAQ_MODE_PASSIVE)
+            if (daq_base_api.module_config_get_mode(modcfg) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
                 {
@@ -801,13 +803,13 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
     }
 
     /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (daq_base_api.module_config_get_mode(config) != DAQ_MODE_PASSIVE && num_intfs != 0))
+    if (!afpc->instances || (daq_base_api.module_config_get_mode(modcfg) != DAQ_MODE_PASSIVE && num_intfs != 0))
     {
         daq_base_api.instance_set_errbuf(instance, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
         goto err;
     }
 
-    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(config);
+    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(modcfg);
     if ((rval = create_packet_pool(afpc, pool_size ? pool_size : AF_PACKET_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
         goto err;
 
@@ -815,7 +817,8 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
      * Determine the dimensions of the kernel RX ring(s) to request.
      */
     /* 1. Find the total desired packet buffer memory for all instances. */
-    daq_base_api.module_config_first_variable(config, &varKey, &varValue);
+    const char *varKey, *varValue;
+    daq_base_api.module_config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "buffer_size_mb"))
@@ -874,10 +877,11 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h config, DAQ_Instance
         }
 #endif /* PACKET_FANOUT */
 
-        daq_base_api.module_config_next_variable(config, &varKey, &varValue);
+        daq_base_api.module_config_next_variable(modcfg, &varKey, &varValue);
     }
 
     /* Fall back to the environment variable. */
+    uint32_t size;
     if (!size_str)
         size_str = getenv("AF_PACKET_BUFFER_SIZE");
     if (size_str && strcmp("max", size_str) != 0)
