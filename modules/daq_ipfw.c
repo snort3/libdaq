@@ -441,8 +441,8 @@ DAQ_Module_t ipfw_daq_module_data =
     .set_errbuf = ipfw_daq_set_errbuf,
     .get_device_index = ipfw_daq_get_device_index,
     .modify_flow = NULL,
-    .hup_prep = NULL,
-    .hup_apply = NULL,
-    .hup_post = NULL,
+    .config_load = NULL,
+    .config_swap = NULL,
+    .config_free = NULL,
 };
 

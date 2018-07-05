@@ -39,9 +39,9 @@ typedef uint32_t (*daq_module_get_capabilities_func) (void *handle);
 typedef int (*daq_module_get_datalink_type_func) (void *handle);
 typedef int (*daq_module_get_device_index_func) (void *handle, const char *device);
 typedef int (*daq_module_modify_flow_func) (void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
-typedef int (*daq_module_hup_prep_func) (void *handle, void **new_config);
-typedef int (*daq_module_hup_apply_func) (void *handle, void *new_config, void **old_config);
-typedef int (*daq_module_hup_post_func) (void *handle, void *old_config);
+typedef int (*daq_module_config_load_func) (void *handle, void **new_config);
+typedef int (*daq_module_config_swap_func) (void *handle, void *new_config, void **old_config);
+typedef int (*daq_module_config_free_func) (void *handle, void *old_config);
 typedef int (*daq_module_dp_add_dc_func) (void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
         const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
 typedef int (*daq_module_query_flow_func) (void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
@@ -65,9 +65,9 @@ typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(get_device_index);
     DAQ_INSTANCE_API_STRUCT(modify_flow);
     DAQ_INSTANCE_API_STRUCT(query_flow);
-    DAQ_INSTANCE_API_STRUCT(hup_prep);
-    DAQ_INSTANCE_API_STRUCT(hup_apply);
-    DAQ_INSTANCE_API_STRUCT(hup_post);
+    DAQ_INSTANCE_API_STRUCT(config_load);
+    DAQ_INSTANCE_API_STRUCT(config_swap);
+    DAQ_INSTANCE_API_STRUCT(config_free);
     DAQ_INSTANCE_API_STRUCT(dp_add_dc);
     DAQ_INSTANCE_API_STRUCT(msg_receive);
     DAQ_INSTANCE_API_STRUCT(msg_finalize);
@@ -155,11 +155,11 @@ typedef struct _daq_module_api
     /* Query a flow */
     daq_module_query_flow_func query_flow;
     /* Read new configuration */
-    daq_module_hup_prep_func hup_prep;
+    daq_module_config_load_func config_load;
     /* Swap new and old configuration */
-    daq_module_hup_apply_func hup_apply;
+    daq_module_config_swap_func config_swap;
     /* Destroy old configuration */
-    daq_module_hup_post_func hup_post;
+    daq_module_config_free_func config_free;
     /** DAQ API to program a FST/EFT entry for dynamic protocol data channel
      *
      * @param [in] handle      DAQ module handle

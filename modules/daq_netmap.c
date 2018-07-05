@@ -848,9 +848,9 @@ const DAQ_Module_t netmap_daq_module_data =
     /* .set_errbuf = */ netmap_daq_set_errbuf,
     /* .get_device_index = */ netmap_daq_get_device_index,
     /* .modify_flow = */ NULL,
-    /* .hup_prep = */ NULL,
-    /* .hup_apply = */ NULL,
-    /* .hup_post = */ NULL,
+    /* .config_load = */ NULL,
+    /* .config_swap = */ NULL,
+    /* .config_free = */ NULL,
     /* .dp_add_dc = */ NULL,
     /* .query_flow = */ NULL
 };

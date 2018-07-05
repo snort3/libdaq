@@ -69,17 +69,17 @@ int daq_default_modify_flow(void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *mo
     return DAQ_ERROR_NOTSUP;
 }
 
-int daq_default_hup_prep(void *handle, void **new_config)
+int daq_default_config_load(void *handle, void **new_config)
 {
     return DAQ_ERROR_NOTSUP;
 }
 
-int daq_default_hup_apply(void *handle, void *new_config, void **old_config)
+int daq_default_config_swap(void *handle, void *new_config, void **old_config)
 {
     return DAQ_ERROR_NOTSUP;
 }
 
-int daq_default_hup_post(void *handle, void *old_config)
+int daq_default_config_free(void *handle, void *old_config)
 {
     return DAQ_ERROR_NOTSUP;
 }

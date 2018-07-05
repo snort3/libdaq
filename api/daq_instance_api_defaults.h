@@ -14,9 +14,9 @@ uint32_t daq_default_get_capabilities(void *handle);
 int daq_default_get_datalink_type(void *handle);
 int daq_default_get_device_index(void *handle, const char *device);
 int daq_default_modify_flow(void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
-int daq_default_hup_prep(void *handle, void **new_config);
-int daq_default_hup_apply(void *handle, void *new_config, void **old_config);
-int daq_default_hup_post(void *handle, void *old_config);
+int daq_default_config_load(void *handle, void **new_config);
+int daq_default_config_swap(void *handle, void *new_config, void **old_config);
+int daq_default_config_free(void *handle, void *old_config);
 int daq_default_dp_add_dc(void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
         const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
 int daq_default_query_flow(void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);

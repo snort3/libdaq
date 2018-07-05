@@ -129,9 +129,9 @@ static void handler(int sig)
             notdone = 0;
             break;
         case SIGHUP:
-            daq_instance_hup_prep(instance, &newconfig);
-            daq_instance_hup_apply(instance, newconfig, &oldconfig);
-            daq_instance_hup_post(instance, oldconfig);
+            daq_instance_config_load(instance, &newconfig);
+            daq_instance_config_swap(instance, newconfig, &oldconfig);
+            daq_instance_config_free(instance, oldconfig);
             break;
     }
 }
