@@ -181,19 +181,4 @@ typedef struct _daq_module_api
 
 #define DAQ_ERRBUF_SIZE 256
 
-/* This is a convenience macro for safely printing to DAQ error buffers.  It must be called on a known-size character array. */
-#ifdef WIN32
-inline void DPE(char *var, char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-
-    snprintf(var, sizeof(var), ap);
-
-    va_end(ap);
-}
-#else
-#define DPE(var, ...) snprintf(var, sizeof(var), __VA_ARGS__)
-#endif
-
 #endif /* _DAQ_API_H */
