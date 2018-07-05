@@ -63,7 +63,6 @@ typedef struct {
     struct sfbpf_program fcode;
     struct sockaddr_in sin;
 
-    DAQ_State state;
     DAQ_Stats_t stats;
 } IpfwImpl;
 
@@ -148,7 +147,6 @@ static int ipfw_daq_initialize(const DAQ_Config_h config, void **handle, char* e
     }
 
     impl->sock = -1;
-    impl->state = DAQ_STATE_INITIALIZED;
 
     *handle = impl;
     return DAQ_SUCCESS;
@@ -213,7 +211,6 @@ static int ipfw_daq_start (void* handle)
         return DAQ_ERROR;
     }
 
-    impl->state = DAQ_STATE_STARTED;
     return DAQ_SUCCESS;
 }
 
@@ -222,7 +219,6 @@ static int ipfw_daq_stop (void* handle)
     IpfwImpl* impl = (IpfwImpl*)handle;
     close(impl->sock);
     impl->sock = -1;
-    impl->state = DAQ_STATE_STOPPED;
     return DAQ_SUCCESS;
 }
 
@@ -369,12 +365,6 @@ static int ipfw_daq_breakloop (void* handle)
     return DAQ_SUCCESS;
 }
 
-static DAQ_State ipfw_daq_check_status (void* handle)
-{
-    IpfwImpl* impl = (IpfwImpl*)handle;
-    return impl->state;
-}
-
 static int ipfw_daq_get_stats (void* handle, DAQ_Stats_t* stats)
 {
     IpfwImpl* impl = (IpfwImpl*)handle;
@@ -442,7 +432,6 @@ DAQ_Module_t ipfw_daq_module_data =
     .breakloop = ipfw_daq_breakloop,
     .stop = ipfw_daq_stop,
     .shutdown = ipfw_daq_shutdown,
-    .check_status = ipfw_daq_check_status,
     .get_stats = ipfw_daq_get_stats,
     .reset_stats = ipfw_daq_reset_stats,
     .get_snaplen = ipfw_daq_get_snaplen,

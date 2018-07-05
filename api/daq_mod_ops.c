@@ -54,6 +54,7 @@ typedef struct _daq_instance
 {
     DAQ_ModuleInstance_t *module_instances;
     DAQ_InstanceAPI_t api;
+    DAQ_State state;
     char errbuf[DAQ_ERRBUF_SIZE];
 } DAQ_Instance_t;
 
@@ -87,7 +88,6 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, shutdown, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, check_status, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, reset_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_snaplen, default_impl);
@@ -204,6 +204,7 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
         snprintf(errbuf, len, "Couldn't allocate a new DAQ instance structure!");
         return DAQ_ERROR_NOMEM;
     }
+    instance->state = DAQ_STATE_UNINITIALIZED;
 
     int rval = daq_module_instantiate(modcfg, instance);
     if (rval != DAQ_SUCCESS)
@@ -215,6 +216,8 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
 
     /* Resolve the top-level instance API from the top of the stack with defaults. */
     resolve_instance_api(&instance->api, instance->module_instances, true);
+
+    instance->state = DAQ_STATE_INITIALIZED;
 
     *instance_ptr = instance;
 
@@ -240,13 +243,17 @@ DAQ_LINKAGE int daq_instance_start(DAQ_Instance_t *instance)
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
-    if (daq_instance_check_status(instance) != DAQ_STATE_INITIALIZED)
+    if (instance->state != DAQ_STATE_INITIALIZED)
     {
         daq_instance_set_errbuf(instance, "Can't start an instance that isn't initialized!");
         return DAQ_ERROR;
     }
 
-    return instance->api.start.func(instance->api.start.context);
+    int rval = instance->api.start.func(instance->api.start.context);
+    if (rval == DAQ_SUCCESS)
+        instance->state = DAQ_STATE_STARTED;
+
+    return rval;
 }
 
 DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, DAQ_Msg_h msg,
@@ -283,13 +290,17 @@ DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_t *instance)
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
-    if (daq_instance_check_status(instance) != DAQ_STATE_STARTED)
+    if (instance->state != DAQ_STATE_STARTED)
     {
         daq_instance_set_errbuf(instance, "Can't stop an instance that hasn't started!");
         return DAQ_ERROR;
     }
 
-    return instance->api.stop.func(instance->api.stop.context);
+    int rval = instance->api.stop.func(instance->api.stop.context);
+    if (rval == DAQ_SUCCESS)
+        instance->state = DAQ_STATE_STOPPED;
+
+    return rval;
 }
 
 DAQ_LINKAGE int daq_instance_shutdown(DAQ_Instance_t *instance)
@@ -308,7 +319,7 @@ DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_t *instance)
     if (!instance)
         return DAQ_STATE_UNKNOWN;
 
-    return instance->api.check_status.func(instance->api.check_status.context);
+    return instance->state;
 }
 
 DAQ_LINKAGE int daq_instance_get_stats(DAQ_Instance_t *instance, DAQ_Stats_t *stats)

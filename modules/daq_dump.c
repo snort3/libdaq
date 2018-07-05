@@ -451,7 +451,6 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .breakloop = */ NULL,
     /* .stop = */ dump_daq_stop,
     /* .shutdown = */ dump_daq_shutdown,
-    /* .check_status = */ NULL,
     /* .get_stats = */ dump_daq_get_stats,
     /* .reset_stats = */ dump_daq_reset_stats,
     /* .get_snaplen = */ NULL,

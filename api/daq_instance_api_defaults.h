@@ -7,7 +7,6 @@ int daq_default_inject(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, 
 int daq_default_breakloop(void *handle);
 int daq_default_stop(void *handle);
 void daq_default_shutdown(void *handle);
-DAQ_State daq_default_check_status(void *handle);
 int daq_default_get_stats(void *handle, DAQ_Stats_t *stats);
 void daq_default_reset_stats(void *handle);
 int daq_default_get_snaplen(void *handle);

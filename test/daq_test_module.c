@@ -42,11 +42,6 @@ static void daq_test_shutdown(void *handle)
 {
 }
 
-static DAQ_State daq_test_check_status(void *handle)
-{
-    return DAQ_SUCCESS;
-}
-
 static int daq_test_get_stats(void *handle, DAQ_Stats_t *stats)
 {
     return DAQ_SUCCESS;
@@ -98,7 +93,6 @@ DAQ_ModuleAPI_t test_module =
     /* .breakloop = */ daq_test_breakloop,
     /* .stop = */ daq_test_stop,
     /* .shutdown = */ daq_test_shutdown,
-    /* .check_status = */ daq_test_check_status,
     /* .get_stats = */ daq_test_get_stats,
     /* .reset_stats = */ daq_test_reset_stats,
     /* .get_snaplen = */ daq_test_get_snaplen,

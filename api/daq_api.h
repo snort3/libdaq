@@ -32,7 +32,6 @@ typedef int (*daq_module_inject_func) (void *handle, DAQ_Msg_h msg, const uint8_
 typedef int (*daq_module_breakloop_func) (void *handle);
 typedef int (*daq_module_stop_func) (void *handle);
 typedef void (*daq_module_shutdown_func) (void *handle);
-typedef DAQ_State (*daq_module_check_status_func) (void *handle);
 typedef int (*daq_module_get_stats_func) (void *handle, DAQ_Stats_t *stats);
 typedef void (*daq_module_reset_stats_func) (void *handle);
 typedef int (*daq_module_get_snaplen_func) (void *handle);
@@ -58,7 +57,6 @@ typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(breakloop);
     DAQ_INSTANCE_API_STRUCT(stop);
     DAQ_INSTANCE_API_STRUCT(shutdown);
-    DAQ_INSTANCE_API_STRUCT(check_status);
     DAQ_INSTANCE_API_STRUCT(get_stats);
     DAQ_INSTANCE_API_STRUCT(reset_stats);
     DAQ_INSTANCE_API_STRUCT(get_snaplen);
@@ -140,8 +138,6 @@ typedef struct _daq_module_api
     daq_module_stop_func stop;
     /* Close the device and clean up */
     daq_module_shutdown_func shutdown;
-    /* Get the status of the module (one of DAQ_STATE_*). */
-    daq_module_check_status_func check_status;
     /* Populates the <stats> structure with the current DAQ stats.  These stats are cumulative. */
     daq_module_get_stats_func get_stats;
     /* Resets the DAQ module's internal stats. */

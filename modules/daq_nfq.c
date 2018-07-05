@@ -69,7 +69,6 @@ typedef struct _nfq_context
     bool debug;
     /* State */
     DAQ_Instance_h instance;
-    DAQ_State state;
     DAQ_Stats_t stats;
     NfqMsgPool pool;
     char *nlmsg_buf;
@@ -575,8 +574,6 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
         goto fail;
     }
 
-    nfqc->state = DAQ_STATE_INITIALIZED;
-
     *ctxt_ptr = nfqc;
 
     return DAQ_SUCCESS;
@@ -595,19 +592,9 @@ fail:
     return rval;
 }
 
-/* Module->set_filter() */
-static int nfq_daq_set_filter(void *handle, const char *filter)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
 /* Module->start() */
 static int nfq_daq_start(void *handle)
 {
-    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
-
-    nfqc->state = DAQ_STATE_STARTED;
-
     return DAQ_SUCCESS;
 }
 
@@ -643,8 +630,6 @@ static int nfq_daq_stop(void *handle)
     mnl_socket_close(nfqc->nlsock);
     nfqc->nlsock = NULL;
 
-    nfqc->state = DAQ_STATE_STOPPED;
-
     return DAQ_SUCCESS;
 }
 
@@ -659,14 +644,6 @@ static void nfq_daq_shutdown(void *handle)
         free(nfqc->nlmsg_buf);
     destroy_packet_pool(nfqc);
     free(nfqc);
-}
-
-/* Module->check_status() */
-static DAQ_State nfq_daq_check_status(void *handle)
-{
-    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
-
-    return nfqc->state;
 }
 
 /* Module->get_stats() */
@@ -837,13 +814,12 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .prepare = */ nfq_daq_prepare,
     /* .get_variable_descs = */ nfq_daq_get_variable_descs,
     /* .initialize = */ nfq_daq_initialize,
-    /* .set_filter = */ nfq_daq_set_filter,
+    /* .set_filter = */ NULL,
     /* .start = */ nfq_daq_start,
     /* .inject = */ nfq_daq_inject,
     /* .breakloop = */ nfq_daq_breakloop,
     /* .stop = */ nfq_daq_stop,
     /* .shutdown = */ nfq_daq_shutdown,
-    /* .check_status = */ nfq_daq_check_status,
     /* .get_stats = */ nfq_daq_get_stats,
     /* .reset_stats = */ nfq_daq_reset_stats,
     /* .get_snaplen = */ nfq_daq_get_snaplen,

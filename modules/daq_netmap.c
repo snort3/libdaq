@@ -87,7 +87,6 @@ typedef struct _netmap_context
     struct sfbpf_program fcode;
     volatile int break_loop;
     DAQ_Stats_t stats;
-    DAQ_State state;
     char errbuf[256];
 } Netmap_Context_t;
 
@@ -148,8 +147,6 @@ static int netmap_close(Netmap_Context_t *nmc)
     }
 
     sfbpf_freecode(&nmc->fcode);
-
-    nmc->state = DAQ_STATE_STOPPED;
 
     return 0;
 }
@@ -395,8 +392,6 @@ static int netmap_daq_initialize(const DAQ_Config_h config, void **ctxt_ptr, cha
         daq_config_next_variable(config, &varKey, &varValue);
     }
 
-    nmc->state = DAQ_STATE_INITIALIZED;
-
     *ctxt_ptr = nmc;
     return DAQ_SUCCESS;
 
@@ -451,8 +446,6 @@ static int netmap_daq_start(void *handle)
     }
 
     memset(&nmc->stats, 0, sizeof(DAQ_Stats_t));;
-
-    nmc->state = DAQ_STATE_STARTED;
 
     return DAQ_SUCCESS;
 }
@@ -762,13 +755,6 @@ static void netmap_daq_shutdown(void *handle)
     free(nmc);
 }
 
-static DAQ_State netmap_daq_check_status(void *handle)
-{
-    Netmap_Context_t *nmc = (Netmap_Context_t *) handle;
-
-	return nmc->state;
-}
-
 static int netmap_daq_get_stats(void *handle, DAQ_Stats_t * stats)
 {
     Netmap_Context_t *nmc = (Netmap_Context_t *) handle;
@@ -853,7 +839,6 @@ const DAQ_Module_t netmap_daq_module_data =
     /* .breakloop = */ netmap_daq_breakloop,
     /* .stop = */ netmap_daq_stop,
     /* .shutdown = */ netmap_daq_shutdown,
-    /* .check_status = */ netmap_daq_check_status,
     /* .get_stats = */ netmap_daq_get_stats,
     /* .reset_stats = */ netmap_daq_reset_stats,
     /* .get_snaplen = */ netmap_daq_get_snaplen,

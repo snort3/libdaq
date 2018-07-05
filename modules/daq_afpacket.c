@@ -91,6 +91,7 @@ typedef struct _af_packet_instance
     int index;
     struct _af_packet_instance *peer;
     struct sockaddr_ll sll;
+    bool active;
 } AFPacketInstance;
 
 #ifdef PACKET_FANOUT
@@ -141,7 +142,6 @@ typedef struct _afpacket_context
 #endif
     volatile bool break_loop;
     DAQ_Stats_t stats;
-    DAQ_State state;
     /* Message receive state */
     AFPacketInstance *curr_instance;
 } AFPacket_Context_t;
@@ -609,6 +609,8 @@ static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
         return -1;
 #endif
 
+    instance->active = true;
+
     return 0;
 }
 
@@ -618,11 +620,10 @@ static void update_hw_stats(AFPacket_Context_t *afpc)
     struct tpacket_stats kstats;
     socklen_t len = sizeof (struct tpacket_stats);
 
-    if (afpc->state != DAQ_STATE_STARTED)
-        return;
-
     for (instance = afpc->instances; instance; instance = instance->next)
     {
+        if (!instance->active)
+            continue;
         memset(&kstats, 0, len);
         if (getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len) > -1)
         {
@@ -654,8 +655,6 @@ static int af_packet_close(AFPacket_Context_t *afpc)
 #ifdef LIBPCAP_AVAILABLE
     pcap_freecode(&afpc->fcode);
 #endif
-
-    afpc->state = DAQ_STATE_STOPPED;
 
     return 0;
 }
@@ -899,8 +898,6 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleIn
 
     afpc->curr_instance = afpc->instances;
 
-    afpc->state = DAQ_STATE_INITIALIZED;
-
     *ctxt_ptr = afpc;
 
     return DAQ_SUCCESS;
@@ -961,8 +958,6 @@ static int afpacket_daq_start(void *handle)
     }
 
     reset_stats(afpc);
-
-    afpc->state = DAQ_STATE_STARTED;
 
     return DAQ_SUCCESS;
 }
@@ -1065,13 +1060,6 @@ static void afpacket_daq_shutdown(void *handle)
         free(afpc->filter);
     destroy_packet_pool(afpc);
     free(afpc);
-}
-
-static DAQ_State afpacket_daq_check_status(void *handle)
-{
-    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-
-    return afpc->state;
 }
 
 static int afpacket_daq_get_stats(void *handle, DAQ_Stats_t *stats)
@@ -1406,7 +1394,6 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .breakloop = */ afpacket_daq_breakloop,
     /* .stop = */ afpacket_daq_stop,
     /* .shutdown = */ afpacket_daq_shutdown,
-    /* .check_status = */ afpacket_daq_check_status,
     /* .get_stats = */ afpacket_daq_get_stats,
     /* .reset_stats = */ afpacket_daq_reset_stats,
     /* .get_snaplen = */ afpacket_daq_get_snaplen,

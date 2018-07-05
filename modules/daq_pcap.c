@@ -74,7 +74,6 @@ typedef struct _pcap_context
     /* State */
     DAQ_Instance_h instance;
     DAQ_Stats_t stats;
-    DAQ_State state;
     char pcap_errbuf[PCAP_ERRBUF_SIZE];
     PcapMsgPool pool;
     pcap_t *handle;
@@ -299,7 +298,6 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     }
 
     pc->hwupdate_count = 0;
-    pc->state = DAQ_STATE_INITIALIZED;
 
     *ctxt_ptr = pc;
 
@@ -425,7 +423,6 @@ static int pcap_daq_start(void *handle)
 
     pcap_daq_reset_stats(handle);
 
-    pc->state = DAQ_STATE_STARTED;
     return DAQ_SUCCESS;
 
 fail:
@@ -481,8 +478,6 @@ static int pcap_daq_stop(void *handle)
         pc->handle = NULL;
     }
 
-    pc->state = DAQ_STATE_STOPPED;
-
     return DAQ_SUCCESS;
 }
 
@@ -500,13 +495,6 @@ static void pcap_daq_shutdown(void *handle)
         free(pc->filter_string);
     destroy_packet_pool(pc);
     free(pc);
-}
-
-static DAQ_State pcap_daq_check_status(void *handle)
-{
-    Pcap_Context_t *pc = (Pcap_Context_t *) handle;
-
-    return pc->state;
 }
 
 static int pcap_daq_get_stats(void *handle, DAQ_Stats_t *stats)
@@ -713,7 +701,6 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .breakloop = */ pcap_daq_breakloop,
     /* .stop = */ pcap_daq_stop,
     /* .shutdown = */ pcap_daq_shutdown,
-    /* .check_status = */ pcap_daq_check_status,
     /* .get_stats = */ pcap_daq_get_stats,
     /* .reset_stats = */ pcap_daq_reset_stats,
     /* .get_snaplen = */ pcap_daq_get_snaplen,

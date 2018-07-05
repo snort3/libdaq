@@ -35,11 +35,6 @@ void daq_default_shutdown(void *handle)
 {
 }
 
-DAQ_State daq_default_check_status(void *handle)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
 int daq_default_get_stats(void *handle, DAQ_Stats_t *stats)
 {
     return DAQ_ERROR_NOTSUP;
