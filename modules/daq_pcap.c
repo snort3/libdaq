@@ -45,6 +45,8 @@
 #define PCAP_DEFAULT_POOL_SIZE 16
 #define DAQ_PCAP_ROLLOVER_LIM 1000000000 //Check for rollover every billionth packet
 
+#define SET_ERROR(instance, ...)    daq_base_api.instance_set_errbuf(instance, __VA_ARGS__)
+
 typedef struct _pcap_pkt_desc
 {
     DAQ_Msg_t msg;
@@ -121,7 +123,7 @@ static int create_packet_pool(Pcap_Context_t *pc, unsigned size)
     pool->pool = calloc(sizeof(PcapPktDesc), size);
     if (!pool->pool)
     {
-        daq_base_api.instance_set_errbuf(pc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
+        SET_ERROR(pc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
                 __func__, sizeof(PcapPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
@@ -133,7 +135,7 @@ static int create_packet_pool(Pcap_Context_t *pc, unsigned size)
         desc->data = malloc(pc->snaplen);
         if (!desc->data)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s: Could not allocate %d bytes for a packet descriptor message buffer!",
+            SET_ERROR(pc->instance, "%s: Could not allocate %d bytes for a packet descriptor message buffer!",
                     __func__, pc->snaplen);
             return DAQ_ERROR_NOMEM;
         }
@@ -173,7 +175,7 @@ static int update_hw_stats(Pcap_Context_t *pc)
         memset(&ps, 0, sizeof(struct pcap_stat));
         if (pcap_stats(pc->handle, &ps) == -1)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s", pcap_geterr(pc->handle));
+            SET_ERROR(pc->instance, "%s", pcap_geterr(pc->handle));
             return DAQ_ERROR;
         }
 
@@ -203,7 +205,7 @@ static inline int set_nonblocking(Pcap_Context_t *pc, bool nonblocking)
         int status;
         if ((status = pcap_setnonblock(pc->handle, nonblocking ? 1 : 0, pc->pcap_errbuf)) < 0)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s", pc->pcap_errbuf);
+            SET_ERROR(pc->instance, "%s", pc->pcap_errbuf);
             return status;
         }
         pc->nonblocking = nonblocking;
@@ -237,7 +239,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     pc = calloc(1, sizeof(Pcap_Context_t));
     if (!pc)
     {
-        daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the new PCAP context!", __func__);
+        SET_ERROR(instance, "%s: Couldn't allocate memory for the new PCAP context!", __func__);
         return DAQ_ERROR_NOMEM;
     }
     pc->instance = instance;
@@ -278,7 +280,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         pc->fp = fopen(daq_base_api.config_get_input(cfg), "rb");
         if (!pc->fp)
         {
-            daq_base_api.instance_set_errbuf(instance, "%s: Couldn't open file '%s' for reading: %s", __func__,
+            SET_ERROR(instance, "%s: Couldn't open file '%s' for reading: %s", __func__,
                     daq_base_api.config_get_input(cfg), strerror(errno));
             destroy_packet_pool(pc);
             free(pc);
@@ -290,7 +292,7 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         pc->device = strdup(daq_base_api.config_get_input(cfg));
         if (!pc->device)
         {
-            daq_base_api.instance_set_errbuf(instance, "%s: Couldn't allocate memory for the device string!", __func__);
+            SET_ERROR(instance, "%s: Couldn't allocate memory for the device string!", __func__);
             destroy_packet_pool(pc);
             free(pc);
             return DAQ_ERROR_NOMEM;
@@ -310,14 +312,14 @@ static int pcap_daq_install_filter(Pcap_Context_t *pc, const char *filter)
 
     if (pcap_compile(pc->handle, &fcode, filter, 1, pc->netmask) < 0)
     {
-        daq_base_api.instance_set_errbuf(pc->instance, "%s: pcap_compile: %s", __func__, pcap_geterr(pc->handle));
+        SET_ERROR(pc->instance, "%s: pcap_compile: %s", __func__, pcap_geterr(pc->handle));
         return DAQ_ERROR;
     }
 
     if (pcap_setfilter(pc->handle, &fcode) < 0)
     {
         pcap_freecode(&fcode);
-        daq_base_api.instance_set_errbuf(pc->instance, "%s: pcap_setfilter: %s", __func__, pcap_geterr(pc->handle));
+        SET_ERROR(pc->instance, "%s: pcap_setfilter: %s", __func__, pcap_geterr(pc->handle));
         return DAQ_ERROR;
     }
 
@@ -344,12 +346,12 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
         dead_handle = pcap_open_dead(DLT_EN10MB, pc->snaplen);
         if (!dead_handle)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s: Could not allocate a dead PCAP handle!", __func__);
+            SET_ERROR(pc->instance, "%s: Could not allocate a dead PCAP handle!", __func__);
             return DAQ_ERROR_NOMEM;
         }
         if (pcap_compile(dead_handle, &fcode, filter, 1, pc->netmask) < 0)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s: pcap_compile: %s", __func__, pcap_geterr(dead_handle));
+            SET_ERROR(pc->instance, "%s: pcap_compile: %s", __func__, pcap_geterr(dead_handle));
             return DAQ_ERROR;
         }
         pcap_freecode(&fcode);
@@ -361,7 +363,7 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
         pc->filter_string = strdup(filter);
         if (!pc->filter_string)
         {
-            daq_base_api.instance_set_errbuf(pc->instance, "%s: Could not allocate space to store a copy of the filter string!", __func__);
+            SET_ERROR(pc->instance, "%s: Could not allocate space to store a copy of the filter string!", __func__);
             return DAQ_ERROR_NOMEM;
         }
     }
@@ -429,14 +431,14 @@ fail:
     if (pc->handle)
     {
         if (status == PCAP_ERROR || status == PCAP_ERROR_NO_SUCH_DEVICE || status == PCAP_ERROR_PERM_DENIED)
-            daq_base_api.instance_set_errbuf(pc->instance, "%s", pcap_geterr(pc->handle));
+            SET_ERROR(pc->instance, "%s", pcap_geterr(pc->handle));
         else
-            daq_base_api.instance_set_errbuf(pc->instance, "%s: %s", pc->device, pcap_statustostr(status));
+            SET_ERROR(pc->instance, "%s: %s", pc->device, pcap_statustostr(status));
         pcap_close(pc->handle);
         pc->handle = NULL;
     }
     else
-        daq_base_api.instance_set_errbuf(pc->instance, "%s", pc->pcap_errbuf);
+        SET_ERROR(pc->instance, "%s", pc->pcap_errbuf);
     return DAQ_ERROR;
 }
 
@@ -446,7 +448,7 @@ static int pcap_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *pa
 
     if (pcap_inject(pc->handle, packet_data, len) < 0)
     {
-        daq_base_api.instance_set_errbuf(pc->instance, "%s", pcap_geterr(pc->handle));
+        SET_ERROR(pc->instance, "%s", pcap_geterr(pc->handle));
         return DAQ_ERROR;
     }
 
@@ -612,7 +614,7 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
                 *rstat = (idx == 0) ? DAQ_RSTAT_TIMEOUT : DAQ_RSTAT_WOULD_BLOCK;
             else if (pcap_rval == -1)
             {
-                daq_base_api.instance_set_errbuf(pc->instance, "%s", pcap_geterr(pc->handle));
+                SET_ERROR(pc->instance, "%s", pcap_geterr(pc->handle));
                 *rstat = DAQ_RSTAT_ERROR;
             }
             else if (pcap_rval == -2)
