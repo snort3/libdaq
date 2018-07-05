@@ -134,6 +134,11 @@ void daq_modinst_resolve_subapi(DAQ_ModuleInstance_t *modinst, DAQ_InstanceAPI_t
     resolve_instance_api(api, modinst->next, false);
 }
 
+void daq_instance_set_errbuf_va(DAQ_Instance_t *instance, const char *format, va_list ap)
+{
+    vsnprintf(instance->errbuf, sizeof(instance->errbuf), format, ap);
+}
+
 void daq_instance_set_errbuf(DAQ_Instance_t *instance, const char *format, ...)
 {
     va_list ap;
@@ -142,7 +147,7 @@ void daq_instance_set_errbuf(DAQ_Instance_t *instance, const char *format, ...)
     va_end(ap);
 }
 
-int daq_module_instantiate(DAQ_ModuleConfig_h modcfg, DAQ_Instance_t *instance)
+int daq_module_instantiate(DAQ_Instance_t *instance, DAQ_ModuleConfig_h modcfg)
 {
     DAQ_ModuleInstance_t *modinst;
 
@@ -206,7 +211,7 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
     }
     instance->state = DAQ_STATE_UNINITIALIZED;
 
-    int rval = daq_module_instantiate(modcfg, instance);
+    int rval = daq_module_instantiate(instance, modcfg);
     if (rval != DAQ_SUCCESS)
     {
         snprintf(errbuf, len, "%s", instance->errbuf);

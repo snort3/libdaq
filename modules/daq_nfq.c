@@ -41,7 +41,7 @@
 #define NFQ_DEFAULT_POOL_SIZE   16
 #define DEFAULT_QUEUE_MAXLEN    1024   // Based on NFQNL_QMAX_DEFAULT from nfnetlnk_queue_core.c
 
-#define SET_ERROR(instance, ...)    daq_base_api.instance_set_errbuf(instance, __VA_ARGS__)
+#define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
 typedef struct _nfq_pkt_desc
 {
@@ -70,7 +70,7 @@ typedef struct _nfq_context
     bool fail_open;
     bool debug;
     /* State */
-    DAQ_Instance_h instance;
+    DAQ_ModuleInstance_h modinst;
     DAQ_Stats_t stats;
     NfqMsgPool pool;
     char *nlmsg_buf;
@@ -125,7 +125,7 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
     pool->pool = calloc(sizeof(NfqPktDesc), size);
     if (!pool->pool)
     {
-        SET_ERROR(nfqc->instance, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
+        SET_ERROR(nfqc->modinst, "%s: Could not allocate %zu bytes for a packet descriptor pool!",
                 __func__, sizeof(NfqPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
@@ -137,7 +137,7 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
         desc->nlmsg_buf = malloc(nfqc->nlmsg_bufsize);
         if (!desc->nlmsg_buf)
         {
-            SET_ERROR(nfqc->instance, "%s: Could not allocate %zu bytes for a packet descriptor message buffer!",
+            SET_ERROR(nfqc->modinst, "%s: Could not allocate %zu bytes for a packet descriptor message buffer!",
                     __func__, nfqc->nlmsg_bufsize);
             return DAQ_ERROR_NOMEM;
         }
@@ -386,32 +386,29 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     Nfq_Context_t *nfqc;
     int rval = DAQ_ERROR;
 
-    DAQ_Instance_h instance = daq_base_api.modinst_get_instance(modinst);
-
     nfqc = calloc(1, sizeof(Nfq_Context_t));
     if (!nfqc)
     {
-        SET_ERROR(instance, "%s: Couldn't allocate memory for the new NFQ context", __func__);
+        SET_ERROR(modinst, "%s: Couldn't allocate memory for the new NFQ context", __func__);
         return DAQ_ERROR_NOMEM;
     }
-    nfqc->instance = instance;
+    nfqc->modinst = modinst;
 
     nfqc->queue_maxlen = DEFAULT_QUEUE_MAXLEN;
 
-    DAQ_Config_h cfg = daq_base_api.module_config_get_config(modcfg);
     char *endptr;
     errno = 0;
-    nfqc->queue_num = strtoul(daq_base_api.config_get_input(cfg), &endptr, 10);
+    nfqc->queue_num = strtoul(daq_base_api.config_get_input(modcfg), &endptr, 10);
     if (*endptr != '\0' || errno != 0)
     {
-        SET_ERROR(instance, "%s: Invalid queue number specified: '%s'",
-                __func__, daq_base_api.config_get_input(cfg));
+        SET_ERROR(modinst, "%s: Invalid queue number specified: '%s'",
+                __func__, daq_base_api.config_get_input(modcfg));
         rval = DAQ_ERROR_INVAL;
         goto fail;
     }
 
     const char *varKey, *varValue;
-    daq_base_api.module_config_first_variable(modcfg, &varKey, &varValue);
+    daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "debug"))
@@ -424,17 +421,17 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
             nfqc->queue_maxlen = strtol(varValue, NULL, 10);
             if (*endptr != '\0' || errno != 0)
             {
-                SET_ERROR(instance, "%s: Invalid value for key '%s': '%s'",
+                SET_ERROR(modinst, "%s: Invalid value for key '%s': '%s'",
                         __func__, varKey, varValue);
                 rval = DAQ_ERROR_INVAL;
                 goto fail;
             }
         }
 
-        daq_base_api.module_config_next_variable(modcfg, &varKey, &varValue);
+        daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
 
-    nfqc->snaplen = daq_base_api.config_get_snaplen(cfg);
+    nfqc->snaplen = daq_base_api.config_get_snaplen(modcfg);
 
     /* Largest desired packet payload plus netlink data overhead - this is probably overkill
         (the libnetfilter_queue example inexplicably halves MNL_SOCKET_BUFFER_SIZE), but it
@@ -448,14 +445,14 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     nfqc->nlmsg_buf = malloc(nfqc->nlmsg_bufsize);
     if (!nfqc->nlmsg_buf)
     {
-        SET_ERROR(instance, "%s: Couldn't allocate %zu bytes for a general use buffer",
+        SET_ERROR(modinst, "%s: Couldn't allocate %zu bytes for a general use buffer",
                 __func__, nfqc->nlmsg_bufsize);
         rval = DAQ_ERROR_NOMEM;
         goto fail;
     }
 
     /* Netlink message buffer length must be determined prior to creating packet pool */
-    uint32_t pool_size = daq_base_api.module_config_get_msg_pool_size(modcfg);
+    uint32_t pool_size = daq_base_api.config_get_msg_pool_size(modcfg);
     if ((rval = create_packet_pool(nfqc, pool_size ? pool_size : NFQ_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
         goto fail;
 
@@ -463,7 +460,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     nfqc->nlsock = mnl_socket_open(NETLINK_NETFILTER);
     if (!nfqc->nlsock)
     {
-        SET_ERROR(instance, "%s: Couldn't open netfilter netlink socket: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't open netfilter netlink socket: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
@@ -471,7 +468,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     nfqc->nlsock_fd = mnl_socket_get_fd(nfqc->nlsock);
 
     /* Implement the requested timeout by way of the receive timeout on the netlink socket */
-    nfqc->timeout = daq_base_api.config_get_timeout(cfg);
+    nfqc->timeout = daq_base_api.config_get_timeout(modcfg);
     if (nfqc->timeout)
     {
         struct timeval tv;
@@ -479,7 +476,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
         tv.tv_usec = (nfqc->timeout % 1000) * 1000;
         if (setsockopt(nfqc->nlsock_fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv, sizeof(tv)) == -1)
         {
-            SET_ERROR(instance, "%s: Couldn't set receive timeout on netlink socket: %s (%d)",
+            SET_ERROR(modinst, "%s: Couldn't set receive timeout on netlink socket: %s (%d)",
                     __func__, strerror(errno), errno);
             goto fail;
         }
@@ -495,7 +492,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     {
         if (setsockopt(nfqc->nlsock_fd, SOL_SOCKET, SO_RCVBUF, &socket_rcvbuf_size, sizeof(socket_rcvbuf_size)) == -1)
         {
-            SET_ERROR(instance, "%s: Couldn't set receive buffer size on netlink socket to %u: %s (%d)",
+            SET_ERROR(modinst, "%s: Couldn't set receive buffer size on netlink socket to %u: %s (%d)",
                     __func__, socket_rcvbuf_size, strerror(errno), errno);
             goto fail;
         }
@@ -505,7 +502,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
 
     if (mnl_socket_bind(nfqc->nlsock, 0, MNL_SOCKET_AUTOPID) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't bind the netlink socket: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't bind the netlink socket: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
@@ -518,28 +515,28 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_PF_UNBIND, 0);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't unbind from NFQ for AF_INET: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't unbind from NFQ for AF_INET: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
     nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET6, NFQNL_CFG_CMD_PF_UNBIND, 0);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't unbind from NFQ for AF_INET6: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't unbind from NFQ for AF_INET6: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
     nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_PF_BIND, 0);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't bind to NFQ for AF_INET: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't bind to NFQ for AF_INET: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
     nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET6, NFQNL_CFG_CMD_PF_BIND, 0);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't bind to NFQ for AF_INET6: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't bind to NFQ for AF_INET6: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
@@ -548,7 +545,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_UNSPEC, NFQNL_CFG_CMD_BIND, nfqc->queue_num);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
                 __func__, nfqc->queue_num, strerror(errno), errno);
         goto fail;
     }
@@ -571,7 +568,7 @@ static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstanc
     }
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(instance, "%s: Couldn't configure NFQ parameters: %s (%d)",
+        SET_ERROR(modinst, "%s: Couldn't configure NFQ parameters: %s (%d)",
                 __func__, strerror(errno), errno);
         goto fail;
     }
@@ -625,7 +622,7 @@ static int nfq_daq_stop(void *handle)
     struct nlmsghdr *nlh = nfq_build_cfg_command(nfqc->nlmsg_buf, AF_INET, NFQNL_CFG_CMD_UNBIND, nfqc->queue_num);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(nfqc->instance, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
+        SET_ERROR(nfqc->modinst, "%s: Couldn't bind to NFQ queue %u: %s (%d)",
                 __func__, nfqc->queue_num, strerror(errno), errno);
         return DAQ_ERROR;
     }
@@ -724,7 +721,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
             }
             else
             {
-                SET_ERROR(nfqc->instance, "%s: Socket receive failed: %d - %s (%d)",
+                SET_ERROR(nfqc->modinst, "%s: Socket receive failed: %d - %s (%d)",
                         __func__, ret, strerror(errno), errno);
                 *rstat = DAQ_RSTAT_ERROR;
             }
@@ -734,7 +731,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
         ret = mnl_cb_run(desc->nlmsg_buf, ret, 0, nfqc->portid, process_message_cb, desc);
         if (ret < 0)
         {
-            SET_ERROR(nfqc->instance, "%s: Netlink message processing failed: %d - %s (%d)",
+            SET_ERROR(nfqc->modinst, "%s: Netlink message processing failed: %d - %s (%d)",
                     __func__, ret, strerror(errno), errno);
             *rstat = DAQ_RSTAT_ERROR;
             break;
@@ -778,7 +775,7 @@ static int nfq_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
             nfq_verdict, plen, msg->data);
     if (mnl_socket_sendto(nfqc->nlsock, nlh, nlh->nlmsg_len) == -1)
     {
-        SET_ERROR(nfqc->instance, "%s: Couldn't send NFQ verdict: %s (%d)",
+        SET_ERROR(nfqc->modinst, "%s: Couldn't send NFQ verdict: %s (%d)",
                         __func__, strerror(errno), errno);
         return DAQ_ERROR;
     }

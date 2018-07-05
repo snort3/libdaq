@@ -1,0 +1,60 @@
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <stdarg.h>
+
+#include "daq.h"
+#include "daq_api_internal.h"
+
+static const char *base_api_config_get_input(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_input(cfg);
+}
+
+static int base_api_config_get_snaplen(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_snaplen(cfg);
+}
+
+static unsigned base_api_config_get_timeout(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_timeout(cfg);
+}
+
+static int base_api_instantiate_submodule(DAQ_ModuleInstance_h modinst, DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Instance_h instance = daq_modinst_get_instance(modinst);
+    return daq_module_instantiate(instance, modcfg);
+}
+
+static void base_api_set_errbuf(DAQ_ModuleInstance_h modinst, const char *format, ...)
+{
+    DAQ_Instance_h instance = daq_modinst_get_instance(modinst);
+    va_list ap;
+    va_start(ap, format);
+    daq_instance_set_errbuf_va(instance, format, ap);
+    va_end(ap);
+}
+
+void populate_base_api(DAQ_BaseAPI_t *base_api)
+{
+    base_api->api_version = DAQ_BASE_API_VERSION;
+    base_api->api_size = sizeof(DAQ_BaseAPI_t);
+    base_api->config_get_input = base_api_config_get_input;
+    base_api->config_get_snaplen = base_api_config_get_snaplen;
+    base_api->config_get_timeout = base_api_config_get_timeout;
+    base_api->config_get_msg_pool_size = daq_module_config_get_msg_pool_size;
+    base_api->config_get_mode = daq_module_config_get_mode;
+    base_api->config_get_variable = daq_module_config_get_variable;
+    base_api->config_first_variable = daq_module_config_first_variable;
+    base_api->config_next_variable = daq_module_config_next_variable;
+    base_api->config_get_next = daq_module_config_get_next;
+    base_api->instantiate_submodule = base_api_instantiate_submodule;
+    base_api->resolve_subapi = daq_modinst_resolve_subapi;
+    base_api->set_errbuf = base_api_set_errbuf;
+}

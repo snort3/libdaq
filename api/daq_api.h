@@ -83,24 +83,19 @@ typedef struct _daq_base_api
     uint32_t api_version;
     uint32_t api_size;
     /* Configuration accessors */
-    const char *(*config_get_input) (DAQ_Config_h cfg);
-    int (*config_get_snaplen) (DAQ_Config_h cfg);
-    unsigned (*config_get_timeout) (DAQ_Config_h cfg);
-    /* Instance configuration accessors */
-    DAQ_Config_h (*module_config_get_config) (DAQ_ModuleConfig_h modcfg);
-    unsigned (*module_config_get_msg_pool_size) (DAQ_ModuleConfig_h modcfg);
-    DAQ_Mode (*module_config_get_mode) (DAQ_ModuleConfig_h modcfg);
-    const char *(*module_config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
-    int (*module_config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
-    int (*module_config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
-    DAQ_ModuleConfig_h (*module_config_get_next) (DAQ_ModuleConfig_h modcfg);
-    /* Module operations */
-    int (*module_instantiate) (DAQ_ModuleConfig_h modcfg, DAQ_Instance_h instance);
-    /* Module instance operations */
-    DAQ_Instance_h (*modinst_get_instance) (DAQ_ModuleInstance_h modinst);
-    void (*modinst_resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
-    /* Instance operations */
-    void (*instance_set_errbuf) (DAQ_Instance_h instance, const char *format, ...);
+    const char *(*config_get_input) (DAQ_ModuleConfig_h modcfg);
+    int (*config_get_snaplen) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*config_get_timeout) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*config_get_msg_pool_size) (DAQ_ModuleConfig_h modcfg);
+    DAQ_Mode (*config_get_mode) (DAQ_ModuleConfig_h modcfg);
+    const char *(*config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
+    int (*config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+    int (*config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
+    DAQ_ModuleConfig_h (*config_get_next) (DAQ_ModuleConfig_h modcfg);
+    /* Module/Instance operations */
+    int (*instantiate_submodule) (DAQ_ModuleInstance_h modinst, DAQ_ModuleConfig_h modcfg);
+    void (*resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
+    void (*set_errbuf) (DAQ_ModuleInstance_h modinst, const char *format, ...);
 } DAQ_BaseAPI_t;
 
 

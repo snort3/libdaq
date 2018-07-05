@@ -39,7 +39,7 @@
 #define DAQ_DUMP_PCAP_FILE "inline-out.pcap"
 #define DAQ_DUMP_TEXT_FILE "inline-out.txt"
 
-#define SET_ERROR(instance, ...)    daq_base_api.instance_set_errbuf(instance, __VA_ARGS__)
+#define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
 #define CALL_SUBAPI_NOARGS(ctxt, fname) \
     ctxt->subapi.fname.func(ctxt->subapi.fname.context)
@@ -56,7 +56,7 @@ typedef enum {
 
 typedef struct
 {
-    DAQ_Instance_h instance;
+    DAQ_ModuleInstance_h modinst;
 
     // delegate most stuff to downstream
     DAQ_InstanceAPI_t subapi;
@@ -121,25 +121,23 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     const char *varKey, *varValue;
     int rval;
 
-    DAQ_Instance_h instance = daq_base_api.modinst_get_instance(modinst);
-
-    subconfig = daq_base_api.module_config_get_next(modcfg);
+    subconfig = daq_base_api.config_get_next(modcfg);
     if (!subconfig)
     {
-        SET_ERROR(instance, "%s: No submodule configuration provided", __func__);
+        SET_ERROR(modinst, "%s: No submodule configuration provided", __func__);
         return DAQ_ERROR_INVAL;
     }
 
     dc = calloc(1, sizeof(DumpContext));
     if (!dc)
     {
-        SET_ERROR(instance, "%s: Couldn't allocate memory for the DAQ context", __func__);
+        SET_ERROR(modinst, "%s: Couldn't allocate memory for the DAQ context", __func__);
         return DAQ_ERROR_NOMEM;
     }
-    dc->instance = instance;
+    dc->modinst = modinst;
     dc->output_type = DUMP_OUTPUT_PCAP;
 
-    daq_base_api.module_config_first_variable(modcfg, &varKey, &varValue);
+    daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "file"))
@@ -147,7 +145,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
             dc->pcap_filename = strdup(varValue);
             if (!dc->pcap_filename)
             {
-                SET_ERROR(instance, "%s: Couldn't allocate memory for the PCAP output filename", __func__);
+                SET_ERROR(modinst, "%s: Couldn't allocate memory for the PCAP output filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }
@@ -157,7 +155,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
             dc->text_filename = strdup(varValue);
             if (!dc->text_filename)
             {
-                SET_ERROR(instance, "%s: Couldn't allocate memory for the text output filename", __func__);
+                SET_ERROR(modinst, "%s: Couldn't allocate memory for the text output filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }
@@ -174,15 +172,15 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
                 dc->output_type = DUMP_OUTPUT_BOTH;
             else
             {
-                SET_ERROR(instance, "%s: Invalid output type (%s)", __func__, varValue);
+                SET_ERROR(modinst, "%s: Invalid output type (%s)", __func__, varValue);
                 free(dc);
                 return DAQ_ERROR_INVAL;
             }
         }
-        daq_base_api.module_config_next_variable(modcfg, &varKey, &varValue);
+        daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
 
-    rval = daq_base_api.module_instantiate(subconfig, instance);
+    rval = daq_base_api.instantiate_submodule(modinst, subconfig);
     if (rval != DAQ_SUCCESS)
     {
         if (dc->pcap_filename)
@@ -192,7 +190,7 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         free(dc);
         return rval;
     }
-    daq_base_api.modinst_resolve_subapi(modinst, &dc->subapi);
+    daq_base_api.resolve_subapi(modinst, &dc->subapi);
 
     *ctxt_ptr = dc;
 
@@ -237,7 +235,7 @@ static int dump_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *da
 
         if (ferror(pcap_dump_file(dc->dumper)))
         {
-            SET_ERROR(dc->instance, "inject can't write to dump file");
+            SET_ERROR(dc->modinst, "inject can't write to dump file");
             return DAQ_ERROR;
         }
     }
@@ -268,7 +266,7 @@ static int dump_daq_start(void* handle)
         if (!dc->dumper)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->instance, "can't open dump file");
+            SET_ERROR(dc->modinst, "can't open dump file");
             return DAQ_ERROR;
         }
         pcap_close(pcap);
@@ -282,7 +280,7 @@ static int dump_daq_start(void* handle)
         if (!dc->text_out)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->instance, "can't open text output file");
+            SET_ERROR(dc->modinst, "can't open text output file");
             return DAQ_ERROR;
         }
     }
