@@ -1,5 +1,5 @@
-#ifndef _DAQ_TEST_MODULE
-#define _DAQ_TEST_MODULE
+#ifndef _DAQ_TEST_MODULE_H
+#define _DAQ_TEST_MODULE_H
 
 #include <daq_api.h>
 

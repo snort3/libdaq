@@ -18,8 +18,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-#ifndef STDIO_WRAPPER
-#define STDIO_WRAPPER
+#ifndef _MOCK_STDIO_H
+#define _MOCK_STDIO_H
 
 #include <stdbool.h>
 
