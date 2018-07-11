@@ -86,6 +86,9 @@ typedef struct _af_packet_instance
     int fd;
     unsigned tp_version;
     unsigned tp_hdrlen;
+    unsigned tp_reserve;
+    unsigned tp_frame_size;
+    unsigned actual_snaplen;
     void *buffer;
     AFPacketRing rx_ring;
     AFPacketRing tx_ring;
@@ -93,6 +96,7 @@ typedef struct _af_packet_instance
     int index;
     struct _af_packet_instance *peer;
     struct sockaddr_ll sll;
+    int mtu;
     bool active;
 } AFPacketInstance;
 
@@ -129,7 +133,7 @@ typedef struct _afpacket_context
     char *filter;
     int snaplen;
     int timeout;
-    uint32_t size;
+    uint32_t ring_size;
 #ifdef PACKET_FANOUT
     AFPacketFanoutCfg fanout_cfg;
 #endif
@@ -195,14 +199,14 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
     {
         /* Allocate packet data and set up descriptor */
         AFPacketPktDesc *desc = &pool->pool[pool->info.size];
-        desc->data = malloc(afpc->snaplen);
+        desc->data = malloc(afpc->instances->actual_snaplen);
         if (!desc->data)
         {
             SET_ERROR(afpc->modinst, "%s: Could not allocate %d bytes for a packet descriptor message buffer!",
-                    __func__, afpc->snaplen);
+                    __func__, afpc->instances->actual_snaplen);
             return DAQ_ERROR_NOMEM;
         }
-        pool->info.mem_size += afpc->snaplen;
+        pool->info.mem_size += afpc->instances->actual_snaplen;
 
         /* Initialize non-zero invariant packet header fields. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
@@ -227,7 +231,7 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
     return DAQ_SUCCESS;
 }
 
-static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *instance)
+static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *instance, int protocol)
 {
     struct sockaddr_ll sll;
     int err;
@@ -237,7 +241,7 @@ static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *i
     memset(&sll, 0, sizeof(struct sockaddr_ll));
     sll.sll_family = AF_PACKET;
     sll.sll_ifindex = instance->index;
-    sll.sll_protocol = htons(ETH_P_ALL);
+    sll.sll_protocol = htons(protocol);
 
     if (bind(instance->fd, (struct sockaddr *) &sll, sizeof(sll)) == -1)
     {
@@ -331,7 +335,6 @@ static void destroy_instance(AFPacketInstance *instance)
     }
 }
 
-
 static int iface_get_arptype(AFPacketInstance *instance)
 {
     struct ifreq ifr;
@@ -342,9 +345,7 @@ static int iface_get_arptype(AFPacketInstance *instance)
     if (ioctl(instance->fd, SIOCGIFHWADDR, &ifr) == -1)
     {
         if (errno == ENODEV)
-        {
             return DAQ_ERROR_NODEV;
-        }
         return DAQ_ERROR;
     }
 
@@ -355,6 +356,8 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
 {
     AFPacketInstance *instance = NULL;
     struct ifreq ifr;
+    socklen_t len;
+    int val;
 
     instance = calloc(1, sizeof(AFPacketInstance));
     if (!instance)
@@ -370,8 +373,10 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
         goto err;;
     }
 
-    /* Open the PF_PACKET raw socket to receive all network traffic completely unmodified. */
-    instance->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    /* Open the PF_PACKET raw socket to receive all network traffic completely unmodified.
+        We use 0 for the protocol so that the packet pseudo-interface will not go into a running
+        state until we bind() it to an interface later with a real protocol. */
+    instance->fd = socket(PF_PACKET, SOCK_RAW, 0);
     if (instance->fd == -1)
     {
         SET_ERROR(afpc->modinst, "%s: Could not open the PF_PACKET socket: %s", __func__, strerror(errno));
@@ -388,31 +393,13 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
     }
     instance->index = ifr.ifr_ifindex;
 
-    /* Initialize the sockaddr for this instance's interface for later injection/forwarding use. */
-    instance->sll.sll_family = AF_PACKET;
-    instance->sll.sll_ifindex = instance->index;
-    instance->sll.sll_protocol = htons(ETH_P_ALL);
-
-    return instance;
-
-err:
-    destroy_instance(instance);
-    return NULL;
-}
-
-/* The function below was heavily influenced by LibPCAP's pcap-linux.c.  Thanks! */
-static int determine_version(AFPacket_Context_t *afpc, AFPacketInstance *instance)
-{
-    socklen_t len;
-    int val;
-
-    /* Probe whether kernel supports TPACKET_V2 */
+    /* Probe whether the kernel supports TPACKET_V2 */
     val = TPACKET_V2;
     len = sizeof(val);
     if (getsockopt(instance->fd, SOL_PACKET, PACKET_HDRLEN, &val, &len) < 0)
     {
         SET_ERROR(afpc->modinst, "Couldn't retrieve TPACKET_V2 header length: %s", strerror(errno));
-        return -1;
+        goto err;
     }
     instance->tp_hdrlen = val;
 
@@ -421,7 +408,7 @@ static int determine_version(AFPacket_Context_t *afpc, AFPacketInstance *instanc
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_VERSION, &val, sizeof(val)) < 0)
     {
         SET_ERROR(afpc->modinst, "Couldn't activate TPACKET_V2 on packet socket: %s", strerror(errno));
-        return -1;
+        goto err;
     }
     instance->tp_version = TPACKET_V2;
 
@@ -430,26 +417,121 @@ static int determine_version(AFPacket_Context_t *afpc, AFPacketInstance *instanc
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_RESERVE, &val, sizeof(val)) < 0)
     {
         SET_ERROR(afpc->modinst, "Couldn't set up a %d-byte reservation packet socket: %s", val, strerror(errno));
-        return -1;
+        goto err;
     }
+
+    /* Get the interface MTU */
+    memset (&ifr, 0, sizeof(ifr));
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", instance->name);
+    if (ioctl(instance->fd, SIOCGIFMTU, &ifr) == -1)
+    {
+        SET_ERROR(afpc->modinst, "%s: Could not query MTU for '%s': %s (%d)", __func__,
+                instance->name, strerror(errno), errno);
+        goto err;
+    }
+    instance->mtu = ifr.ifr_mtu;
+
+    /* Get the current reservation.  Hopefully it's what we set it to earlier for VLAN reconstruction. */
+    if (getsockopt(instance->fd, SOL_PACKET, PACKET_RESERVE, &val, &len) == -1)
+    {
+        SET_ERROR(afpc->modinst, "%s: Could not query packet reserved space for '%s': %s (%d)",
+                __func__, instance->name, strerror(errno), errno);
+        goto err;
+    }
+    instance->tp_reserve = val;
+
+    /* Bind the socket to the interface with protocol 0 to associate it with the interface while not putting it
+        into the running state yet. */
+    if (bind_instance_interface(afpc, instance, 0) != 0)
+        goto err;
+
+    /* Verify that the link-layer type is ethernet as that's all we're supporting. */
+    int arptype = iface_get_arptype(instance);
+    if (arptype < 0)
+    {
+        SET_ERROR(afpc->modinst, "%s: failed to get interface type for device %s: (%d) %s",
+                __func__, instance->name, errno, strerror(errno));
+        goto err;
+    }
+
+    /* Normal loopback traffic presents itself as ethernet traffic with zeroed out MAC addresses,
+        and injected traffic shows (ala tcpreplay) shows up with populated ethernet headers.  Either
+        way, we can just treat it like normal ethernet traffic and handle it. */
+    if (arptype != ARPHRD_ETHER && arptype != ARPHRD_LOOPBACK)
+    {
+        SET_ERROR(afpc->modinst, "%s: invalid interface type for device %s: %d",
+                __func__, instance->name, arptype);
+        goto err;
+    }
+
+    /* Turn on promiscuous mode for the device. */
+    struct packet_mreq mr;
+    memset(&mr, 0, sizeof(mr));
+    mr.mr_ifindex = instance->index;
+    mr.mr_type = PACKET_MR_PROMISC;
+    if (setsockopt(instance->fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1)
+    {
+        SET_ERROR(afpc->modinst, "%s: setsockopt: %s", __func__, strerror(errno));
+        goto err;
+    }
+
+    /* Initialize the sockaddr for this instance's interface for later injection/forwarding use. */
+    instance->sll.sll_family = AF_PACKET;
+    instance->sll.sll_ifindex = instance->index;
+    instance->sll.sll_protocol = htons(ETH_P_ALL);
 
     if (afpc->debug)
     {
-        printf("Version: %u\n", instance->tp_version);
-        printf("Header Length: %u\n", instance->tp_hdrlen);
+        printf("[%s]\n", instance->name);
+        printf("  TPacket Version: %u\n", instance->tp_version);
+        printf("  TPacket Header Length: %u\n", instance->tp_hdrlen);
+        printf("  MTU: %d\n", instance->mtu);
+        printf("  Reservation: %u\n", instance->tp_reserve);
     }
 
-    return DAQ_SUCCESS;
+    return instance;
+
+err:
+    destroy_instance(instance);
+    return NULL;
 }
 
-static int calculate_layout(AFPacket_Context_t *afpc, struct tpacket_req *layout, unsigned int tp_hdrlen, int order)
+static void calculate_frame_size(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
-    unsigned int tp_hdrlen_sll, netoff, frames_per_block;
+    /* Calculate the TPACKET frame size to use.
+        From packet_mmap.txt in the Linux kernel documentation:
 
-    /* Calculate the frame size and minimum block size required. */
-    tp_hdrlen_sll = TPACKET_ALIGN(tp_hdrlen) + sizeof(struct sockaddr_ll);
-    netoff = TPACKET_ALIGN(tp_hdrlen_sll + ETH_HLEN) + VLAN_TAG_LEN;
-    layout->tp_frame_size = TPACKET_ALIGN(netoff - ETH_HLEN + afpc->snaplen);
+            Frame structure:
+               - Start. Frame must be aligned to TPACKET_ALIGNMENT=16
+               - struct tpacket_hdr
+               - pad to TPACKET_ALIGNMENT=16
+               - struct sockaddr_ll
+               - Gap, chosen so that packet data (Start+tp_net) aligns to
+                 TPACKET_ALIGNMENT=16
+               - Start+tp_mac: [ Optional MAC header ]
+               - Start+tp_net: Packet data, aligned to TPACKET_ALIGNMENT=16.
+               - Pad to align to TPACKET_ALIGNMENT=16
+
+        The space we reserve for VLAN reconstruction sits before the MAC header.
+        I'm aware the ETH_HLEN should always be less than 16, but I just want this logic
+        to as closely match that in the kernel as possible.
+    */
+    unsigned tp_hdrlen_sll = TPACKET_ALIGN(instance->tp_hdrlen) + sizeof(struct sockaddr_ll);
+    unsigned netoff = TPACKET_ALIGN(tp_hdrlen_sll + (ETH_HLEN < 16 ? 16 : ETH_HLEN)) + instance->tp_reserve;
+    unsigned macoff = netoff - ETH_HLEN;
+
+    instance->tp_frame_size = TPACKET_ALIGN(macoff + afpc->snaplen);
+    instance->actual_snaplen = instance->tp_frame_size - macoff;
+}
+
+static int calculate_layout(AFPacket_Context_t *afpc, AFPacketInstance *instance, struct tpacket_req *layout, int order)
+{
+    unsigned int frames_per_block;
+
+    /* Use the pre-calculated frame size. */
+    layout->tp_frame_size = instance->tp_frame_size;
+
+    /* Calculate the minimum block size required. */
     layout->tp_block_size = getpagesize() << order;
     while (layout->tp_block_size < layout->tp_frame_size)
         layout->tp_block_size <<= 1;
@@ -463,9 +545,9 @@ static int calculate_layout(AFPacket_Context_t *afpc, struct tpacket_req *layout
 
     /* Find the total number of frames required to amount to the requested per-interface memory.
         Then find the number of blocks required to hold those packet buffer frames. */
-    layout->tp_frame_nr = afpc->size / layout->tp_frame_size;
+    layout->tp_frame_nr = afpc->ring_size / layout->tp_frame_size;
     layout->tp_block_nr = layout->tp_frame_nr / frames_per_block;
-    /* afpc->layout.tp_frame_nr is requested to match frames_per_block*n_blocks */
+    /* afpc->layout.tp_frame_nr is requested to match frames_per_block * n_blocks */
     layout->tp_frame_nr = layout->tp_block_nr * frames_per_block;
     if (afpc->debug)
     {
@@ -474,12 +556,13 @@ static int calculate_layout(AFPacket_Context_t *afpc, struct tpacket_req *layout
         printf("  Frames:     %u\n", layout->tp_frame_nr);
         printf("  Block Size: %u (Order %d)\n", layout->tp_block_size, order);
         printf("  Blocks:     %u\n", layout->tp_block_nr);
+        printf("  Wasted:     %u\n", layout->tp_block_nr * (layout->tp_block_size % layout->tp_frame_size));
     }
 
     return DAQ_SUCCESS;
 }
 
-#define DEFAULT_ORDER 3
+#define DEFAULT_ORDER 5
 static int create_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFPacketRing *ring, int optname)
 {
     int rc, order;
@@ -487,7 +570,7 @@ static int create_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFP
     /* Starting with page allocations of order 3, try to allocate an RX ring in the kernel. */
     for (order = DEFAULT_ORDER; order >= 0; order--)
     {
-        if (calculate_layout(afpc, &ring->layout, instance->tp_hdrlen, order))
+        if (calculate_layout(afpc, instance, &ring->layout, order))
             return DAQ_ERROR;
 
         /* Ask the kernel to create the ring. */
@@ -535,6 +618,30 @@ static int mmap_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     return DAQ_SUCCESS;
 }
 
+static int create_instance_rings(AFPacket_Context_t *afpc, AFPacketInstance *instance)
+{
+    /* Calculate the frame size to request from the kernel. */
+    calculate_frame_size(afpc, instance);
+
+    /* Request the kernel RX ring from af_packet... */
+    if (create_ring(afpc, instance, &instance->rx_ring, PACKET_RX_RING) != DAQ_SUCCESS)
+        return DAQ_ERROR;
+    /* ...request the kernel TX ring from af_packet if we're in inline mode... */
+    if (instance->peer && create_ring(afpc, instance, &instance->tx_ring, PACKET_TX_RING) != DAQ_SUCCESS)
+        return DAQ_ERROR;
+    /* ...map the memory for the kernel ring(s) into userspace... */
+    if (mmap_rings(afpc, instance) != DAQ_SUCCESS)
+        return DAQ_ERROR;
+    /* ...and, finally, set up a userspace ring buffer to represent the kernel RX ring... */
+    if (set_up_ring(afpc, instance, &instance->rx_ring) != DAQ_SUCCESS)
+        return DAQ_ERROR;
+    /* ...as well as one for the TX ring if we're in inline mode... */
+    if (instance->peer && set_up_ring(afpc, instance, &instance->tx_ring) != DAQ_SUCCESS)
+        return DAQ_ERROR;
+
+    return DAQ_SUCCESS;
+}
+
 #ifdef PACKET_FANOUT
 static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
@@ -553,60 +660,12 @@ static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance
 
 static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
-    struct packet_mreq mr;
-    int arptype;
-
     /* Bind the RX ring to this interface. */
-    if (bind_instance_interface(afpc, instance) != 0)
+    if (bind_instance_interface(afpc, instance, ETH_P_ALL) != 0)
         return -1;
 
-    /* Turn on promiscuous mode for the device. */
-    memset(&mr, 0, sizeof(mr));
-    mr.mr_ifindex = instance->index;
-    mr.mr_type = PACKET_MR_PROMISC;
-    if (setsockopt(instance->fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) == -1)
-    {
-        SET_ERROR(afpc->modinst, "%s: setsockopt: %s", __func__, strerror(errno));
-        return -1;
-    }
-
-    /* Get the link-layer type. */
-    arptype = iface_get_arptype(instance);
-    if (arptype < 0)
-    {
-        SET_ERROR(afpc->modinst, "%s: failed to get interface type for device %s: (%d) %s",
-                __func__, instance->name, errno, strerror(errno));
-        return -1;
-    }
-
-    if (arptype != ARPHRD_ETHER)
-    {
-        SET_ERROR(afpc->modinst, "%s: invalid interface type for device %s: %d != %d",
-                __func__, instance->name, arptype, ARPHRD_ETHER);
-        return -1;
-    }
-
-    /* Determine which versions of TPACKET the socket supports. */
-    if (determine_version(afpc, instance) != DAQ_SUCCESS)
-        return -1;
-
-    /* Request the kernel RX ring from af_packet... */
-    if (create_ring(afpc, instance, &instance->rx_ring, PACKET_RX_RING) != DAQ_SUCCESS)
-        return -1;
-    /* ...request the kernel TX ring from af_packet if we're in inline mode... */
-    if (instance->peer && create_ring(afpc, instance, &instance->tx_ring, PACKET_TX_RING) != DAQ_SUCCESS)
-        return -1;
-    /* ...map the memory for the kernel ring(s) into userspace... */
-    if (mmap_rings(afpc, instance) != DAQ_SUCCESS)
-        return -1;
-    /* ...and, finally, set up a userspace ring buffer to represent the kernel RX ring... */
-    if (set_up_ring(afpc, instance, &instance->rx_ring) != DAQ_SUCCESS)
-        return -1;
-    /* ...as well as one for the TX ring if we're in inline mode... */
-    if (instance->peer && set_up_ring(afpc, instance, &instance->tx_ring) != DAQ_SUCCESS)
-        return -1;
 #ifdef PACKET_FANOUT
-    /* ...and configure packet fanout if requested. */
+    /* Configure packet fanout if requested.  This must happen after the final binding. */
     if (afpc->fanout_cfg.enabled && configure_fanout(afpc, instance) != DAQ_SUCCESS)
         return -1;
 #endif
@@ -629,7 +688,8 @@ static void update_hw_stats(AFPacket_Context_t *afpc)
         memset(&kstats, 0, len);
         if (getsockopt(instance->fd, SOL_PACKET, PACKET_STATISTICS, &kstats, &len) > -1)
         {
-            /* The IOCTL adds tp_drops to tp_packets in the returned structure for some mind-boggling reason... */
+            /* tp_packets is a superset of tp_drops as it is incremented prior to the processing
+                that determines the copy will be dropped/not made. */
             afpc->stats.hw_packets_received += kstats.tp_packets - kstats.tp_drops;
             afpc->stats.hw_packets_dropped += kstats.tp_drops;
         }
@@ -720,7 +780,7 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleIn
     char *name1, *name2, *dev;
     char intf[IFNAMSIZ];
     size_t len;
-    int num_rings, num_intfs = 0;
+    int num_intfs = 0;
     int rval = DAQ_ERROR;
 
     afpc = calloc(1, sizeof(AFPacket_Context_t));
@@ -753,68 +813,6 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleIn
         goto err;
     }
 
-    while (*dev != '\0')
-    {
-        len = strcspn(dev, ":");
-        if (len >= IFNAMSIZ)
-        {
-            SET_ERROR(modinst, "%s: Interface name too long! (%zu)", __func__, len);
-            goto err;
-        }
-        if (len != 0)
-        {
-            afpc->intf_count++;
-            if (afpc->intf_count >= AF_PACKET_MAX_INTERFACES)
-            {
-                SET_ERROR(modinst, "%s: Using more than %d interfaces is not supported!", __func__, AF_PACKET_MAX_INTERFACES);
-                goto err;
-            }
-            snprintf(intf, len + 1, "%s", dev);
-            afi = create_instance(afpc, intf);
-            if (!afi)
-                goto err;
-
-            afi->next = afpc->instances;
-            afpc->instances = afi;
-            num_intfs++;
-            if (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE)
-            {
-                if (num_intfs == 2)
-                {
-                    name1 = afpc->instances->next->name;
-                    name2 = afpc->instances->name;
-
-                    if (create_bridge(afpc, name1, name2) != DAQ_SUCCESS)
-                    {
-                        SET_ERROR(modinst, "%s: Couldn't create the bridge between %s and %s!", __func__, name1, name2);
-                        goto err;
-                    }
-                    num_intfs = 0;
-                }
-                else if (num_intfs > 2)
-                    break;
-            }
-        }
-        else
-            len = 1;
-        dev += len;
-    }
-
-    /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE && num_intfs != 0))
-    {
-        SET_ERROR(modinst, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
-        goto err;
-    }
-
-    uint32_t pool_size = daq_base_api.config_get_msg_pool_size(modcfg);
-    if ((rval = create_packet_pool(afpc, pool_size ? pool_size : AF_PACKET_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
-        goto err;
-
-    /*
-     * Determine the dimensions of the kernel RX ring(s) to request.
-     */
-    /* 1. Find the total desired packet buffer memory for all instances. */
     const char *varKey, *varValue;
     daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
@@ -878,22 +876,96 @@ static int afpacket_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleIn
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
 
-    /* Fall back to the environment variable. */
     uint32_t size;
-    if (!size_str)
-        size_str = getenv("AF_PACKET_BUFFER_SIZE");
     if (size_str && strcmp("max", size_str) != 0)
         size = strtoul(size_str, NULL, 10);
     else
         size = AF_PACKET_DEFAULT_BUFFER_SIZE;
-    /* The size is specified in megabytes. */
+    /* The size is specified in megabytes.  Convert it to bytes. */
     size = size * 1024 * 1024;
 
-    /* 2. Divide it evenly across the number of rings.  (One per passive interface, two per inline.) */
-    num_rings = 0;
+    while (*dev != '\0')
+    {
+        len = strcspn(dev, ":");
+        if (len >= IFNAMSIZ)
+        {
+            SET_ERROR(modinst, "%s: Interface name too long! (%zu)", __func__, len);
+            goto err;
+        }
+        if (len != 0)
+        {
+            afpc->intf_count++;
+            if (afpc->intf_count >= AF_PACKET_MAX_INTERFACES)
+            {
+                SET_ERROR(modinst, "%s: Using more than %d interfaces is not supported!", __func__, AF_PACKET_MAX_INTERFACES);
+                goto err;
+            }
+            snprintf(intf, len + 1, "%s", dev);
+            afi = create_instance(afpc, intf);
+            if (!afi)
+                goto err;
+
+            afi->next = afpc->instances;
+            afpc->instances = afi;
+            num_intfs++;
+            if (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE)
+            {
+                if (num_intfs == 2)
+                {
+                    name1 = afpc->instances->next->name;
+                    name2 = afpc->instances->name;
+
+                    if (create_bridge(afpc, name1, name2) != DAQ_SUCCESS)
+                    {
+                        SET_ERROR(modinst, "%s: Couldn't create the bridge between %s and %s!", __func__, name1, name2);
+                        goto err;
+                    }
+                    num_intfs = 0;
+                }
+                else if (num_intfs > 2)
+                    break;
+            }
+        }
+        else
+            len = 1;
+        dev += len;
+    }
+
+    /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
+    if (!afpc->instances || (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE && num_intfs != 0))
+    {
+        SET_ERROR(modinst, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
+        goto err;
+    }
+
+    /*
+     * Determine the dimensions of the kernel RX/TX ring(s) to request.
+     * Divide the total packet buffer memory evenly across the number of rings.
+     * (One per passive interface, two per inline.)
+     */
+    unsigned num_rings = 0;
     for (afi = afpc->instances; afi; afi = afi->next)
         num_rings += afi->peer ? 2 : 1;
-    afpc->size = size / num_rings;
+    afpc->ring_size = size / num_rings;
+
+    /* Create the RX (and potentially TX) rings and map them into userspace. */
+    for (afi = afpc->instances; afi; afi = afi->next)
+    {
+        if ((rval = create_instance_rings(afpc, afi)) != DAQ_SUCCESS)
+            goto err;
+    }
+
+    /* Finally, create the message buffer pool. */
+    uint32_t pool_size = daq_base_api.config_get_msg_pool_size(modcfg);
+    if (pool_size == 0)
+    {
+        /* Default the pool size to 10% of the allocated RX frames. */
+        for (afi = afpc->instances; afi; afi = afi->next)
+            pool_size += afi->rx_ring.layout.tp_frame_nr;
+        pool_size /= 10;
+    }
+    if ((rval = create_packet_pool(afpc, pool_size ? pool_size : AF_PACKET_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
+        goto err;
 
     afpc->curr_instance = afpc->instances;
 
@@ -1082,7 +1154,11 @@ static int afpacket_daq_get_snaplen(void *handle)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
 
-    return afpc->snaplen;
+    /* Note: This returns the maximum capture length that will be returned by the kernel.
+        It is slightly larger than the originally requested snaplen due to reserving room
+        for reconstructing the VLAN tag as well as rounding up due to alignment. */
+
+    return afpc->instances->actual_snaplen;
 }
 
 static uint32_t afpacket_daq_get_capabilities(void *handle)
@@ -1114,7 +1190,7 @@ static int afpacket_daq_get_device_index(void *handle, const char *device)
     return DAQ_ERROR_NODEV;
 }
 
-static inline AFPacketEntry *afpacket_find_packet(AFPacket_Context_t *afpc)
+static inline AFPacketEntry *find_packet(AFPacket_Context_t *afpc)
 {
     AFPacketInstance *instance;
     AFPacketEntry *entry;
@@ -1135,12 +1211,12 @@ static inline AFPacketEntry *afpacket_find_packet(AFPacket_Context_t *afpc)
     return NULL;
 }
 
-static inline int afpacket_wait_for_packet(AFPacket_Context_t *afpc)
+static inline DAQ_RecvStatus wait_for_packet(AFPacket_Context_t *afpc)
 {
     AFPacketInstance *instance;
     struct pollfd pfd[AF_PACKET_MAX_INTERFACES];
     uint32_t i;
-    int ret;
+    int ret = 0;
 
     for (i = 0, instance = afpc->instances; instance; i++, instance = instance->next)
     {
@@ -1148,38 +1224,61 @@ static inline int afpacket_wait_for_packet(AFPacket_Context_t *afpc)
         pfd[i].revents = 0;
         pfd[i].events = POLLIN;
     }
-    ret = poll(pfd, afpc->intf_count, afpc->timeout);
-    /* If we were interrupted by a signal, start the loop over.  The user should call daq_breakloop to actually exit. */
-    if (ret < 0)
+    /* Chop the timeout into one second chunks (plus any remainer) to improve responsiveness to
+        breakloop interruption when there is no traffic and the timeout is very long (or unlimited). */
+    int timeout = afpc->timeout;
+    while (timeout != 0)
     {
-        if (errno != EINTR)
+        /* If the receive has been canceled, break out of the loop and return. */
+        if (afpc->break_loop)
+        {
+            afpc->break_loop = false;
+            return DAQ_RSTAT_INTERRUPTED;
+        }
+
+        int poll_timeout;
+        if (timeout >= 1000)
+        {
+            poll_timeout = 1000;
+            timeout -= 1000;
+        }
+        else if (timeout > 0)
+        {
+            poll_timeout = timeout;
+            timeout = 0;
+        }
+        else
+            poll_timeout = 1000;
+
+        ret = poll(pfd, afpc->intf_count, poll_timeout);
+        /* If some number of of sockets have events returned, check them all for badness. */
+        if (ret > 0)
+        {
+            for (i = 0; i < afpc->intf_count; i++)
+            {
+                if (pfd[i].revents & (POLLHUP | POLLRDHUP | POLLERR | POLLNVAL))
+                {
+                    if (pfd[i].revents & (POLLHUP | POLLRDHUP))
+                        SET_ERROR(afpc->modinst, "%s: Hang-up on a packet socket", __func__);
+                    else if (pfd[i].revents & POLLERR)
+                        SET_ERROR(afpc->modinst, "%s: Encountered error condition on a packet socket", __func__);
+                    else if (pfd[i].revents & POLLNVAL)
+                        SET_ERROR(afpc->modinst, "%s: Invalid polling request on a packet socket", __func__);
+                    return DAQ_RSTAT_ERROR;
+                }
+            }
+            /* All good! A packet should be waiting for us somewhere. */
+            return DAQ_RSTAT_OK;
+        }
+        /* If we were interrupted by a signal, start the loop over.  The user should call daq_breakloop to actually exit. */
+        if (ret < 0 && errno != EINTR)
         {
             SET_ERROR(afpc->modinst, "%s: Poll failed: %s (%d)", __func__, strerror(errno), errno);
-            return DAQ_ERROR;
-        }
-        return DAQ_ERROR_AGAIN;
-    }
-    /* The poll timed out? */
-    if (ret == 0)
-        return 0;
-    /* If some number of of sockets have events returned, check them all for badness. */
-    if (ret > 0)
-    {
-        for (i = 0; i < afpc->intf_count; i++)
-        {
-            if (pfd[i].revents & (POLLHUP | POLLRDHUP | POLLERR | POLLNVAL))
-            {
-                if (pfd[i].revents & (POLLHUP | POLLRDHUP))
-                    SET_ERROR(afpc->modinst, "%s: Hang-up on a packet socket", __func__);
-                else if (pfd[i].revents & POLLERR)
-                    SET_ERROR(afpc->modinst, "%s: Encountered error condition on a packet socket", __func__);
-                else if (pfd[i].revents & POLLNVAL)
-                    SET_ERROR(afpc->modinst, "%s: Invalid polling request on a packet socket", __func__);
-                return DAQ_ERROR;
-            }
+            return DAQ_RSTAT_ERROR;
         }
     }
-    return 1;
+
+    return DAQ_RSTAT_TIMEOUT;
 }
 
 static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
@@ -1187,145 +1286,133 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
     AFPacketInstance *instance;
     DAQ_RecvStatus status = DAQ_RSTAT_OK;
-    unsigned idx;
+    unsigned idx = 0;
 
-    for (idx = 0; idx < max_recv; idx++)
+    while (idx < max_recv)
     {
+        /* Check to see if the receive has been canceled.  If so, reset it and return appropriately. */
+        if (afpc->break_loop)
+        {
+            afpc->break_loop = false;
+            status = DAQ_RSTAT_INTERRUPTED;
+            break;
+        }
+
         /* Make sure that we have a packet descriptor available to populate. */
         AFPacketPktDesc *desc = afpc->pool.freelist;
         if (!desc)
         {
-            *rstat = DAQ_RSTAT_NOBUF;
+            status = DAQ_RSTAT_NOBUF;
             break;
         }
 
-        /* Attempt to receive a packet into it, skipping filtered packets along the way. */
-        do
+        /* Try to find a packet ready for processing from one of the RX rings. */
+        AFPacketEntry *entry = find_packet(afpc);
+        if (!entry)
         {
-            AFPacketEntry *entry = afpacket_find_packet(afpc);
-            if (!entry)
+            /* Only block waiting for a packet if we haven't received anything yet. */
+            /* FIXIT-L - Bad interaction with leading packets filtered by BPF? */
+            if (idx != 0)
             {
-                /* Only block waiting for a packet if we haven't received anything yet. */
-                if (idx != 0)
-                {
-                    status = DAQ_RSTAT_WOULD_BLOCK;
-                    break;
-                }
-                while (status == DAQ_RSTAT_OK)
-                {
-                    int ret = afpacket_wait_for_packet(afpc);
-                    if (ret <= 0)
-                    {
-                        if (ret == 0)
-                            status = DAQ_RSTAT_TIMEOUT;
-                        else if (ret == DAQ_ERROR_AGAIN)
-                        {
-                            if (afpc->break_loop)
-                            {
-                                afpc->break_loop = false;
-                                status = DAQ_RSTAT_INTERRUPTED;
-                            }
-                        }
-                        else
-                            status = DAQ_RSTAT_ERROR;
-                    }
-                    break;
-                }
-                if (status != DAQ_RSTAT_OK)
-                    break;
-                continue;
-            }
-            unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
-            tp_len = entry->hdr.h2->tp_len;
-            tp_mac = entry->hdr.h2->tp_mac;
-            tp_snaplen = entry->hdr.h2->tp_snaplen;
-            tp_sec = entry->hdr.h2->tp_sec;
-            tp_usec = entry->hdr.h2->tp_nsec / 1000;
-            instance = afpc->curr_instance;
-            if (tp_mac + tp_snaplen > instance->rx_ring.layout.tp_frame_size)
-            {
-                SET_ERROR(afpc->modinst, "%s: Corrupted frame on kernel ring (MAC offset %u + CapLen %u > FrameSize %d)",
-                        __func__, tp_mac, tp_snaplen, afpc->curr_instance->rx_ring.layout.tp_frame_size);
-                status = DAQ_RSTAT_ERROR;
+                status = DAQ_RSTAT_WOULD_BLOCK;
                 break;
             }
-            uint8_t *data = entry->hdr.raw + tp_mac;
-            /* Make a valiant attempt at reconstructing the VLAN tag if it has been stripped.  This really sucks. :( */
-            if ((instance->tp_version == TPACKET_V2) &&
+            status = wait_for_packet(afpc);
+            if (status != DAQ_RSTAT_OK)
+                break;
+            continue;
+        }
+
+        unsigned int tp_len, tp_mac, tp_snaplen, tp_sec, tp_usec;
+        tp_len = entry->hdr.h2->tp_len;
+        tp_mac = entry->hdr.h2->tp_mac;
+        tp_snaplen = entry->hdr.h2->tp_snaplen;
+        tp_sec = entry->hdr.h2->tp_sec;
+        tp_usec = entry->hdr.h2->tp_nsec / 1000;
+        instance = afpc->curr_instance;
+        if (tp_mac + tp_snaplen > instance->rx_ring.layout.tp_frame_size)
+        {
+            SET_ERROR(afpc->modinst, "%s: Corrupted frame on kernel ring (MAC offset %u + CapLen %u > FrameSize %d)",
+                    __func__, tp_mac, tp_snaplen, afpc->curr_instance->rx_ring.layout.tp_frame_size);
+            status = DAQ_RSTAT_ERROR;
+            break;
+        }
+
+        uint8_t *data = entry->hdr.raw + tp_mac;
+        /* Make a valiant attempt at reconstructing the VLAN tag if it has been stripped by moving the 
+           MAC addresses backward into the reserved space to make room for the VLAN tag and filling
+           that tag structure in.  */
+        if (
 #if defined(TP_STATUS_VLAN_VALID)
-                    (entry->hdr.h2->tp_vlan_tci || (entry->hdr.h2->tp_status & TP_STATUS_VLAN_VALID)) &&
+                (entry->hdr.h2->tp_vlan_tci || (entry->hdr.h2->tp_status & TP_STATUS_VLAN_VALID)) &&
 #else
-                    entry->hdr.h2->tp_vlan_tci &&
+                entry->hdr.h2->tp_vlan_tci &&
 #endif
-                    tp_snaplen >= (unsigned int) vlan_offset)
-            {
-                struct vlan_tag *tag;
+                tp_snaplen >= (unsigned int) vlan_offset)
+        {
+            struct vlan_tag *tag;
 
-                data -= VLAN_TAG_LEN;
-                memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
+            data -= VLAN_TAG_LEN;
+            memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
 
-                tag = (struct vlan_tag *) (data + vlan_offset);
+            tag = (struct vlan_tag *) (data + vlan_offset);
 #if defined(TP_STATUS_VLAN_TPID_VALID)
-                if (entry->hdr.h2->tp_vlan_tpid && (entry->hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
-                    tag->vlan_tpid = htons(entry->hdr.h2->tp_vlan_tpid);
-                else
+            if (entry->hdr.h2->tp_vlan_tpid && (entry->hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
+                tag->vlan_tpid = htons(entry->hdr.h2->tp_vlan_tpid);
+            else
 #endif
-                    tag->vlan_tpid = htons(ETH_P_8021Q);
-                tag->vlan_tci = htons(entry->hdr.h2->tp_vlan_tci);
+                tag->vlan_tpid = htons(ETH_P_8021Q);
+            tag->vlan_tci = htons(entry->hdr.h2->tp_vlan_tci);
 
-                tp_snaplen += VLAN_TAG_LEN;
-                tp_len += VLAN_TAG_LEN;
-            }
+            tp_snaplen += VLAN_TAG_LEN;
+            tp_len += VLAN_TAG_LEN;
+        }
 #ifdef LIBPCAP_AVAILABLE
-            /* Check to see if this hits the BPF.  If it does, dispose of it and
-               move on to the next packet (transmitting in the inline scenario). */
-            if (afpc->fcode.bf_insns && bpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
-            {
-                afpc->stats.packets_filtered++;
-                afpacket_transmit_packet(instance->peer, data, tp_snaplen);
-                entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
-                continue;
-            }
-#endif
-            /* Populate the packet descriptor, copying the packet data and releasing the packet
-                ring entry back to the kernel for reuse. */
-            memcpy(desc->data, data, tp_snaplen);
+        /* Check to see if this hits the BPF.  If it does, dispose of it and
+           move on to the next packet (transmitting in the inline scenario). */
+        if (afpc->fcode.bf_insns && bpf_filter(afpc->fcode.bf_insns, data, tp_len, tp_snaplen) == 0)
+        {
+            afpc->stats.packets_filtered++;
+            afpacket_transmit_packet(instance->peer, data, tp_snaplen);
             entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
-            desc->instance = instance;
-            desc->length = tp_snaplen;
+            continue;
+        }
+#endif
+        /* Populate the packet descriptor, copying the packet data and releasing the packet
+           ring entry back to the kernel for reuse. */
+        memcpy(desc->data, data, tp_snaplen);
+        entry->hdr.h2->tp_status = TP_STATUS_KERNEL;
+        desc->instance = instance;
+        desc->length = tp_snaplen;
 
-            /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */
-            DAQ_Msg_t *msg = &desc->msg;
-            msg->data_len = tp_len;
+        /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */
+        DAQ_Msg_t *msg = &desc->msg;
+        msg->data_len = tp_snaplen;
 
-            /* Then, set up the DAQ packet header. */
-            DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
-            pkthdr->ts.tv_sec = tp_sec;
-            pkthdr->ts.tv_usec = tp_usec;
-            pkthdr->pktlen = tp_len;
-            pkthdr->ingress_index = instance->index;
-            pkthdr->egress_index = instance->peer ? instance->peer->index : DAQ_PKTHDR_UNKNOWN;
-            pkthdr->flags = 0;
-            /* The following fields should remain in their virgin state:
-                address_space_id (0)
-                ingress_group (DAQ_PKTHDR_UNKNOWN)
-                egress_group (DAQ_PKTHDR_UNKNOWN)
-                opaque (0)
-                flow_id (0)
-            */
+        /* Then, set up the DAQ packet header. */
+        DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
+        pkthdr->ts.tv_sec = tp_sec;
+        pkthdr->ts.tv_usec = tp_usec;
+        pkthdr->pktlen = tp_len;
+        pkthdr->ingress_index = instance->index;
+        pkthdr->egress_index = instance->peer ? instance->peer->index : DAQ_PKTHDR_UNKNOWN;
+        pkthdr->flags = 0;
+        /* The following fields should remain in their virgin state:
+            address_space_id (0)
+            ingress_group (DAQ_PKTHDR_UNKNOWN)
+            egress_group (DAQ_PKTHDR_UNKNOWN)
+            opaque (0)
+            flow_id (0)
+         */
 
-            /* Last, but not least, extract this descriptor from the free list and 
-                place the message in the return vector. */
-            afpc->pool.freelist = desc->next;
-            desc->next = NULL;
-            afpc->pool.info.available--;
-            msgs[idx] = &desc->msg;
+        /* Last, but not least, extract this descriptor from the free list and 
+           place the message in the return vector. */
+        afpc->pool.freelist = desc->next;
+        desc->next = NULL;
+        afpc->pool.info.available--;
+        msgs[idx] = &desc->msg;
 
-            break;
-        } while (!afpc->break_loop);
-
-        if (status != DAQ_RSTAT_OK || afpc->break_loop)
-            break;
+        idx++;
     }
 
     *rstat = status;
