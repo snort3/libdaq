@@ -27,6 +27,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -84,16 +85,29 @@ typedef struct _DAQTestConfig
     DAQ_Verdict default_verdict;
     PingAction ping_action;
     IPv4Addr *ip_addrs;
+    unsigned thread_count;
     bool list_and_exit;
-    bool dump_unknown_ingress;
     bool modify_opaque_value;
     bool performance_mode;
     bool dump_packets;
 } DAQTestConfig;
 
+typedef struct _DAQTestThreadContext
+{
+    const DAQTestConfig *cfg;
+    DAQ_Instance_h instance;
+    pthread_t tid;
+    unsigned long packet_count;
+    void *newconfig;
+    void *oldconfig;
+    volatile bool done;
+    volatile bool exited;
+} DAQTestThreadContext;
+
 typedef struct _DAQTestPacket
 {
     DAQ_Msg_h msg;
+    const DAQTestThreadContext *ctxt;
     const DAQ_PktHdr_t *hdr;
     const uint8_t *packet;
     const struct ether_header *eth;
@@ -126,11 +140,7 @@ static uint8_t normal_ping_data[IP_MAXPACKET];
 static uint8_t fake_ping_data[IP_MAXPACKET];
 static uint8_t local_mac_addr[ETH_ALEN];
 
-static volatile sig_atomic_t notdone = 1;
-static DAQTestConfig dtc;
-static DAQ_Instance_h instance = NULL;
-static unsigned long packet_count = 0;
-static unsigned long meta_count = 0;
+static volatile sig_atomic_t pending_signal = 0;
 static int dlt;
 
 const char *ping_action_strings[MAX_PING_ACTION+1] =
@@ -141,20 +151,7 @@ const char *ping_action_strings[MAX_PING_ACTION+1] =
 
 static void handler(int sig)
 {
-    void *newconfig, *oldconfig;
-    switch(sig)
-    {
-        case SIGTERM:
-        case SIGINT:
-            daq_instance_breakloop(instance);
-            notdone = 0;
-            break;
-        case SIGHUP:
-            daq_instance_config_load(instance, &newconfig);
-            daq_instance_config_swap(instance, newconfig, &oldconfig);
-            daq_instance_config_free(instance, oldconfig);
-            break;
-    }
+    pending_signal = sig;
 }
 
 static void usage(void)
@@ -178,6 +175,7 @@ static void usage(void)
     printf("  -v                Increase the verbosity level of the DAQ library (may be specified multiple times)\n");
     printf("  -V <verdict>      Specify a default verdict to render on packets (pass (default), block, blacklist, whitelist)\n");
     printf("  -x                Print a hexdump of each packet received\n");
+    printf("  -z <num>          Specify the number of packet threads to run (default = 1)\n");
 }
 
 static void print_mac(const uint8_t *addr)
@@ -400,7 +398,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
 {
     int rc;
 
-    switch (dtc.ping_action)
+    switch (dtp->ctxt->cfg->ping_action)
     {
         case PING_ACTION_PASS:
             break;
@@ -414,11 +412,11 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
                 reply = forge_icmp_reply(dtp);
                 reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + ntohs(dtp->ip->tot_len);
                 printf("Injecting forged ICMP reply back to source! (%zu bytes)\n", reply_len);
-                rc = daq_instance_inject(instance, dtp->msg, reply, reply_len, 1);
+                rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
-                    printf("Failed to inject ICMP reply: %s\n", daq_instance_get_error(instance));
+                    printf("Failed to inject ICMP reply: %s\n", daq_instance_get_error(dtp->ctxt->instance));
                 free(reply);
                 return DAQ_VERDICT_BLOCK;
             }
@@ -448,11 +446,11 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             if (dtp->eth)
             {
                 printf("Injecting cloned ICMP packet.\n");
-                rc = daq_instance_inject(instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
+                rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
-                    printf("Failed to inject cloned ICMP packet: %s\n", daq_instance_get_error(instance));
+                    printf("Failed to inject cloned ICMP packet: %s\n", daq_instance_get_error(dtp->ctxt->instance));
                 printf("Blocking the original ICMP packet.\n");
                 return DAQ_VERDICT_BLOCK;
             }
@@ -475,7 +473,7 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
         return process_ping(dtp);
     }
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
@@ -492,7 +490,7 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
         //return process_ping(dtp);
     }
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static DAQ_Verdict process_arp(DAQTestPacket *dtp)
@@ -508,7 +506,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
             dtp->arp->ar_pln, ntohs(dtp->arp->ar_op));
 
     if (ntohs(dtp->arp->ar_hrd) != ARPHRD_ETHER)
-        return dtc.default_verdict;
+        return dtp->ctxt->cfg->default_verdict;
 
     etharp = (const struct ether_arp *) dtp->arp;
 
@@ -523,24 +521,24 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     printf(" (%s)\n", inet_ntoa(addr));
 
     if (ntohs(dtp->arp->ar_op) != ARPOP_REQUEST || ntohs(dtp->arp->ar_pro) != ETH_P_IP)
-        return dtc.default_verdict;
+        return dtp->ctxt->cfg->default_verdict;
 
-    for (ip = dtc.ip_addrs; ip; ip = ip->next)
+    for (ip = dtp->ctxt->cfg->ip_addrs; ip; ip = ip->next)
     {
         if (!memcmp(&addr, &ip->addr, sizeof(addr)))
             break;
     }
 
     /* Only perform Ethernet ARP spoofing when in ping spoofing mode and passive mode. */
-    //if (!ip && (dtc.ping_action != PING_ACTION_SPOOF || dtc.mode != DAQ_MODE_PASSIVE))
-    if (!ip || dtc.ping_action != PING_ACTION_SPOOF)
-       return dtc.default_verdict;
+    //if (!ip && (dtp->ctxt->cfg->ping_action != PING_ACTION_SPOOF || dtp->ctxt->cfg->mode != DAQ_MODE_PASSIVE))
+    if (!ip || dtp->ctxt->cfg->ping_action != PING_ACTION_SPOOF)
+       return dtp->ctxt->cfg->default_verdict;
 
     reply = forge_etharp_reply(dtp, local_mac_addr);
     reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(struct ether_arp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
-    if (daq_instance_inject(instance, dtp->msg, reply, reply_len, 1))
-        printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(instance));
+    if (daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1))
+        printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(dtp->ctxt->instance));
     free(reply);
 
     return DAQ_VERDICT_BLOCK;
@@ -577,7 +575,7 @@ static DAQ_Verdict process_ip6(DAQTestPacket *dtp)
             printf(" Protocol: unknown\n");
     }
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static DAQ_Verdict process_ip(DAQTestPacket *dtp)
@@ -611,7 +609,7 @@ static DAQ_Verdict process_ip(DAQTestPacket *dtp)
             printf(" Protocol: unknown\n");
     }
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static DAQ_Verdict process_eth(DAQTestPacket *dtp)
@@ -649,7 +647,7 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
     if (dtp->ip6)
         return process_ip6(dtp);
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static DAQ_Verdict process_packet(DAQTestPacket *dtp)
@@ -672,7 +670,7 @@ static DAQ_Verdict process_packet(DAQTestPacket *dtp)
             printf("Unhandled datalink type: %d!\n", dlt);
     }
 
-    return dtc.default_verdict;
+    return dtp->ctxt->cfg->default_verdict;
 }
 
 static void decode_icmp(DAQTestPacket *dtp, const uint8_t *cursor)
@@ -812,18 +810,19 @@ static void decode_packet(DAQTestPacket *dtp, const uint8_t *packet, const DAQ_P
     }
 }
 
-static DAQ_Verdict handle_packet_message(DAQ_Msg_h msg)
+static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
 {
     const DAQ_PktHdr_t *hdr = daq_msg_get_pkthdr(msg);
     const uint8_t *data = daq_msg_get_data(msg);
+    const DAQTestConfig *cfg = ctxt->cfg;
 
-    packet_count++;
+    ctxt->packet_count++;
 
-    if (dtc.delay)
-        usleep(dtc.delay * 1000);
+    if (cfg->delay)
+        usleep(cfg->delay * 1000);
 
-    if (dtc.performance_mode)
-        return dtc.default_verdict;
+    if (cfg->performance_mode)
+        return cfg->default_verdict;
 
     printf("\nGot Packet! Size = %u/%u, Ingress = %d (Group = %d), Egress = %d (Group = %d), Addr Space ID = %u",
             daq_msg_get_data_len(msg), hdr->pktlen, hdr->ingress_index, hdr->ingress_group,
@@ -875,27 +874,23 @@ static DAQ_Verdict handle_packet_message(DAQ_Msg_h msg)
             printf("ERROR_PACKET ");
         printf("\n");
     }
-    if (hdr->ingress_index < 0 && dtc.dump_unknown_ingress)
-    {
-        printf("Dumping packet data for packet with unknown ingress:\n");
-        print_hex_dump(data, daq_msg_get_data_len(msg));
-    }
-    else if (dtc.dump_packets)
+    if (cfg->dump_packets)
         print_hex_dump(data, daq_msg_get_data_len(msg));
 
-    if (dtc.modify_opaque_value)
+    if (cfg->modify_opaque_value)
     {
         DAQ_ModFlow_t modify;
 
         modify.type = DAQ_MODFLOW_TYPE_OPAQUE;
         modify.length = sizeof(uint32_t);
-        modify.value = &packet_count;
-        daq_instance_modify_flow(instance, msg, &modify);
+        modify.value = &ctxt->packet_count;
+        daq_instance_modify_flow(ctxt->instance, msg, &modify);
     }
 
     DAQTestPacket dtp;
     memset(&dtp, 0, sizeof(dtp));
     dtp.msg = msg;
+    dtp.ctxt = ctxt;
     decode_packet(&dtp, data, hdr);
 
     return process_packet(&dtp);
@@ -906,8 +901,6 @@ static void handle_flow_stats_message(DAQ_Msg_h msg)
     const Flow_Stats_t *stats = (const Flow_Stats_t *) daq_msg_get_hdr(msg);
     char addr_str[INET6_ADDRSTRLEN];
     const struct in6_addr* tmpIp;
-
-    meta_count++;
 
     if (msg->type == DAQ_MSG_TYPE_SOF)
         printf("Received SoF metapacket.\n");
@@ -1022,7 +1015,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
-    const char *options = "A:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:x";
+    const char *options = "A:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:xz:";
     char *endptr;
     int ch;
 
@@ -1031,6 +1024,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
     cfg->snaplen = 1518;
     cfg->default_verdict = DAQ_VERDICT_PASS;
     cfg->ping_action = PING_ACTION_PASS;
+    cfg->thread_count = 1;
     cfg->module_configs = daqtest_module_config_new();
     if (!cfg->module_configs)
         return -1;
@@ -1223,6 +1217,16 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 cfg->dump_packets = true;
                 break;
 
+            case 'z':
+                errno = 0;
+                cfg->thread_count = strtoul(optarg, &endptr, 10);
+                if (*endptr != '\0' || errno != 0 || cfg->thread_count == 0)
+                {
+                    fprintf(stderr, "Invalid thread count specified: %s\n\n", optarg);
+                    return -1;
+                }
+                break;
+
             default:
                 fprintf(stderr, "Invalid argument specified (%c)!\n", ch);
                 return -1;
@@ -1283,125 +1287,31 @@ static void print_config(DAQTestConfig *cfg)
         printf("  In performance mode, no decoding will be done!\n");
 }
 
-int main(int argc, char *argv[])
+static void *processing_thread(void *arg)
 {
-    struct sigaction action;
-    DAQTestModuleConfig *dtmc;
-    DAQTestConfig *cfg;
-    DAQ_ModuleConfig_h modcfg;
-    DAQ_Module_h module;
-    DAQ_Config_h config;
+    DAQTestThreadContext *ctxt = (DAQTestThreadContext *) arg;
+    const DAQTestConfig *cfg = ctxt->cfg;
     DAQ_Stats_t stats;
-    unsigned int i, max_recv, timeout_count;
-    char *key, *value;
-    char errbuf[256];
     uint64_t recv_counters[MAX_DAQ_RSTAT];
+    unsigned int i, max_recv, timeout_count;
     int rval;
 
-    cfg = &dtc;
-    if ((rval = parse_command_line(argc, argv, cfg)) != 0)
-        return rval;
-
-    if ((!cfg->input || !cfg->module_configs->module_name) && !cfg->list_and_exit)
-    {
-        usage();
-        return -1;
-    }
-
-    daq_set_verbosity(cfg->verbosity);
-#ifdef USE_STATIC_MODULES
-    daq_load_static_modules(static_modules);
-#endif
-    daq_load_dynamic_modules(cfg->module_paths);
-
-    if (cfg->list_and_exit)
-    {
-        print_daq_modules();
-        return 0;
-    }
-
-    print_config(cfg);
-
-    if ((rval = daq_config_new(&config)) != DAQ_SUCCESS)
-    {
-        fprintf(stderr, "Error allocating a new DAQ configuration object! (%d)\n", rval);
-        return rval;
-    }
-
-    daq_config_set_input(config, cfg->input);
-    daq_config_set_snaplen(config, cfg->snaplen);
-    daq_config_set_timeout(config, cfg->timeout);
-
-    for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
-    {
-        module = daq_find_module(dtmc->module_name);
-        if (!module)
-        {
-            fprintf(stderr, "Could not find requested module: %s!\n", dtmc->module_name);
-            return -1;
-        }
-
-        if ((rval = daq_module_config_new(&modcfg, module)) != DAQ_SUCCESS)
-        {
-            fprintf(stderr, "Error allocating a new DAQ module configuration object! (%d)\n", rval);
-            return rval;
-        }
-
-        daq_module_config_set_mode(modcfg, dtmc->mode);
-
-        for (i = 0; i < dtmc->num_variables; i++)
-        {
-            key = dtmc->variables[i];
-            value = strchr(key, '=');
-            if (value)
-            {
-                *value = '\0';
-                value++;
-                if (*value == '\0')
-                    value = NULL;
-            }
-            if ((rval = daq_module_config_set_variable(modcfg, key, value)) != DAQ_SUCCESS)
-            {
-                fprintf(stderr, "Error setting DAQ configuration variable with key '%s' and value '%s'! (%d)", key, value, rval);
-                return rval;
-            }
-        }
-        if ((rval = daq_config_push_module_config(config, modcfg)) != DAQ_SUCCESS)
-        {
-            fprintf(stderr, "Error pushing DAQ module configuration for '%s' onto the DAQ config! (%d)\n", dtmc->module_name, rval);
-            return rval;
-        }
-    }
-
-    if ((rval = daq_instance_initialize(config, &instance, errbuf, sizeof(errbuf))) != 0)
-    {
-        fprintf(stderr, "Could not initialize DAQ module: (%d: %s)\n", rval, errbuf);
-        return -1;
-    }
-
-    if (daq_instance_get_capabilities(instance) & DAQ_CAPA_DEVICE_INDEX)
-    {
-        printf("Dumping packets with unknown ingress interface.\n");
-        cfg->dump_unknown_ingress = true;
-    }
-
-    /* Free the configuration object's memory. */
-    daq_config_destroy(config);
-
-    if (cfg->filter && (rval = daq_instance_set_filter(instance, cfg->filter)) != 0)
+    if (cfg->filter && (rval = daq_instance_set_filter(ctxt->instance, cfg->filter)) != 0)
     {
         fprintf(stderr, "Could not set BPF filter for DAQ module! (%d: %s)\n", rval, cfg->filter);
-        return -1;
+        goto exit;
     }
 
-    if ((rval = daq_instance_start(instance)) != DAQ_SUCCESS)
+    if ((rval = daq_instance_start(ctxt->instance)) != DAQ_SUCCESS)
     {
-        fprintf(stderr, "Could not start DAQ module: (%d: %s)\n", rval, daq_instance_get_error(instance));
-        return -1;
+        fprintf(stderr, "Could not start DAQ module: (%d: %s)\n", rval, daq_instance_get_error(ctxt->instance));
+        goto exit;
     }
+
+    printf("Snaplen: %d\n", daq_instance_get_snaplen(ctxt->instance));
 
     DAQ_MsgPoolInfo_t mpool_info;
-    if (daq_instance_get_msg_pool_info(instance, &mpool_info) == DAQ_SUCCESS)
+    if (daq_instance_get_msg_pool_info(ctxt->instance, &mpool_info) == DAQ_SUCCESS)
     {
         printf("Message Pool Info:\n");
         printf("  Size: %u\n", mpool_info.size);
@@ -1409,28 +1319,28 @@ int main(int argc, char *argv[])
         printf("  Memory Usage: %zu\n", mpool_info.mem_size);
     }
 
-    dlt = daq_instance_get_datalink_type(instance);
-
-    memset(&action, 0, sizeof(action));
-    action.sa_handler = handler;
-    sigaction(SIGTERM, &action, NULL);
-    sigaction(SIGINT, &action, NULL);
-    sigaction(SIGHUP, &action, NULL);
-
-    initialize_static_data();
-    printf("Local MAC Address: ");
-    print_mac(local_mac_addr);
-    printf("\n");
+    dlt = daq_instance_get_datalink_type(ctxt->instance);
 
     memset(recv_counters, 0, sizeof(recv_counters));
     max_recv = timeout_count = 0;
-    while (notdone && (!cfg->packet_limit || packet_count < cfg->packet_limit))
+    while (!ctxt->done && (!cfg->packet_limit || ctxt->packet_count < cfg->packet_limit))
     {
+        /* Check to see if a config swap is pending. */
+        if (ctxt->newconfig && !ctxt->oldconfig)
+        {
+            void *oldconfig;
+            rval = daq_instance_config_swap(ctxt->instance, ctxt->newconfig, &oldconfig);
+            if (rval != DAQ_SUCCESS)
+                fprintf(stderr, "Failed to swap in new config: %s (%d)", daq_instance_get_error(ctxt->instance), rval);
+            ctxt->newconfig = NULL;
+            ctxt->oldconfig = oldconfig;
+        }
+
         DAQ_Msg_h msgs[16];
         DAQ_RecvStatus rstat;
         unsigned num_recv;
 
-        num_recv = daq_instance_msg_receive(instance, 16, msgs, &rstat);
+        num_recv = daq_instance_msg_receive(ctxt->instance, 16, msgs, &rstat);
         recv_counters[rstat]++;
         if (num_recv > max_recv)
             max_recv = num_recv;
@@ -1442,7 +1352,7 @@ int main(int argc, char *argv[])
             switch (msg->type)
             {
                 case DAQ_MSG_TYPE_PACKET:
-                    verdict = handle_packet_message(msg);
+                    verdict = handle_packet_message(ctxt, msg);
                     break;
                 case DAQ_MSG_TYPE_SOF:
                 case DAQ_MSG_TYPE_EOF:
@@ -1451,7 +1361,7 @@ int main(int argc, char *argv[])
                 default:
                     break;
             }
-            daq_instance_msg_finalize(instance, msg, verdict);
+            daq_instance_msg_finalize(ctxt->instance, msg, verdict);
         }
 
         if (rstat != DAQ_RSTAT_OK && rstat != DAQ_RSTAT_WOULD_BLOCK)
@@ -1467,7 +1377,7 @@ int main(int argc, char *argv[])
             else if (rstat == DAQ_RSTAT_NOBUF)
                 printf("Ran out of buffers to use, this really shouldn't happen...\n");
             else if (rstat == DAQ_RSTAT_ERROR)
-                fprintf(stderr, "Error receiving messages: %s\n", daq_instance_get_error(instance));
+                fprintf(stderr, "Error receiving messages: %s\n", daq_instance_get_error(ctxt->instance));
             break;
         }
     }
@@ -1493,14 +1403,237 @@ int main(int argc, char *argv[])
     }
     printf("\n");
 
-    if ((rval = daq_instance_get_stats(instance, &stats)) != 0)
-        fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_instance_get_error(instance));
+    if ((rval = daq_instance_get_stats(ctxt->instance, &stats)) != 0)
+        fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_instance_get_error(ctxt->instance));
     else
         print_daq_stats(&stats);
 
-    daq_instance_stop(instance);
+    daq_instance_stop(ctxt->instance);
 
-    daq_instance_shutdown(instance);
+exit:
+    ctxt->exited = true;
+
+    return NULL;
+}
+
+static int create_daq_config(DAQTestConfig *cfg, DAQ_Config_h *daqcfg_ptr)
+{
+    int rval;
+
+    if ((rval = daq_config_new(daqcfg_ptr)) != DAQ_SUCCESS)
+    {
+        fprintf(stderr, "Error allocating a new DAQ configuration object! (%d)\n", rval);
+        return rval;
+    }
+
+    DAQTestModuleConfig *dtmc;
+    DAQ_Config_h daqcfg = *daqcfg_ptr;
+
+    daq_config_set_input(daqcfg, cfg->input);
+    daq_config_set_snaplen(daqcfg, cfg->snaplen);
+    daq_config_set_timeout(daqcfg, cfg->timeout);
+
+    for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
+    {
+        DAQ_Module_h module = daq_find_module(dtmc->module_name);
+        if (!module)
+        {
+            fprintf(stderr, "Could not find requested module: %s!\n", dtmc->module_name);
+            return -1;
+        }
+
+        DAQ_ModuleConfig_h modcfg;
+        if ((rval = daq_module_config_new(&modcfg, module)) != DAQ_SUCCESS)
+        {
+            fprintf(stderr, "Error allocating a new DAQ module configuration object! (%d)\n", rval);
+            return rval;
+        }
+
+        daq_module_config_set_mode(modcfg, dtmc->mode);
+
+        for (unsigned i = 0; i < dtmc->num_variables; i++)
+        {
+            char *key = dtmc->variables[i];
+            char *value = strchr(key, '=');
+            if (value)
+            {
+                *value = '\0';
+                value++;
+                if (*value == '\0')
+                    value = NULL;
+            }
+            if ((rval = daq_module_config_set_variable(modcfg, key, value)) != DAQ_SUCCESS)
+            {
+                fprintf(stderr, "Error setting DAQ configuration variable with key '%s' and value '%s'! (%d)", key, value, rval);
+                return rval;
+            }
+        }
+        if ((rval = daq_config_push_module_config(daqcfg, modcfg)) != DAQ_SUCCESS)
+        {
+            fprintf(stderr, "Error pushing DAQ module configuration for '%s' onto the DAQ config! (%d)\n", dtmc->module_name, rval);
+            return rval;
+        }
+    }
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    DAQTestConfig cfg;
+    DAQ_Config_h daqcfg;
+    int rval;
+
+    if ((rval = parse_command_line(argc, argv, &cfg)) != 0)
+        return rval;
+
+    if ((!cfg.input || !cfg.module_configs->module_name) && !cfg.list_and_exit)
+    {
+        usage();
+        return -1;
+    }
+
+    daq_set_verbosity(cfg.verbosity);
+#ifdef USE_STATIC_MODULES
+    daq_load_static_modules(static_modules);
+#endif
+    daq_load_dynamic_modules(cfg.module_paths);
+
+    if (cfg.list_and_exit)
+    {
+        print_daq_modules();
+        return 0;
+    }
+
+    print_config(&cfg);
+
+    initialize_static_data();
+    printf("Local MAC Address: ");
+    print_mac(local_mac_addr);
+    printf("\n");
+
+    if ((rval = create_daq_config(&cfg, &daqcfg)) != DAQ_SUCCESS)
+        return rval;
+
+    /* Allocate the packet thread contexts and instantiate a DAQ instance for each. */
+    DAQTestThreadContext *threads = calloc(cfg.thread_count, sizeof(*threads));
+
+    for (unsigned i = 0; i < cfg.thread_count; i++)
+    {
+        DAQTestThreadContext *dttc = &threads[i];
+        char errbuf[256];
+
+        if ((rval = daq_instance_initialize(daqcfg, &dttc->instance, errbuf, sizeof(errbuf))) != 0)
+        {
+            fprintf(stderr, "Could not initialize DAQ module: (%d: %s)\n", rval, errbuf);
+            return -1;
+        }
+
+        dttc->cfg = &cfg;
+    }
+
+    /* Free the configuration object's memory. */
+    daq_config_destroy(daqcfg);
+
+    /* Set up the main thread to handle signals. */
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = handler;
+    sigaction(SIGTERM, &action, NULL);
+    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGHUP, &action, NULL);
+
+    /* Spin off all of the packet threads (blocking the signals we're catching). */
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGHUP);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
+    for (unsigned i = 0; i < cfg.thread_count; i++)
+    {
+        DAQTestThreadContext *dttc = &threads[i];
+        if ((rval = pthread_create(&dttc->tid, NULL, processing_thread, dttc)) != 0)
+        {
+            fprintf(stderr, "Error creating thread: %s (%d)\n", strerror(errno), errno);
+            return -1;
+        }
+    }
+    pthread_sigmask(SIG_UNBLOCK, &set, NULL);
+
+    /* Start the main loop. */
+    const struct timespec main_sleep = { 0, 1000000 }; // 0.001 sec
+    bool notdone;
+    do
+    {
+        if (pending_signal)
+        {
+            switch (pending_signal)
+            {
+                case SIGTERM:
+                case SIGINT:
+                    printf("Sending breakloop to all instances.\n");
+                    for (unsigned i = 0; i < cfg.thread_count; i++)
+                    {
+                        DAQTestThreadContext *dttc = &threads[i];
+                        dttc->done = true;
+                        daq_instance_breakloop(dttc->instance);
+                    }
+                    break;
+
+                case SIGHUP:
+                    printf("Loading config and signaling a swap for all instances.\n");
+                    for (unsigned i = 0; i < cfg.thread_count; i++)
+                    {
+                        DAQTestThreadContext *dttc = &threads[i];
+                        if (dttc->newconfig || dttc->oldconfig)
+                        {
+                            printf("Skipping config reload for instance %u as it is still reloading.\n", i);
+                            continue;
+                        }
+                        void *newconfig;
+                        if ((rval = daq_instance_config_load(dttc->instance, &newconfig)) == DAQ_SUCCESS)
+                            dttc->newconfig = newconfig;
+                        else if (rval != DAQ_ERROR_NOTSUP)
+                            fprintf(stderr, "Failed to load new config for instance %u: %d", i, rval);
+                    }
+                    break;
+
+                default:
+                    printf("Received unrecognized signal: %d\n", pending_signal);
+            }
+            pending_signal = 0;
+        }
+
+        nanosleep(&main_sleep, NULL);
+
+        /* Check if any threads are still running and perform other housekeeping... */
+        notdone = false;
+        for (unsigned i = 0; i < cfg.thread_count; i++)
+        {
+            DAQTestThreadContext *dttc = &threads[i];
+            if (dttc->oldconfig)
+            {
+                rval = daq_instance_config_free(dttc->instance, dttc->oldconfig);
+                if (rval != DAQ_SUCCESS)
+                    fprintf(stderr, "Failed to free old config for instance %u: %d", i, rval);
+                dttc->oldconfig = NULL;
+            }
+            if (!dttc->exited)
+                notdone = true;
+        }
+    } while (notdone);
+
+    /* Clean up all of the packet threads and tear down their DAQ instances. */
+    for (unsigned i = 0; i < cfg.thread_count; i++)
+    {
+        DAQTestThreadContext *dttc = &threads[i];
+        if ((rval = pthread_join(dttc->tid, NULL)) != 0)
+        {
+            fprintf(stderr, "Error joining thread: %s (%d)\n", strerror(errno), errno);
+            return -1;
+        }
+        daq_instance_shutdown(dttc->instance);
+    }
 
     return 0;
 }
