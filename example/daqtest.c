@@ -21,12 +21,6 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
-#include <netinet/in.h>
-#include <netinet/ether.h>
-#include <netinet/icmp6.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip6.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -34,13 +28,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
 #include <daq.h>
 #include <daq_dlt.h>
+
+#include "netinet_compat.h"
 
 typedef enum
 {
@@ -110,12 +106,12 @@ typedef struct _DAQTestPacket
     const DAQTestThreadContext *ctxt;
     const DAQ_PktHdr_t *hdr;
     const uint8_t *packet;
-    const struct ether_header *eth;
-    const struct arphdr *arp;
-    const struct iphdr *ip;
-    const struct ip6_hdr *ip6;
-    const struct icmphdr *icmp;
-    const struct icmp6_hdr *icmp6;
+    const EthHdr *eth;
+    const EthArpHdr *arp;
+    const IpHdr *ip;
+    const Ip6Hdr *ip6;
+    const IcmpHdr *icmp;
+    const Icmp6Hdr *icmp6;
     const struct tcphdr *tcp;
     const struct udphdr *udp;
     uint16_t vlan_tags;
@@ -256,17 +252,17 @@ static void initialize_static_data(void)
 
 static int replace_icmp_data(DAQTestPacket *dtp)
 {
-    struct icmphdr *icmp;
+    IcmpHdr *icmp;
     uint8_t *data;
     size_t dlen;
     int offset;
     int modified = 0;
 
-    icmp = (struct icmphdr *) dtp->icmp;
+    icmp = (IcmpHdr *) dtp->icmp;
     icmp->checksum = 0;
 
-    dlen = ntohs(dtp->ip->tot_len) - sizeof(struct iphdr) - sizeof(struct icmphdr);
-    data = (uint8_t *) icmp + sizeof(struct icmphdr);
+    dlen = ntohs(dtp->ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
+    data = (uint8_t *) icmp + sizeof(IcmpHdr);
     offset = 0;
     if (dlen > sizeof(sizeof(struct timeval)))
     {
@@ -295,7 +291,7 @@ static int replace_icmp_data(DAQTestPacket *dtp)
     if (modified)
     {
         icmp->checksum = 0;
-        icmp->checksum = in_cksum((uint16_t *) icmp, ntohs(dtp->ip->tot_len) - sizeof(struct iphdr));
+        icmp->checksum = in_cksum((uint16_t *) icmp, ntohs(dtp->ip->tot_len) - sizeof(IpHdr));
     }
 
     return modified;
@@ -305,26 +301,26 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
 {
     const uint8_t *request = dtp->packet;
     uint8_t *reply;
-    const struct ether_header *eth_request;
-    struct ether_header *eth_reply;
-    const struct ether_arp *etharp_request;
-    struct ether_arp *etharp_reply;
+    const EthHdr *eth_request;
+    EthHdr *eth_reply;
+    const EthArp *etharp_request;
+    EthArp *etharp_reply;
     size_t arphdr_offset;
 
     arphdr_offset = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr);
-    reply = calloc(arphdr_offset + sizeof(struct ether_arp), sizeof(uint8_t));
+    reply = calloc(arphdr_offset + sizeof(EthArp), sizeof(uint8_t));
 
     /* Set up the ethernet header... */
     eth_request = dtp->eth;
-    eth_reply = (struct ether_header *) reply;
+    eth_reply = (EthHdr *) reply;
     memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
     memcpy(eth_reply->ether_shost, mac_addr, ETH_ALEN);
     memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
 
     /* Now the ARP header... */
-    etharp_request = (const struct ether_arp *) dtp->arp;
-    etharp_reply = (struct ether_arp *) (reply + arphdr_offset);
-    memcpy(&etharp_reply->ea_hdr, &etharp_request->ea_hdr, sizeof(struct arphdr));
+    etharp_request = (const EthArp *) dtp->arp;
+    etharp_reply = (EthArp *) (reply + arphdr_offset);
+    memcpy(&etharp_reply->ea_hdr, &etharp_request->ea_hdr, sizeof(EthArpHdr));
     etharp_reply->ea_hdr.ar_op = htons(ARPOP_REPLY);
 
     /* Finally, the ethernet ARP reply... */
@@ -340,12 +336,12 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
 {
     const uint8_t *request = dtp->packet;
     uint8_t *reply;
-    const struct ether_header *eth_request;
-    struct ether_header *eth_reply;
-    const struct iphdr *ip_request;
-    struct iphdr *ip_reply;
-    const struct icmphdr *icmp_request;
-    struct icmphdr *icmp_reply;
+    const EthHdr *eth_request;
+    EthHdr *eth_reply;
+    const IpHdr *ip_request;
+    IpHdr *ip_reply;
+    const IcmpHdr *icmp_request;
+    IcmpHdr *icmp_reply;
     uint32_t dlen;
     size_t arphdr_offset;
 
@@ -354,14 +350,14 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
 
     /* Set up the ethernet header... */
     eth_request = dtp->eth;
-    eth_reply = (struct ether_header *) reply;
+    eth_reply = (EthHdr *) reply;
     memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
     memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETH_ALEN);
     memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
 
     /* Now the IP header... */
     ip_request = dtp->ip;
-    ip_reply = (struct iphdr *) (reply + arphdr_offset);
+    ip_reply = (IpHdr *) (reply + arphdr_offset);
     ip_reply->ihl = ip_request->ihl;
     ip_reply->version = ip_request->version;
     ip_reply->tos = ip_request->tos;
@@ -377,7 +373,7 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
 
     /* And the ICMP header... */
     icmp_request = dtp->icmp;
-    icmp_reply = (struct icmphdr *) (reply + arphdr_offset + sizeof(struct iphdr));
+    icmp_reply = (IcmpHdr *) (reply + arphdr_offset + sizeof(IpHdr));
     icmp_reply->type = ICMP_ECHOREPLY;
     icmp_reply->code = 0;
     icmp_reply->checksum = 0;
@@ -385,11 +381,11 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
     icmp_reply->un.echo.sequence = icmp_request->un.echo.sequence;
 
     /* Copy the ICMP padding... */
-    dlen = ntohs(ip_request->tot_len) - sizeof(struct iphdr) - sizeof(struct icmphdr);
+    dlen = ntohs(ip_request->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     memcpy(icmp_reply + 1, icmp_request + 1, dlen);
 
     /* Last, but not least, checksum the ICMP packet */
-    icmp_reply->checksum = in_cksum((uint16_t *) icmp_reply, ntohs(ip_request->tot_len) - sizeof(struct iphdr));
+    icmp_reply->checksum = in_cksum((uint16_t *) icmp_reply, ntohs(ip_request->tot_len) - sizeof(IpHdr));
 
     return reply;
 }
@@ -463,7 +459,7 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
 {
     unsigned int dlen;
 
-    dlen = ntohs(dtp->ip->tot_len) - sizeof(struct iphdr) - sizeof(struct icmphdr);
+    dlen = ntohs(dtp->ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     printf("  ICMP: Type %hu  Code %hu  Checksum %hu  (%u bytes of data)\n",
            dtp->icmp->type, dtp->icmp->code, dtp->icmp->checksum, dlen);
     if (dtp->icmp->type == ICMP_ECHO || dtp->icmp->type == ICMP_ECHOREPLY)
@@ -480,7 +476,7 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
 {
     unsigned int dlen;
 
-    dlen = ntohs(dtp->ip6->ip6_plen) - sizeof(struct ip6_hdr) - sizeof(struct icmp6_hdr);
+    dlen = ntohs(dtp->ip6->ip6_plen) - sizeof(Ip6Hdr) - sizeof(Icmp6Hdr);
     printf("  ICMP: Type %hu  Code %hu  Checksum %hu  (%u bytes of data)\n",
            dtp->icmp6->icmp6_type, dtp->icmp6->icmp6_code, dtp->icmp6->icmp6_cksum, dlen);
     if (dtp->icmp6->icmp6_type == ICMP6_ECHO_REQUEST || dtp->icmp6->icmp6_type == ICMP6_ECHO_REPLY)
@@ -495,7 +491,7 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_arp(DAQTestPacket *dtp)
 {
-    const struct ether_arp *etharp;
+    const EthArp *etharp;
     struct in_addr addr;
     IPv4Addr *ip;
     uint8_t *reply;
@@ -508,7 +504,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     if (ntohs(dtp->arp->ar_hrd) != ARPHRD_ETHER)
         return dtp->ctxt->cfg->default_verdict;
 
-    etharp = (const struct ether_arp *) dtp->arp;
+    etharp = (const EthArp *) dtp->arp;
 
     printf("  Sender: ");
     print_mac(etharp->arp_sha);
@@ -535,7 +531,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
        return dtp->ctxt->cfg->default_verdict;
 
     reply = forge_etharp_reply(dtp, local_mac_addr);
-    reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(struct ether_arp);
+    reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(EthArp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
     if (daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1))
         printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(dtp->ctxt->instance));
@@ -556,7 +552,7 @@ static DAQ_Verdict process_ip6(DAQTestPacket *dtp)
     uint8_t next_hdr = dtp->ip6->ip6_nxt;
     if (next_hdr == IPPROTO_FRAGMENT)
     {
-        const struct ip6_frag *frag = (const struct ip6_frag *) (dtp->ip6 + 1);
+        const Ip6Frag *frag = (const Ip6Frag *) (dtp->ip6 + 1);
         next_hdr = frag->ip6f_nxt;
     }
 
@@ -675,12 +671,12 @@ static DAQ_Verdict process_packet(DAQTestPacket *dtp)
 
 static void decode_icmp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->icmp = (const struct icmphdr *) cursor;
+    dtp->icmp = (const IcmpHdr *) cursor;
 }
 
 static void decode_icmp6(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->icmp6 = (const struct icmp6_hdr *) cursor;
+    dtp->icmp6 = (const Icmp6Hdr *) cursor;
 }
 
 static void decode_tcp(DAQTestPacket *dtp, const uint8_t *cursor)
@@ -697,15 +693,15 @@ static void decode_ip6(DAQTestPacket *dtp, const uint8_t *cursor)
 {
     uint16_t offset;
 
-    dtp->ip6 = (const struct ip6_hdr *) cursor;
+    dtp->ip6 = (const Ip6Hdr *) cursor;
     offset = sizeof(*dtp->ip6);
 
     uint8_t next_hdr = dtp->ip6->ip6_nxt;
     if (next_hdr == IPPROTO_FRAGMENT)
     {
-        const struct ip6_frag *frag = (const struct ip6_frag *) (cursor + offset);
+        const Ip6Frag *frag = (const Ip6Frag *) (cursor + offset);
         next_hdr = frag->ip6f_nxt;
-        offset += sizeof(struct ip6_frag);
+        offset += sizeof(Ip6Frag);
     }
 
     switch (next_hdr)
@@ -729,7 +725,7 @@ static void decode_ip(DAQTestPacket *dtp, const uint8_t *cursor)
 {
     uint16_t offset;
 
-    dtp->ip = (const struct iphdr *) cursor;
+    dtp->ip = (const IpHdr *) cursor;
     if ((dtp->ip->ihl * 4) < 20)
     {
         printf("   * Invalid IP header length: %d bytes\n", dtp->ip->ihl * 4);
@@ -754,7 +750,7 @@ static void decode_ip(DAQTestPacket *dtp, const uint8_t *cursor)
 
 static void decode_arp(DAQTestPacket *dtp, const uint8_t *cursor)
 {
-    dtp->arp = (const struct arphdr *) cursor;
+    dtp->arp = (const EthArpHdr *) cursor;
 }
 
 static void decode_eth(DAQTestPacket *dtp, const uint8_t *cursor)
@@ -762,7 +758,7 @@ static void decode_eth(DAQTestPacket *dtp, const uint8_t *cursor)
     uint16_t ether_type;
     uint16_t offset;
 
-    dtp->eth = (const struct ether_header *) (cursor);
+    dtp->eth = (const EthHdr *) (cursor);
     ether_type = ntohs(dtp->eth->ether_type);
     offset = sizeof(*dtp->eth);
     while (ether_type == ETH_P_8021Q)
