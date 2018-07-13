@@ -42,6 +42,10 @@ static int daq_test_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     return DAQ_SUCCESS;
 }
 
+static void daq_test_destroy(void *handle)
+{
+}
+
 static int daq_test_start(void *handle)
 {
     return DAQ_SUCCESS;
@@ -60,10 +64,6 @@ static int daq_test_breakloop(void *handle)
 static int daq_test_stop(void *handle)
 {
     return DAQ_SUCCESS;
-}
-
-static void daq_test_shutdown(void *handle)
-{
 }
 
 static int daq_test_get_stats(void *handle, DAQ_Stats_t *stats)
@@ -111,12 +111,12 @@ DAQ_ModuleAPI_t test_module =
     /* .prepare = */ daq_test_prepare,
     /* .get_variable_descs = */ daq_test_get_variable_descs,
     /* .initialize = */ daq_test_initialize,
+    /* .destroy = */ daq_test_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ daq_test_start,
     /* .inject = */ daq_test_inject,
     /* .breakloop = */ daq_test_breakloop,
     /* .stop = */ daq_test_stop,
-    /* .shutdown = */ daq_test_shutdown,
     /* .get_stats = */ daq_test_get_stats,
     /* .reset_stats = */ daq_test_reset_stats,
     /* .get_snaplen = */ daq_test_get_snaplen,

@@ -303,6 +303,22 @@ static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     return DAQ_SUCCESS;
 }
 
+static void pcap_daq_destroy(void *handle)
+{
+    Pcap_Context_t *pc = (Pcap_Context_t *) handle;
+
+    if (pc->handle)
+        pcap_close(pc->handle);
+    if (pc->fp)
+        fclose(pc->fp);
+    if (pc->device)
+        free(pc->device);
+    if (pc->filter_string)
+        free(pc->filter_string);
+    destroy_packet_pool(pc);
+    free(pc);
+}
+
 static int pcap_daq_install_filter(Pcap_Context_t *pc, const char *filter)
 {
     struct bpf_program fcode;
@@ -478,22 +494,6 @@ static int pcap_daq_stop(void *handle)
     }
 
     return DAQ_SUCCESS;
-}
-
-static void pcap_daq_shutdown(void *handle)
-{
-    Pcap_Context_t *pc = (Pcap_Context_t *) handle;
-
-    if (pc->handle)
-        pcap_close(pc->handle);
-    if (pc->fp)
-        fclose(pc->fp);
-    if (pc->device)
-        free(pc->device);
-    if (pc->filter_string)
-        free(pc->filter_string);
-    destroy_packet_pool(pc);
-    free(pc);
 }
 
 static int pcap_daq_get_stats(void *handle, DAQ_Stats_t *stats)
@@ -694,12 +694,12 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .prepare = */ pcap_daq_prepare,
     /* .get_variable_descs = */ pcap_daq_get_variable_descs,
     /* .initialize = */ pcap_daq_initialize,
+    /* .destroy = */ pcap_daq_destroy,
     /* .set_filter = */ pcap_daq_set_filter,
     /* .start = */ pcap_daq_start,
     /* .inject = */ pcap_daq_inject,
     /* .breakloop = */ pcap_daq_breakloop,
     /* .stop = */ pcap_daq_stop,
-    /* .shutdown = */ pcap_daq_shutdown,
     /* .get_stats = */ pcap_daq_get_stats,
     /* .reset_stats = */ pcap_daq_reset_stats,
     /* .get_snaplen = */ pcap_daq_get_snaplen,

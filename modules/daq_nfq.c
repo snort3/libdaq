@@ -591,6 +591,19 @@ fail:
     return rval;
 }
 
+/* Module->destroy() */
+static void nfq_daq_destroy(void *handle)
+{
+    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
+
+    if (nfqc->nlsock)
+        mnl_socket_close(nfqc->nlsock);
+    if (nfqc->nlmsg_buf)
+        free(nfqc->nlmsg_buf);
+    destroy_packet_pool(nfqc);
+    free(nfqc);
+}
+
 /* Module->start() */
 static int nfq_daq_start(void *handle)
 {
@@ -630,19 +643,6 @@ static int nfq_daq_stop(void *handle)
     nfqc->nlsock = NULL;
 
     return DAQ_SUCCESS;
-}
-
-/* Module->shutdown() */
-static void nfq_daq_shutdown(void *handle)
-{
-    Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
-
-    if (nfqc->nlsock)
-        mnl_socket_close(nfqc->nlsock);
-    if (nfqc->nlmsg_buf)
-        free(nfqc->nlmsg_buf);
-    destroy_packet_pool(nfqc);
-    free(nfqc);
 }
 
 /* Module->get_stats() */
@@ -813,12 +813,12 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .prepare = */ nfq_daq_prepare,
     /* .get_variable_descs = */ nfq_daq_get_variable_descs,
     /* .initialize = */ nfq_daq_initialize,
+    /* .destroy = */ nfq_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ nfq_daq_start,
     /* .inject = */ nfq_daq_inject,
     /* .breakloop = */ nfq_daq_breakloop,
     /* .stop = */ nfq_daq_stop,
-    /* .shutdown = */ nfq_daq_shutdown,
     /* .get_stats = */ nfq_daq_get_stats,
     /* .reset_stats = */ nfq_daq_reset_stats,
     /* .get_snaplen = */ nfq_daq_get_snaplen,

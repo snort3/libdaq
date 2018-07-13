@@ -50,10 +50,6 @@ int daq_default_stop(void *handle)
     return DAQ_ERROR_NOTSUP;
 }
 
-void daq_default_shutdown(void *handle)
-{
-}
-
 int daq_default_get_stats(void *handle, DAQ_Stats_t *stats)
 {
     return DAQ_ERROR_NOTSUP;

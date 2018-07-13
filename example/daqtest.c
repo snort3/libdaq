@@ -1632,7 +1632,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Error joining thread: %s (%d)\n", strerror(errno), errno);
             return -1;
         }
-        daq_instance_shutdown(dttc->instance);
+        daq_instance_destroy(dttc->instance);
     }
 
     return 0;

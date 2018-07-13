@@ -31,7 +31,6 @@ typedef int (*daq_module_start_func) (void *handle);
 typedef int (*daq_module_inject_func) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
 typedef int (*daq_module_breakloop_func) (void *handle);
 typedef int (*daq_module_stop_func) (void *handle);
-typedef void (*daq_module_shutdown_func) (void *handle);
 typedef int (*daq_module_get_stats_func) (void *handle, DAQ_Stats_t *stats);
 typedef void (*daq_module_reset_stats_func) (void *handle);
 typedef int (*daq_module_get_snaplen_func) (void *handle);
@@ -56,7 +55,6 @@ typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(inject);
     DAQ_INSTANCE_API_STRUCT(breakloop);
     DAQ_INSTANCE_API_STRUCT(stop);
-    DAQ_INSTANCE_API_STRUCT(shutdown);
     DAQ_INSTANCE_API_STRUCT(get_stats);
     DAQ_INSTANCE_API_STRUCT(reset_stats);
     DAQ_INSTANCE_API_STRUCT(get_snaplen);
@@ -121,6 +119,8 @@ typedef struct _daq_module_api
     /* Initialize the device for packet acquisition with the supplied configuration.
        This should not start queuing packets for the application. */
     int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_ModuleInstance_h modinst, void **ctxt_ptr);
+    /* Clean up and destroy an instantiation of this module. */
+    void (*destroy) (void *handle);
     /* Set the module's BPF based on the given string */
     daq_module_set_filter_func set_filter;
     /* Complete device opening and begin queuing packets if they have not been already. */
@@ -131,8 +131,6 @@ typedef struct _daq_module_api
     daq_module_breakloop_func breakloop;
     /* Stop queuing packets, if possible */
     daq_module_stop_func stop;
-    /* Close the device and clean up */
-    daq_module_shutdown_func shutdown;
     /* Populates the <stats> structure with the current DAQ stats.  These stats are cumulative. */
     daq_module_get_stats_func get_stats;
     /* Resets the DAQ module's internal stats. */

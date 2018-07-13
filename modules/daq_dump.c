@@ -198,11 +198,10 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     return DAQ_SUCCESS;
 }
 
-static void dump_daq_shutdown(void *handle)
+static void dump_daq_destroy(void *handle)
 {
     DumpContext *dc = (DumpContext *) handle;
 
-    CALL_SUBAPI_NOARGS(dc, shutdown);
     if (dc->pcap_filename)
         free(dc->pcap_filename);
     if (dc->text_filename)
@@ -446,12 +445,12 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .prepare = */ dump_daq_prepare,
     /* .get_variable_descs = */ dump_daq_get_variable_descs,
     /* .initialize = */ dump_daq_initialize,
+    /* .destroy = */ dump_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ dump_daq_start,
     /* .inject = */ dump_daq_inject,
     /* .breakloop = */ NULL,
     /* .stop = */ dump_daq_stop,
-    /* .shutdown = */ dump_daq_shutdown,
     /* .get_stats = */ dump_daq_get_stats,
     /* .reset_stats = */ dump_daq_reset_stats,
     /* .get_snaplen = */ NULL,

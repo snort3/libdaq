@@ -88,7 +88,6 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, shutdown, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, reset_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_snaplen, default_impl);
@@ -104,20 +103,6 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     RESOLVE_INSTANCE_API(api, modinst, msg_receive, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, msg_finalize, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_msg_pool_info, default_impl);
-}
-
-static void daq_instance_destroy(DAQ_Instance_t *instance)
-{
-    if (instance)
-    {
-        DAQ_ModuleInstance_t *modinst;
-        while ((modinst = instance->module_instances) != NULL)
-        {
-            instance->module_instances = modinst->next;
-            free(modinst);
-        }
-        free(instance);
-    }
 }
 
 
@@ -179,6 +164,24 @@ int daq_module_instantiate(DAQ_Instance_t *instance, DAQ_ModuleConfig_h modcfg)
 /*
  * Exported functions that apply to instances of DAQ modules go here.
  */
+DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_t *instance)
+{
+    if (!instance)
+        return DAQ_ERROR_NOCTX;
+
+    /* Destroy the module stack from the top down. */
+    DAQ_ModuleInstance_t *modinst;
+    while ((modinst = instance->module_instances) != NULL)
+    {
+        instance->module_instances = modinst->next;
+        modinst->module->destroy(modinst->context);
+        free(modinst);
+    }
+    free(instance);
+
+    return DAQ_SUCCESS;
+}
+
 DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_t **instance_ptr, char *errbuf, size_t len)
 {
     /* Don't do this. */
@@ -307,17 +310,6 @@ DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_t *instance)
         instance->state = DAQ_STATE_STOPPED;
 
     return rval;
-}
-
-DAQ_LINKAGE int daq_instance_shutdown(DAQ_Instance_t *instance)
-{
-    if (!instance)
-        return DAQ_ERROR_NOCTX;
-
-    instance->api.shutdown.func(instance->api.shutdown.context);
-    daq_instance_destroy(instance);
-
-    return DAQ_SUCCESS;
 }
 
 DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_t *instance)

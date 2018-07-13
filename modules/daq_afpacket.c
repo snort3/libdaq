@@ -985,6 +985,19 @@ err:
     return rval;
 }
 
+static void afpacket_daq_destroy(void *handle)
+{
+    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+
+    af_packet_close(afpc);
+    if (afpc->device)
+        free(afpc->device);
+    if (afpc->filter)
+        free(afpc->filter);
+    destroy_packet_pool(afpc);
+    free(afpc);
+}
+
 static int afpacket_daq_set_filter(void *handle, const char *filter)
 {
 #ifdef LIBPCAP_AVAILABLE
@@ -1118,19 +1131,6 @@ static int afpacket_daq_stop(void *handle)
     af_packet_close(afpc);
 
     return DAQ_SUCCESS;
-}
-
-static void afpacket_daq_shutdown(void *handle)
-{
-    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-
-    af_packet_close(afpc);
-    if (afpc->device)
-        free(afpc->device);
-    if (afpc->filter)
-        free(afpc->filter);
-    destroy_packet_pool(afpc);
-    free(afpc);
 }
 
 static int afpacket_daq_get_stats(void *handle, DAQ_Stats_t *stats)
@@ -1474,12 +1474,12 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .prepare = */ afpacket_daq_prepare,
     /* .get_variable_descs = */ afpacket_daq_get_variable_descs,
     /* .initialize = */ afpacket_daq_initialize,
+    /* .destroy = */ afpacket_daq_destroy,
     /* .set_filter = */ afpacket_daq_set_filter,
     /* .start = */ afpacket_daq_start,
     /* .inject = */ afpacket_daq_inject,
     /* .breakloop = */ afpacket_daq_breakloop,
     /* .stop = */ afpacket_daq_stop,
-    /* .shutdown = */ afpacket_daq_shutdown,
     /* .get_stats = */ afpacket_daq_get_stats,
     /* .reset_stats = */ afpacket_daq_reset_stats,
     /* .get_snaplen = */ afpacket_daq_get_snaplen,

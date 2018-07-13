@@ -83,13 +83,13 @@ DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 /* DAQ Module Instance functions */
 DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);
+DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
 DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_Msg_h msg, const uint8_t *packet_data,
                                         uint32_t len, int reverse);
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
-DAQ_LINKAGE int daq_instance_shutdown(DAQ_Instance_h instance);
 DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_stats(DAQ_Instance_h instance, DAQ_Stats_t *stats);
 DAQ_LINKAGE void daq_instance_reset_stats(DAQ_Instance_h instance);
