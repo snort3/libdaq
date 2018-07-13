@@ -28,6 +28,18 @@ if LIBPCAP_AVAILABLE
 endif
 endif
 
+if BUILD_BPF_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += daq_bpf.la
+    daq_bpf_la_SOURCES = daq_bpf.c
+    daq_bpf_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
+    daq_bpf_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
+    daq_bpf_la_LIBADD = -lpcap
+endif
+    libdaq_static_modules_la_SOURCES += daq_bpf.c
+    libdaq_static_modules_la_CPPFLAGS += -DBUILD_BPF_MODULE $(PCAP_CPPFLAGS)
+endif
+
 if BUILD_PCAP_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += daq_pcap.la

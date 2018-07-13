@@ -166,6 +166,20 @@ if test "$enable_afpacket_module" = yes; then
 fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
 
+# BPF Wrapper Module
+AC_ARG_ENABLE(bpf-module,
+              AS_HELP_STRING([--disable-bpf-module],[do not build the bundled BPF wrapper module]),
+              [enable_bpf_module="$enableval"], [enable_bpf_module="$DEFAULT_ENABLE"])
+if test "$enable_bpf_module" = yes; then
+    if test "$LIBPCAP_AVAILABLE" = yes ; then
+        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+    else
+        AC_MSG_WARN([LibPCAP not available, disabling the BPF DAQ module])
+        enable_bpf_module=no
+    fi
+fi
+AM_CONDITIONAL([BUILD_BPF_MODULE], [test "$enable_bpf_module" = yes])
+
 # Dump Module
 AC_ARG_ENABLE(dump-module,
               AS_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
@@ -277,6 +291,7 @@ AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 #AC_SUBST(DNET_LDFLAGS)
 
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
+                                      "$enable_bpf_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
                                       "$enable_ipfw_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
@@ -354,6 +369,7 @@ AC_MSG_RESULT([
     code_coverage_ldflags:  ${CODE_COVERAGE_LDFLAGS}
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
+    Build BPF DAQ module....... : $enable_bpf_module
     Build Dump DAQ module...... : $enable_dump_module
     Build IPFW DAQ module...... : $enable_ipfw_module
     Build NFQ DAQ module....... : $enable_nfq_module

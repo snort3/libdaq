@@ -26,6 +26,9 @@ const DAQ_ModuleAPI_t *static_modules[] =
 #ifdef BUILD_AFPACKET_MODULE
     &afpacket_daq_module_data,
 #endif
+#ifdef BUILD_BPF_MODULE
+    &bpf_daq_module_data,
+#endif
 #ifdef BUILD_DUMP_MODULE
     &dump_daq_module_data,
 #endif
