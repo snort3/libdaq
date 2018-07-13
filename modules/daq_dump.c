@@ -117,17 +117,8 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
 
 static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
-    DAQ_ModuleConfig_h subconfig;
     DumpContext *dc;
     const char *varKey, *varValue;
-    int rval;
-
-    subconfig = daq_base_api.config_get_next(modcfg);
-    if (!subconfig)
-    {
-        SET_ERROR(modinst, "%s: No submodule configuration provided", __func__);
-        return DAQ_ERROR_INVAL;
-    }
 
     dc = calloc(1, sizeof(DumpContext));
     if (!dc)
@@ -137,6 +128,13 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     }
     dc->modinst = modinst;
     dc->output_type = DUMP_OUTPUT_PCAP;
+
+    if (daq_base_api.resolve_subapi(modinst, &dc->subapi) != DAQ_SUCCESS)
+    {
+        SET_ERROR(modinst, "%s: Couldn't resolve subapi. No submodule configured?", __func__);
+        free(dc);
+        return DAQ_ERROR_INVAL;
+    }
 
     daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
@@ -180,18 +178,6 @@ static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         }
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
-
-    rval = daq_base_api.instantiate_submodule(modinst, subconfig);
-    if (rval != DAQ_SUCCESS)
-    {
-        if (dc->pcap_filename)
-            free(dc->pcap_filename);
-        if (dc->text_filename)
-            free(dc->text_filename);
-        free(dc);
-        return rval;
-    }
-    daq_base_api.resolve_subapi(modinst, &dc->subapi);
 
     *ctxt_ptr = dc;
 

@@ -115,9 +115,14 @@ DAQ_Instance_t *daq_modinst_get_instance(DAQ_ModuleInstance_t *modinst)
     return modinst->instance;
 }
 
-void daq_modinst_resolve_subapi(DAQ_ModuleInstance_t *modinst, DAQ_InstanceAPI_t *api)
+int daq_modinst_resolve_subapi(DAQ_ModuleInstance_t *modinst, DAQ_InstanceAPI_t *api)
 {
+    if (!modinst->next)
+        return DAQ_ERROR_INVAL;
+
     resolve_instance_api(api, modinst->next, false);
+
+    return DAQ_SUCCESS;
 }
 
 void daq_instance_set_errbuf_va(DAQ_Instance_t *instance, const char *format, va_list ap)
@@ -131,33 +136,6 @@ void daq_instance_set_errbuf(DAQ_Instance_t *instance, const char *format, ...)
     va_start(ap, format);
     vsnprintf(instance->errbuf, sizeof(instance->errbuf), format, ap);
     va_end(ap);
-}
-
-int daq_module_instantiate(DAQ_Instance_t *instance, DAQ_ModuleConfig_h modcfg)
-{
-    DAQ_ModuleInstance_t *modinst;
-
-    modinst = calloc(1, sizeof(*modinst));
-    if (!modinst)
-    {
-        daq_instance_set_errbuf(instance, "Couldn't allocate a new DAQ module instance structure!");
-        return DAQ_ERROR_NOMEM;
-    }
-
-    modinst->instance = instance;
-    modinst->module = daq_module_config_get_module(modcfg);
-
-    /* Add this module instance to the bottom of the stack */
-    if (instance->module_instances)
-    {
-        DAQ_ModuleInstance_t *pmi;
-        for (pmi = instance->module_instances; pmi->next; pmi = pmi->next);
-        pmi->next = modinst;
-    }
-    else
-        instance->module_instances = modinst;
-
-    return modinst->module->initialize(modcfg, modinst, &modinst->context);
 }
 
 
@@ -174,7 +152,8 @@ DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_t *instance)
     while ((modinst = instance->module_instances) != NULL)
     {
         instance->module_instances = modinst->next;
-        modinst->module->destroy(modinst->context);
+        if (modinst->context)
+            modinst->module->destroy(modinst->context);
         free(modinst);
     }
     free(instance);
@@ -200,7 +179,7 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
         return DAQ_ERROR_INVAL;
     }
 
-    DAQ_ModuleConfig_h modcfg = daq_config_top_module_config(config);
+    DAQ_ModuleConfig_h modcfg = daq_config_bottom_module_config(config);
     if (!modcfg)
     {
         snprintf(errbuf, len, "Can't initialize without a module configuration!");
@@ -215,13 +194,34 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
     }
     instance->state = DAQ_STATE_UNINITIALIZED;
 
-    int rval = daq_module_instantiate(instance, modcfg);
-    if (rval != DAQ_SUCCESS)
-    {
-        snprintf(errbuf, len, "%s", instance->errbuf);
-        daq_instance_destroy(instance);
-        return rval;
-    }
+    /* Build out the instance from the bottom of the configuration stack up. */
+    do {
+        DAQ_ModuleInstance_t *modinst = calloc(1, sizeof(*modinst));
+        if (!modinst)
+        {
+            snprintf(errbuf, len, "Couldn't allocate a new DAQ module instance structure!");
+            daq_instance_destroy(instance);
+            return DAQ_ERROR_NOMEM;
+        }
+
+        modinst->instance = instance;
+        modinst->module = daq_module_config_get_module(modcfg);
+
+        /* Push this on top of the module instance stack.  This must be done before instantiating
+            the module so that it can be referenced inside of that call. */
+        modinst->next = instance->module_instances;
+        instance->module_instances = modinst;
+
+        int rval = modinst->module->initialize(modcfg, modinst, &modinst->context);
+        if (rval != DAQ_SUCCESS)
+        {
+            snprintf(errbuf, len, "%s", instance->errbuf);
+            daq_instance_destroy(instance);
+            return rval;
+        }
+
+        modcfg = daq_config_previous_module_config(config);
+    } while (modcfg);
 
     /* Resolve the top-level instance API from the top of the stack with defaults. */
     resolve_instance_api(&instance->api, instance->module_instances, true);

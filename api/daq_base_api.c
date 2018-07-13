@@ -45,12 +45,6 @@ static unsigned base_api_config_get_timeout(DAQ_ModuleConfig_h modcfg)
     return daq_config_get_timeout(cfg);
 }
 
-static int base_api_instantiate_submodule(DAQ_ModuleInstance_h modinst, DAQ_ModuleConfig_h modcfg)
-{
-    DAQ_Instance_h instance = daq_modinst_get_instance(modinst);
-    return daq_module_instantiate(instance, modcfg);
-}
-
 static void base_api_set_errbuf(DAQ_ModuleInstance_h modinst, const char *format, ...)
 {
     DAQ_Instance_h instance = daq_modinst_get_instance(modinst);
@@ -72,8 +66,6 @@ void populate_base_api(DAQ_BaseAPI_t *base_api)
     base_api->config_get_variable = daq_module_config_get_variable;
     base_api->config_first_variable = daq_module_config_first_variable;
     base_api->config_next_variable = daq_module_config_next_variable;
-    base_api->config_get_next = daq_module_config_get_next;
-    base_api->instantiate_submodule = base_api_instantiate_submodule;
     base_api->resolve_subapi = daq_modinst_resolve_subapi;
     base_api->set_errbuf = base_api_set_errbuf;
 }

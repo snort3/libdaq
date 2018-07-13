@@ -46,6 +46,7 @@ typedef struct _daq_dict
 typedef struct _daq_module_config
 {
     struct _daq_module_config *next;
+    struct _daq_module_config *prev;
     struct _daq_config *config;     /* Backreference to the configuration this is contained within */
     const DAQ_ModuleAPI_t *module;  /* Module that will be instantiated with this configuration */
     DAQ_Mode mode;                  /* Module mode (DAQ_MODE_*) */
@@ -466,6 +467,7 @@ DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_t *cfg, DAQ_ModuleConfi
     {
         if (!(modcfg->module->type & DAQ_TYPE_WRAPPER))
             return DAQ_ERROR_INVAL;
+        cfg->module_configs->prev = modcfg;
         modcfg->next = cfg->module_configs;
     }
     modcfg->config = cfg;
@@ -484,6 +486,7 @@ DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_pop_module_config(DAQ_Config_t *cfg)
 
     modcfg = cfg->module_configs;
     cfg->module_configs = modcfg->next;
+    cfg->module_configs->prev = NULL;
     cfg->iterator = NULL;
 
     modcfg->config = NULL;
@@ -502,12 +505,34 @@ DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_top_module_config(DAQ_Config_t *cfg)
     return cfg->iterator;
 }
 
+DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_bottom_module_config(DAQ_Config_t *cfg)
+{
+    if (!cfg)
+        return NULL;
+
+    for (cfg->iterator = cfg->module_configs;
+         cfg->iterator && cfg->iterator->next;
+         cfg->iterator = cfg->iterator->next);
+
+    return cfg->iterator;
+}
+
 DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_next_module_config(DAQ_Config_t *cfg)
 {
     if (!cfg || !cfg->iterator)
         return NULL;
 
     cfg->iterator = cfg->iterator->next;
+
+    return cfg->iterator;
+}
+
+DAQ_LINKAGE DAQ_ModuleConfig_t *daq_config_previous_module_config(DAQ_Config_t *cfg)
+{
+    if (!cfg || !cfg->iterator)
+        return NULL;
+
+    cfg->iterator = cfg->iterator->prev;
 
     return cfg->iterator;
 }

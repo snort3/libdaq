@@ -89,10 +89,8 @@ typedef struct _daq_base_api
     const char *(*config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
     int (*config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
     int (*config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
-    DAQ_ModuleConfig_h (*config_get_next) (DAQ_ModuleConfig_h modcfg);
     /* Module/Instance operations */
-    int (*instantiate_submodule) (DAQ_ModuleInstance_h modinst, DAQ_ModuleConfig_h modcfg);
-    void (*resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
+    int (*resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
     void (*set_errbuf) (DAQ_ModuleInstance_h modinst, const char *format, ...);
 } DAQ_BaseAPI_t;
 

@@ -78,7 +78,9 @@ DAQ_LINKAGE unsigned daq_config_get_timeout(DAQ_Config_h cfg);
 DAQ_LINKAGE int daq_config_push_module_config(DAQ_Config_h cfg, DAQ_ModuleConfig_h modcfg);
 DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_pop_module_config(DAQ_Config_h cfg);
 DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_top_module_config(DAQ_Config_h cfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_bottom_module_config(DAQ_Config_h cfg);
 DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_next_module_config(DAQ_Config_h cfg);
+DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_previous_module_config(DAQ_Config_h cfg);
 DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 /* DAQ Module Instance functions */
