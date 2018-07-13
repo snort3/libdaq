@@ -114,9 +114,9 @@ typedef struct _daq_module_api
     /* Get a pointer to an array describing the DAQ variables accepted by this module.
         Returns the size of the retrieved array. */
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);
-    /* Initialize the device for packet acquisition with the supplied configuration.
-       This should not start queuing packets for the application. */
-    int (*initialize) (const DAQ_ModuleConfig_h config, DAQ_ModuleInstance_h modinst, void **ctxt_ptr);
+    /* Instantiate the module with the supplied configuration.  Initialize it as much as possible without
+        causing packets to start being queued for the application. */
+    int (*instantiate) (const DAQ_ModuleConfig_h config, DAQ_ModuleInstance_h modinst, void **ctxt_ptr);
     /* Clean up and destroy an instantiation of this module. */
     void (*destroy) (void *handle);
     /* Set the module's BPF based on the given string */

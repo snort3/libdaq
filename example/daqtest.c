@@ -1522,9 +1522,9 @@ int main(int argc, char *argv[])
         DAQTestThreadContext *dttc = &threads[i];
         char errbuf[256];
 
-        if ((rval = daq_instance_initialize(daqcfg, &dttc->instance, errbuf, sizeof(errbuf))) != 0)
+        if ((rval = daq_instance_instantiate(daqcfg, &dttc->instance, errbuf, sizeof(errbuf))) != 0)
         {
-            fprintf(stderr, "Could not initialize DAQ module: (%d: %s)\n", rval, errbuf);
+            fprintf(stderr, "Could not construct a DAQ instance: (%d: %s)\n", rval, errbuf);
             return -1;
         }
 

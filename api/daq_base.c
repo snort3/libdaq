@@ -174,7 +174,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     }
 
     /* Check to make sure that all of the required function pointers are populated. */
-    if (!dm->prepare || !dm->get_variable_descs || !dm->initialize)
+    if (!dm->prepare || !dm->get_variable_descs || !dm->instantiate || !dm->destroy)
     {
         fprintf(stderr, "%s: Module definition is missing function pointer(s)!\n", dm->name);
         return DAQ_ERROR;

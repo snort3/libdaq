@@ -84,7 +84,7 @@ DAQ_LINKAGE DAQ_ModuleConfig_h daq_config_previous_module_config(DAQ_Config_h cf
 DAQ_LINKAGE void daq_config_destroy(DAQ_Config_h cfg);
 
 /* DAQ Module Instance functions */
-DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);
+DAQ_LINKAGE int daq_instance_instantiate(const DAQ_Config_h config, DAQ_Instance_h *instance, char *errbuf, size_t len);
 DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
 DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);

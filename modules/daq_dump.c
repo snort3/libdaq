@@ -115,7 +115,7 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(dump_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int dump_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     DumpContext *dc;
     const char *varKey, *varValue;
@@ -430,7 +430,7 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
     /* .prepare = */ dump_daq_prepare,
     /* .get_variable_descs = */ dump_daq_get_variable_descs,
-    /* .initialize = */ dump_daq_initialize,
+    /* .instantiate = */ dump_daq_instantiate,
     /* .destroy = */ dump_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ dump_daq_start,

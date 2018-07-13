@@ -380,8 +380,8 @@ static int nfq_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
     return sizeof(nfq_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-/* Module->initialize() */
-static int nfq_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+/* Module->instantiate() */
+static int nfq_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     Nfq_Context_t *nfqc;
     int rval = DAQ_ERROR;
@@ -812,7 +812,7 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE | DAQ_TYPE_NO_UNPRIV,
     /* .prepare = */ nfq_daq_prepare,
     /* .get_variable_descs = */ nfq_daq_get_variable_descs,
-    /* .initialize = */ nfq_daq_initialize,
+    /* .instantiate = */ nfq_daq_instantiate,
     /* .destroy = */ nfq_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ nfq_daq_start,

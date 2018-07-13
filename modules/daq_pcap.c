@@ -230,7 +230,7 @@ static int pcap_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
     return sizeof(pcap_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
-static int pcap_daq_initialize(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int pcap_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     Pcap_Context_t *pc;
 
@@ -693,7 +693,7 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .type = */ DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
     /* .prepare = */ pcap_daq_prepare,
     /* .get_variable_descs = */ pcap_daq_get_variable_descs,
-    /* .initialize = */ pcap_daq_initialize,
+    /* .instantiate = */ pcap_daq_instantiate,
     /* .destroy = */ pcap_daq_destroy,
     /* .set_filter = */ pcap_daq_set_filter,
     /* .start = */ pcap_daq_start,

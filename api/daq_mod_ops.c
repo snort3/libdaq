@@ -161,7 +161,7 @@ DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_t *instance)
     return DAQ_SUCCESS;
 }
 
-DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_t **instance_ptr, char *errbuf, size_t len)
+DAQ_LINKAGE int daq_instance_instantiate(const DAQ_Config_h config, DAQ_Instance_t **instance_ptr, char *errbuf, size_t len)
 {
     /* Don't do this. */
     if (!errbuf)
@@ -169,20 +169,20 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
 
     if (!config)
     {
-        snprintf(errbuf, len, "Can't initialize without a configuration!");
+        snprintf(errbuf, len, "Can't instantiate without a configuration!");
         return DAQ_ERROR_INVAL;
     }
 
     if (!instance_ptr)
     {
-        snprintf(errbuf, len, "Can't initialize without a context pointer!");
+        snprintf(errbuf, len, "Can't instantiate without a context pointer!");
         return DAQ_ERROR_INVAL;
     }
 
     DAQ_ModuleConfig_h modcfg = daq_config_bottom_module_config(config);
     if (!modcfg)
     {
-        snprintf(errbuf, len, "Can't initialize without a module configuration!");
+        snprintf(errbuf, len, "Can't instantiate without a module configuration!");
         return DAQ_ERROR_INVAL;
     }
 
@@ -212,7 +212,7 @@ DAQ_LINKAGE int daq_instance_initialize(const DAQ_Config_h config, DAQ_Instance_
         modinst->next = instance->module_instances;
         instance->module_instances = modinst;
 
-        int rval = modinst->module->initialize(modcfg, modinst, &modinst->context);
+        int rval = modinst->module->instantiate(modcfg, modinst, &modinst->context);
         if (rval != DAQ_SUCCESS)
         {
             snprintf(errbuf, len, "%s", instance->errbuf);
