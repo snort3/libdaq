@@ -70,7 +70,6 @@ if BUILD_SHARED_MODULES
     daq_ipfw_la_SOURCES = daq_ipfw.c
     daq_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
     daq_ipfw_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
-    daq_ipfw_la_LIBADD = $(top_builddir)/sfbpf/libsfbpf.la
 endif
     libdaq_static_modules_la_SOURCES += daq_ipfw.c
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_IPFW_MODULE
@@ -94,7 +93,6 @@ if BUILD_SHARED_MODULES
     daq_netmap_la_SOURCES = daq_netmap.c
     daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
     daq_netmap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
-    daq_netmap_la_LIBADD = $(top_builddir)/sfbpf/libsfbpf.la
 endif
     libdaq_static_modules_la_SOURCES += daq_netmap.c
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_NETMAP_MODULE

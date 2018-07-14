@@ -195,12 +195,12 @@ fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 
 # IPFW Module
-#AC_ARG_ENABLE(ipfw-module,
-#              AS_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
-#              [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
-#if test "$enable_ipfw_module" = yes; then
-#    STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
-#fi
+AC_ARG_ENABLE(ipfw-module,
+              AS_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
+              [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
+if test "$enable_ipfw_module" = yes; then
+    AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_ipfw_module=no], [[#include <netinet/in.h>]])
+fi
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 
 # NFQ Module
@@ -246,9 +246,6 @@ AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 #                   #include <net/if.h>
 #                   #include <net/netmap.h>
 #                   ])
-#    if test "$enable_netmap_module" = yes; then
-#        STATIC_LIBS="${STATIC_LIBS} -lsfbpf"
-#    fi
 #fi
 AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 
