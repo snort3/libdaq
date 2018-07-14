@@ -332,32 +332,36 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
     return reply;
 }
 
-static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
+static size_t forge_icmp_reply(DAQTestPacket *dtp, uint8_t **reply_ptr)
 {
     const uint8_t *request = dtp->packet;
     uint8_t *reply;
-    const EthHdr *eth_request;
-    EthHdr *eth_reply;
-    const IpHdr *ip_request;
-    IpHdr *ip_reply;
-    const IcmpHdr *icmp_request;
-    IcmpHdr *icmp_reply;
-    uint32_t dlen;
-    size_t arphdr_offset;
+    size_t iphdr_offset;
+    size_t reply_len;
 
-    arphdr_offset = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr);
-    reply = calloc(arphdr_offset + dtp->ip->tot_len, sizeof(uint8_t));
+    if (dtp->eth)
+    {
+        iphdr_offset = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr);
+        reply_len = iphdr_offset + ntohs(dtp->ip->tot_len);
+        reply = calloc(reply_len, sizeof(uint8_t));
 
-    /* Set up the ethernet header... */
-    eth_request = dtp->eth;
-    eth_reply = (EthHdr *) reply;
-    memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
-    memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETH_ALEN);
-    memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
+        /* Set up the ethernet header... */
+        const EthHdr *eth_request = dtp->eth;
+        EthHdr *eth_reply = (EthHdr *) reply;
+        memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
+        memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETH_ALEN);
+        memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, iphdr_offset - ETH_ALEN * 2);
+    }
+    else
+    {
+        iphdr_offset = 0;
+        reply_len = ntohs(dtp->ip->tot_len);
+        reply = calloc(reply_len, sizeof(uint8_t));
+    }
 
     /* Now the IP header... */
-    ip_request = dtp->ip;
-    ip_reply = (IpHdr *) (reply + arphdr_offset);
+    const IpHdr *ip_request = dtp->ip;
+    IpHdr *ip_reply = (IpHdr *) (reply + iphdr_offset);
     ip_reply->ihl = ip_request->ihl;
     ip_reply->version = ip_request->version;
     ip_reply->tos = ip_request->tos;
@@ -372,8 +376,8 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
     ip_reply->check = in_cksum((uint16_t *) ip_reply, ip_reply->ihl * 4);
 
     /* And the ICMP header... */
-    icmp_request = dtp->icmp;
-    icmp_reply = (IcmpHdr *) (reply + arphdr_offset + sizeof(IpHdr));
+    const IcmpHdr *icmp_request = dtp->icmp;
+    IcmpHdr *icmp_reply = (IcmpHdr *) (reply + iphdr_offset + sizeof(IpHdr));
     icmp_reply->type = ICMP_ECHOREPLY;
     icmp_reply->code = 0;
     icmp_reply->checksum = 0;
@@ -381,13 +385,15 @@ static uint8_t *forge_icmp_reply(DAQTestPacket *dtp)
     icmp_reply->un.echo.sequence = icmp_request->un.echo.sequence;
 
     /* Copy the ICMP padding... */
-    dlen = ntohs(ip_request->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
+    uint32_t dlen = ntohs(ip_request->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     memcpy(icmp_reply + 1, icmp_request + 1, dlen);
 
     /* Last, but not least, checksum the ICMP packet */
     icmp_reply->checksum = in_cksum((uint16_t *) icmp_reply, ntohs(ip_request->tot_len) - sizeof(IpHdr));
 
-    return reply;
+    *reply_ptr = reply;
+
+    return reply_len;
 }
 
 static DAQ_Verdict process_ping(DAQTestPacket *dtp)
@@ -400,13 +406,12 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             break;
 
         case PING_ACTION_SPOOF:
-            if (dtp->icmp->type == ICMP_ECHO && dtp->eth)
+            if (dtp->icmp->type == ICMP_ECHO)
             {
                 uint8_t *reply;
                 size_t reply_len;
 
-                reply = forge_icmp_reply(dtp);
-                reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + ntohs(dtp->ip->tot_len);
+                reply_len = forge_icmp_reply(dtp, &reply);
                 printf("Injecting forged ICMP reply back to source! (%zu bytes)\n", reply_len);
                 rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1);
                 if (rc == DAQ_ERROR_NOTSUP)
@@ -423,12 +428,8 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             return DAQ_VERDICT_BLOCK;
 
         case PING_ACTION_REPLACE:
-            if (dtp->icmp)
-            {
-                replace_icmp_data(dtp);
-                return DAQ_VERDICT_REPLACE;
-            }
-            break;
+            replace_icmp_data(dtp);
+            return DAQ_VERDICT_REPLACE;
 
         case PING_ACTION_BLACKLIST:
             printf("Blacklisting the ping's flow.\n");
@@ -439,18 +440,14 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
             return DAQ_VERDICT_WHITELIST;
 
         case PING_ACTION_CLONE:
-            if (dtp->eth)
-            {
-                printf("Injecting cloned ICMP packet.\n");
-                rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
-                if (rc == DAQ_ERROR_NOTSUP)
-                    printf("This module does not support packet injection.\n");
-                else if (rc != DAQ_SUCCESS)
-                    printf("Failed to inject cloned ICMP packet: %s\n", daq_instance_get_error(dtp->ctxt->instance));
-                printf("Blocking the original ICMP packet.\n");
-                return DAQ_VERDICT_BLOCK;
-            }
-            break;
+            printf("Injecting cloned ICMP packet.\n");
+            rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
+            if (rc == DAQ_ERROR_NOTSUP)
+                printf("This module does not support packet injection.\n");
+            else if (rc != DAQ_SUCCESS)
+                printf("Failed to inject cloned ICMP packet: %s\n", daq_instance_get_error(dtp->ctxt->instance));
+            printf("Blocking the original ICMP packet.\n");
+            return DAQ_VERDICT_BLOCK;
     }
     return DAQ_VERDICT_PASS;
 }
