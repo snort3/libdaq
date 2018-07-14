@@ -53,7 +53,6 @@
 
 #define DAQ_AFPACKET_VERSION 6
 
-#define AF_PACKET_DEFAULT_POOL_SIZE      16
 #define AF_PACKET_DEFAULT_BUFFER_SIZE   128
 #define AF_PACKET_MAX_INTERFACES         32
 
@@ -964,7 +963,7 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
             pool_size += afi->rx_ring.layout.tp_frame_nr;
         pool_size /= 10;
     }
-    if ((rval = create_packet_pool(afpc, pool_size ? pool_size : AF_PACKET_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
+    if ((rval = create_packet_pool(afpc, pool_size)) != DAQ_SUCCESS)
         goto err;
 
     afpc->curr_instance = afpc->instances;
