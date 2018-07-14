@@ -1377,6 +1377,8 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
             continue;
         }
 #endif
+        afpc->stats.packets_received++;
+
         /* Populate the packet descriptor, copying the packet data and releasing the packet
            ring entry back to the kernel for reuse. */
         memcpy(desc->data, data, tp_snaplen);
