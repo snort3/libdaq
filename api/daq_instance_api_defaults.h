@@ -21,10 +21,8 @@
 #include "daq_common.h"
     
 int daq_default_set_filter(void *handle, const char *filter);
-int daq_default_start(void *handle);
 int daq_default_inject(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
 int daq_default_breakloop(void *handle);
-int daq_default_stop(void *handle);
 int daq_default_get_stats(void *handle, DAQ_Stats_t *stats);
 void daq_default_reset_stats(void *handle);
 int daq_default_get_snaplen(void *handle);
