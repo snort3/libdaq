@@ -42,6 +42,9 @@
 
 #define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
+#define CHECK_SUBAPI(ctxt, fname) \
+    (ctxt->subapi.fname.func != NULL)
+
 #define CALL_SUBAPI_NOARGS(ctxt, fname) \
     ctxt->subapi.fname.func(ctxt->subapi.fname.context)
 
@@ -225,6 +228,14 @@ static int dump_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *da
             return DAQ_ERROR;
         }
     }
+
+    if (CHECK_SUBAPI(dc, inject))
+    {
+        int rval = CALL_SUBAPI(dc, inject, msg, data, len, reverse);
+        if (rval != DAQ_SUCCESS)
+            return rval;
+    }
+
     dc->stats.packets_injected++;
     return DAQ_SUCCESS;
 }
@@ -303,12 +314,18 @@ static int dump_daq_stop (void* handle)
 static int dump_daq_get_stats(void* handle, DAQ_Stats_t* stats)
 {
     DumpContext *dc = (DumpContext*) handle;
-    int rval = CALL_SUBAPI(dc, get_stats, stats);
+    int rval = DAQ_SUCCESS;
 
-    /* Use our own concept of verdict and injected packet stats */
-    for (int i = 0; i < MAX_DAQ_VERDICT; i++)
-        stats->verdicts[i] = dc->stats.verdicts[i];
-    stats->packets_injected = dc->stats.packets_injected;
+    if (CHECK_SUBAPI(dc, get_stats))
+    {
+        rval = CALL_SUBAPI(dc, get_stats, stats);
+        /* Use our own concept of verdict and injected packet stats */
+        for (int i = 0; i < MAX_DAQ_VERDICT; i++)
+            stats->verdicts[i] = dc->stats.verdicts[i];
+        stats->packets_injected = dc->stats.packets_injected;
+    }
+    else
+        *stats = dc->stats;
 
     return rval;
 }
@@ -316,14 +333,15 @@ static int dump_daq_get_stats(void* handle, DAQ_Stats_t* stats)
 static void dump_daq_reset_stats(void* handle)
 {
     DumpContext *dc = (DumpContext*) handle;
-    CALL_SUBAPI_NOARGS(dc, reset_stats);
+    if (CHECK_SUBAPI(dc, reset_stats))
+        CALL_SUBAPI_NOARGS(dc, reset_stats);
     memset(&dc->stats, 0, sizeof(dc->stats));
 }
 
 static uint32_t dump_daq_get_capabilities(void* handle)
 {
     DumpContext *dc = (DumpContext*) handle;
-    uint32_t caps = CALL_SUBAPI_NOARGS(dc, get_capabilities);
+    uint32_t caps = CHECK_SUBAPI(dc, get_capabilities) ? CALL_SUBAPI_NOARGS(dc, get_capabilities) : 0;
     caps |= DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT;
     return caps;
 }
@@ -339,6 +357,10 @@ static int dump_daq_modify_flow(void *handle, const DAQ_Msg_t *msg, const DAQ_Mo
                 (unsigned long) hdr->ts.tv_usec, msg->data_len, modify->type, modify->length);
         hexdump(dc->text_out, modify->value, modify->length, "    ");
     }
+
+    if (CHECK_SUBAPI(dc, modify_flow))
+        return CALL_SUBAPI(dc, modify_flow, msg, modify);
+
     return DAQ_SUCCESS;
 }
 
@@ -367,6 +389,10 @@ static int dump_daq_dp_add_dc(void *handle, const DAQ_Msg_t *msg, DAQ_DP_key_t *
         fprintf(dc->text_out, "    %hu %hu %hu %hu 0x%X %u\n", dp_key->address_space_id, dp_key->tunnel_type,
                 dp_key->vlan_id, dp_key->vlan_cnots, params ? params->flags : 0, params ? params->timeout_ms : 0);
     }
+
+    if (CHECK_SUBAPI(dc, dp_add_dc))
+        return CALL_SUBAPI(dc, dp_add_dc, msg, dp_key, packet_data, params);
+
     return DAQ_SUCCESS;
 }
 
