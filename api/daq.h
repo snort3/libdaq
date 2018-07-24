@@ -22,6 +22,10 @@
 #ifndef _DAQ_H
 #define _DAQ_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
 #include <daq_common.h>
 
@@ -141,5 +145,9 @@ static inline void *daq_msg_get_data(DAQ_Msg_h msg)
 {
     return msg->data;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DAQ_H */

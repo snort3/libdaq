@@ -22,6 +22,10 @@
 #ifndef _DAQ_API_H
 #define _DAQ_API_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <daq_common.h>
 
 typedef struct _daq_module_instance *DAQ_ModuleInstance_h;
@@ -171,5 +175,9 @@ typedef struct _daq_module_api
 
 
 #define DAQ_ERRBUF_SIZE 256
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DAQ_API_H */

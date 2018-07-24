@@ -41,6 +41,10 @@
 #ifndef _DAQ_DLT_H
 #define _DAQ_DLT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Link-layer header type codes.
  *
@@ -1401,5 +1405,9 @@
 #define	DLT_NETBSD_RAWAF(af)	(DLT_CLASS_NETBSD_RAWAF | (af))
 #define	DLT_NETBSD_RAWAF_AF(x)	((x) & 0x0000ffff)
 #define	DLT_IS_NETBSD_RAWAF(x)	(DLT_CLASS(x) == DLT_CLASS_NETBSD_RAWAF)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !defined(_DAQ_DLT_H) */

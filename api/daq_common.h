@@ -22,6 +22,10 @@
 #ifndef _DAQ_COMMON_H
 #define _DAQ_COMMON_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <unistd.h>
 #ifndef WIN32
@@ -514,5 +518,9 @@ typedef struct _DAQ_Data_Channel_Params_t
 #define DAQ_CAPA_DECODE_4IN6    0x00010000   /* decodes and tracks flows of IPv4 within IPv6. */
 #define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
 #define DAQ_CAPA_DECODE_MPLS    0x00040000   /* decodes and tracks flows within MPLS. */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _DAQ_COMMON_H */
