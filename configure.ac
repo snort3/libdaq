@@ -4,10 +4,10 @@
 m4_define([daq_major_version], [3])
 m4_define([daq_minor_version], [0])
 m4_define([daq_patch_version], [0])
-m4_define([daq_version], [daq_major_version.daq_minor_version.daq_patch_version])
+m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version])
 
 AC_PREREQ([2.69])
-AC_INIT([daq],[daq_version],[snort-team@sourcefire.com])
+AC_INIT([daq],[daq_version_str],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([api/daq.h])
 AC_CONFIG_HEADERS([config.h])
