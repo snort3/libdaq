@@ -71,7 +71,7 @@ typedef struct _daq_instance
     {                                                   \
         if (mi->module->fname)                          \
         {                                               \
-            api->fname.func = mi->module->fname;        \
+            api->fname.func = mi->module->fname ;       \
             api->fname.context = mi->context;           \
             break;                                      \
         }                                               \
@@ -80,20 +80,12 @@ typedef struct _daq_instance
         api->fname.func = daq_default_ ## fname;        \
 }
 
-#define SET_INSTANCE_API(api, root, fname)  \
-{                                           \
-    api->fname.func = root->module->fname;  \
-    api->fname.context = root->context;     \
-}
-
 static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *modinst, bool default_impl)
 {
     memset(api, 0, sizeof(*api));
     RESOLVE_INSTANCE_API(api, modinst, set_filter, default_impl);
-    SET_INSTANCE_API(api, modinst, start);
     RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
-    SET_INSTANCE_API(api, modinst, stop);
     RESOLVE_INSTANCE_API(api, modinst, get_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, reset_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_snaplen, default_impl);
