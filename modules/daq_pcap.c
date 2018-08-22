@@ -67,7 +67,7 @@ typedef struct _pcap_context
     /* Configuration */
     char *device;
     char *filter_string;
-    int snaplen;
+    unsigned snaplen;
     bool promisc_mode;
     bool immediate_mode;
     int timeout;
@@ -530,9 +530,6 @@ static int pcap_daq_get_snaplen(void *handle)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
 
-    if (pc->handle)
-        return pcap_snapshot(pc->handle);
-
     return pc->snaplen;
 }
 
@@ -631,11 +628,12 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             update_hw_stats(pc);
 
         /* Populate the packet descriptor */
-        memcpy(desc->data, data, pcaphdr->caplen);
+        int caplen = (pcaphdr->caplen > pc->snaplen) ? pc->snaplen : pcaphdr->caplen;
+        memcpy(desc->data, data, caplen);
 
         /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */
         DAQ_Msg_t *msg = &desc->msg;
-        msg->data_len = pcaphdr->caplen;
+        msg->data_len = caplen;
 
         /* Then, set up the DAQ packet header. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
