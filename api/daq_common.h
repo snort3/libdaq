@@ -179,7 +179,7 @@ typedef union {
         uint32_t udp:1;
         uint32_t tcp:1;
         uint32_t icmp:1;
-    };
+    } flags;
 } DAQ_PktDecodeFlags_t;
 
 typedef struct _daq_pkt_decode_data
