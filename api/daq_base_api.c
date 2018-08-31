@@ -33,6 +33,12 @@ static const char *base_api_config_get_input(DAQ_ModuleConfig_h modcfg)
     return daq_config_get_input(cfg);
 }
 
+static uint32_t base_api_config_get_msg_pool_size(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_msg_pool_size(cfg);
+}
+
 static int base_api_config_get_snaplen(DAQ_ModuleConfig_h modcfg)
 {
     DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
@@ -61,7 +67,7 @@ void populate_base_api(DAQ_BaseAPI_t *base_api)
     base_api->config_get_input = base_api_config_get_input;
     base_api->config_get_snaplen = base_api_config_get_snaplen;
     base_api->config_get_timeout = base_api_config_get_timeout;
-    base_api->config_get_msg_pool_size = daq_module_config_get_msg_pool_size;
+    base_api->config_get_msg_pool_size = base_api_config_get_msg_pool_size;
     base_api->config_get_mode = daq_module_config_get_mode;
     base_api->config_get_variable = daq_module_config_get_variable;
     base_api->config_first_variable = daq_module_config_first_variable;

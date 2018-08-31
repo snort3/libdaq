@@ -50,13 +50,13 @@ typedef struct _daq_module_config
     struct _daq_config *config;     /* Backreference to the configuration this is contained within */
     const DAQ_ModuleAPI_t *module;  /* Module that will be instantiated with this configuration */
     DAQ_Mode mode;                  /* Module mode (DAQ_MODE_*) */
-    uint32_t msg_pool_size;         /* Size of the message pool to create (quantity) */
     DAQ_Dict_t variables;           /* Dictionary of arbitrary key[:value] string pairs */
 } DAQ_ModuleConfig_t;
 
 typedef struct _daq_config
 {
     char *input;                    /* Name of the interface(s) or file to be opened */
+    uint32_t msg_pool_size;         /* Size of the message pool to create (quantity) */
     int snaplen;                    /* Maximum packet capture length */
     unsigned timeout;               /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
     DAQ_ModuleConfig_t *module_configs;
@@ -196,24 +196,6 @@ DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_module_config_get_module(DAQ_ModuleConfig
         return NULL;
 
     return modcfg->module;
-}
-
-DAQ_LINKAGE int daq_module_config_set_msg_pool_size(DAQ_ModuleConfig_h modcfg, uint32_t num_msgs)
-{
-    if (!modcfg)
-        return DAQ_ERROR_INVAL;
-
-    modcfg->msg_pool_size = num_msgs;
-
-    return DAQ_SUCCESS;
-}
-
-DAQ_LINKAGE uint32_t daq_module_config_get_msg_pool_size(DAQ_ModuleConfig_h modcfg)
-{
-    if (modcfg)
-        return modcfg->msg_pool_size;
-
-    return 0;
 }
 
 DAQ_LINKAGE int daq_module_config_set_mode(DAQ_ModuleConfig_t *modcfg, DAQ_Mode mode)
@@ -415,6 +397,24 @@ DAQ_LINKAGE const char *daq_config_get_input(DAQ_Config_t *cfg)
         return cfg->input;
 
     return NULL;
+}
+
+DAQ_LINKAGE int daq_config_set_msg_pool_size(DAQ_Config_t *cfg, uint32_t num_msgs)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    cfg->msg_pool_size = num_msgs;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE uint32_t daq_config_get_msg_pool_size(DAQ_Config_t *cfg)
+{
+    if (cfg)
+        return cfg->msg_pool_size;
+
+    return 0;
 }
 
 DAQ_LINKAGE int daq_config_set_snaplen(DAQ_Config_t *cfg, int snaplen)
