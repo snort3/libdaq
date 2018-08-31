@@ -141,7 +141,7 @@ static inline uint32_t daq_msg_get_data_len(DAQ_Msg_h msg)
     return msg->data_len;
 }
 
-static inline void *daq_msg_get_data(DAQ_Msg_h msg)
+static inline uint8_t *daq_msg_get_data(DAQ_Msg_h msg)
 {
     return msg->data;
 }

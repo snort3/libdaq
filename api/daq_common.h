@@ -128,7 +128,7 @@ typedef struct _daq_msg
     size_t hdr_len;             /* Length of the header structure pointed to by 'hdr'. */
     void *hdr;                  /* Pointer to the message header structure for this message. */
     uint32_t data_len;          /* Length of the data pointed to by 'data'.  Should be 0 if 'data' is NULL. */
-    void *data;                 /* Pointer to the variable-length message data. (Optional) */
+    uint8_t *data;              /* Pointer to the variable-length message data. (Optional) */
     void *priv;                 /* Pointer to module instance's private data for this message. (Optional) */
 } DAQ_Msg_t;
 
