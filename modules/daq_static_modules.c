@@ -44,5 +44,8 @@ const DAQ_ModuleAPI_t *static_modules[] =
 #ifdef BUILD_NETMAP_MODULE
     &netmap_daq_module_data,
 #endif
+#ifdef BUILD_TRACE_MODULE
+    &trace_daq_module_data,
+#endif
     NULL
 };

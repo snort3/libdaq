@@ -285,6 +285,12 @@ AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 #    STATIC_LIBS="${STATIC_LIBS} ${DNET_LDFLAGS}"
 #fi
 
+# Trace Module
+AC_ARG_ENABLE(trace-module,
+              AS_HELP_STRING([--disable-trace-module],[do not build the bundled Trace module]),
+              [enable_trace_module="$enableval"], [enable_trace_module="$DEFAULT_ENABLE"])
+AM_CONDITIONAL([BUILD_TRACE_MODULE], [test "$enable_trace_module" = yes])
+
 #AC_SUBST(DNET_LDFLAGS)
 
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
@@ -292,7 +298,8 @@ AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
                                       "$enable_ipfw_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
-                                      "$enable_pcap_module" = yes])
+                                      "$enable_pcap_module" = yes -o \
+                                      "$enable_trace_module" = yes])
 
 LIBS=${save_LIBS}
 
@@ -372,4 +379,5 @@ AC_MSG_RESULT([
     Build NFQ DAQ module....... : $enable_nfq_module
     Build PCAP DAQ module...... : $enable_pcap_module
     Build netmap DAQ module.... : $enable_netmap_module
+    Build Trace DAQ module..... : $enable_trace_module
 ])

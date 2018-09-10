@@ -98,6 +98,18 @@ endif
     libdaq_static_modules_la_CPPFLAGS += -DBUILD_NETMAP_MODULE
 endif
 
+if BUILD_TRACE_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += daq_trace.la
+    daq_trace_la_SOURCES = daq_trace.c
+    daq_trace_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    daq_trace_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    daq_trace_la_LIBADD = -lpcap
+endif
+    libdaq_static_modules_la_SOURCES += daq_trace.c
+    libdaq_static_modules_la_CPPFLAGS += -DBUILD_TRACE_MODULE
+endif
+
 AM_CPPFLAGS = @AM_CPPFLAGS@ -I$(top_srcdir)/api
 
 EXTRA_DIST = daq-modules-config.in
