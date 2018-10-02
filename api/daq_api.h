@@ -35,19 +35,15 @@ typedef int (*daq_module_start_func) (void *handle);
 typedef int (*daq_module_inject_func) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
 typedef int (*daq_module_breakloop_func) (void *handle);
 typedef int (*daq_module_stop_func) (void *handle);
+typedef int (*daq_module_ioctl_func) (void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
 typedef int (*daq_module_get_stats_func) (void *handle, DAQ_Stats_t *stats);
 typedef void (*daq_module_reset_stats_func) (void *handle);
 typedef int (*daq_module_get_snaplen_func) (void *handle);
 typedef uint32_t (*daq_module_get_capabilities_func) (void *handle);
 typedef int (*daq_module_get_datalink_type_func) (void *handle);
-typedef int (*daq_module_get_device_index_func) (void *handle, const char *device);
-typedef int (*daq_module_modify_flow_func) (void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
 typedef int (*daq_module_config_load_func) (void *handle, void **new_config);
 typedef int (*daq_module_config_swap_func) (void *handle, void *new_config, void **old_config);
 typedef int (*daq_module_config_free_func) (void *handle, void *old_config);
-typedef int (*daq_module_dp_add_dc_func) (void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
-        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
-typedef int (*daq_module_query_flow_func) (void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
 typedef unsigned (*daq_module_msg_receive_func) (void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
 typedef int (*daq_module_msg_finalize_func) (void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
 typedef int (*daq_module_get_msg_pool_info_func) (void *handle, DAQ_MsgPoolInfo_t *info);
@@ -59,18 +55,15 @@ typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(inject);
     DAQ_INSTANCE_API_STRUCT(breakloop);
     DAQ_INSTANCE_API_STRUCT(stop);
+    DAQ_INSTANCE_API_STRUCT(ioctl);
     DAQ_INSTANCE_API_STRUCT(get_stats);
     DAQ_INSTANCE_API_STRUCT(reset_stats);
     DAQ_INSTANCE_API_STRUCT(get_snaplen);
     DAQ_INSTANCE_API_STRUCT(get_capabilities);
     DAQ_INSTANCE_API_STRUCT(get_datalink_type);
-    DAQ_INSTANCE_API_STRUCT(get_device_index);
-    DAQ_INSTANCE_API_STRUCT(modify_flow);
-    DAQ_INSTANCE_API_STRUCT(query_flow);
     DAQ_INSTANCE_API_STRUCT(config_load);
     DAQ_INSTANCE_API_STRUCT(config_swap);
     DAQ_INSTANCE_API_STRUCT(config_free);
-    DAQ_INSTANCE_API_STRUCT(dp_add_dc);
     DAQ_INSTANCE_API_STRUCT(msg_receive);
     DAQ_INSTANCE_API_STRUCT(msg_finalize);
     DAQ_INSTANCE_API_STRUCT(get_msg_pool_info);
@@ -133,6 +126,8 @@ typedef struct _daq_module_api
     daq_module_breakloop_func breakloop;
     /* Stop queuing packets, if possible */
     daq_module_stop_func stop;
+    /* Send an I/O control command (read and/or write) */
+    daq_module_ioctl_func ioctl;
     /* Populates the <stats> structure with the current DAQ stats.  These stats are cumulative. */
     daq_module_get_stats_func get_stats;
     /* Resets the DAQ module's internal stats. */
@@ -143,28 +138,12 @@ typedef struct _daq_module_api
     daq_module_get_capabilities_func get_capabilities;
     /* Return the instance's Data Link Type */
     daq_module_get_datalink_type_func get_datalink_type;
-    /* Return the index of the given named device if possible. */
-    daq_module_get_device_index_func get_device_index;
-    /* Modify a flow */
-    daq_module_modify_flow_func modify_flow;
-    /* Query a flow */
-    daq_module_query_flow_func query_flow;
     /* Read new configuration */
     daq_module_config_load_func config_load;
     /* Swap new and old configuration */
     daq_module_config_swap_func config_swap;
     /* Destroy old configuration */
     daq_module_config_free_func config_free;
-    /** DAQ API to program a FST/EFT entry for dynamic protocol data channel
-     *
-     * @param [in] handle      DAQ module handle
-     * @param [in] hdr         DAQ packet header of the control channel packet.
-     * @param [in] dp_key      Key structure of the data channel flow
-     * @param [in] packet_data Packet of the companion control channel packet.
-     * @param [in] params      Parameters to control the PST/EFT entry.
-     * @return                 Error code of the API. 0 - success.
-     */
-    daq_module_dp_add_dc_func dp_add_dc;
 
     daq_module_msg_receive_func msg_receive;
     daq_module_msg_finalize_func msg_finalize;
@@ -172,9 +151,6 @@ typedef struct _daq_module_api
     /* Query message pool info */
     daq_module_get_msg_pool_info_func get_msg_pool_info;
 } DAQ_ModuleAPI_t;
-
-
-#define DAQ_ERRBUF_SIZE 256
 
 #ifdef __cplusplus
 }

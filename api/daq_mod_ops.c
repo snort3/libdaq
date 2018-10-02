@@ -51,6 +51,7 @@ typedef struct _daq_module_instance
     void *context;
 } DAQ_ModuleInstance_t;
 
+#define DAQ_ERRBUF_SIZE 256
 typedef struct _daq_instance
 {
     DAQ_ModuleInstance_t *module_instances;
@@ -88,18 +89,15 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
+    RESOLVE_INSTANCE_API(api, modinst, ioctl, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, reset_stats, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_snaplen, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_capabilities, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_datalink_type, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, get_device_index, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, modify_flow, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, query_flow, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, config_load, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, config_swap, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, config_free, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, dp_add_dc, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, msg_receive, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, msg_finalize, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_msg_pool_info, default_impl);
@@ -312,6 +310,14 @@ DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_t *instance)
     return rval;
 }
 
+DAQ_LINKAGE int daq_instance_ioctl(DAQ_Instance_h instance, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
+{
+    if (!instance)
+        return DAQ_ERROR_NOCTX;
+
+    return instance->api.ioctl.func(instance->api.ioctl.context, cmd, arg, arglen);
+}
+
 DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_t *instance)
 {
     if (!instance)
@@ -372,20 +378,6 @@ DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_t *instance)
     return instance->errbuf;
 }
 
-DAQ_LINKAGE int daq_instance_get_device_index(DAQ_Instance_t *instance, const char *device)
-{
-    if (!instance)
-        return DAQ_ERROR_NOCTX;
-
-    if (!device)
-    {
-        daq_instance_set_errbuf(instance, "No device name to find the index of!");
-        return DAQ_ERROR_INVAL;
-    }
-
-    return instance->api.get_device_index.func(instance->api.get_device_index.context, device);
-}
-
 DAQ_LINKAGE int daq_instance_config_load(DAQ_Instance_t *instance, void **new_config)
 {
     if (!instance)
@@ -408,31 +400,6 @@ DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_t *instance, void *old_con
         return DAQ_ERROR_NOCTX;
 
     return instance->api.config_free.func(instance->api.config_free.context, old_config);
-}
-
-DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_t *instance, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify)
-{
-    if (!instance)
-        return DAQ_ERROR_NOCTX;
-
-    return instance->api.modify_flow.func(instance->api.modify_flow.context, msg, modify);
-}
-
-DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_t *instance, DAQ_Msg_h msg, DAQ_QueryFlow_t *query)
-{
-    if (!instance)
-        return DAQ_ERROR_NOCTX;
-
-    return instance->api.query_flow.func(instance->api.query_flow.context, msg, query);
-}
-
-DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_t *instance, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
-                                        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
-{
-    if (!instance)
-        return DAQ_ERROR_NOCTX;
-
-    return instance->api.dp_add_dc.func(instance->api.dp_add_dc.context, msg, dp_key, packet_data, params);
 }
 
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)

@@ -50,6 +50,11 @@ int daq_default_stop(void *handle)
     return DAQ_SUCCESS;
 }
 
+int daq_default_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
+{
+    return DAQ_ERROR_NOTSUP;
+}
+
 int daq_default_get_stats(void *handle, DAQ_Stats_t *stats)
 {
     return DAQ_ERROR_NOTSUP;
@@ -74,16 +79,6 @@ int daq_default_get_datalink_type(void *handle)
     return DLT_NULL;
 }
 
-int daq_default_get_device_index(void *handle, const char *device)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
-int daq_default_modify_flow(void *handle, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
 int daq_default_config_load(void *handle, void **new_config)
 {
     return DAQ_ERROR_NOTSUP;
@@ -95,17 +90,6 @@ int daq_default_config_swap(void *handle, void *new_config, void **old_config)
 }
 
 int daq_default_config_free(void *handle, void *old_config)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
-int daq_default_dp_add_dc(void *handle, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
-        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
-int daq_default_query_flow(void *handle, DAQ_Msg_h msg, DAQ_QueryFlow_t *query)
 {
     return DAQ_ERROR_NOTSUP;
 }

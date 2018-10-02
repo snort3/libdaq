@@ -209,6 +209,48 @@ static int trace_daq_stop (void* handle)
     return DAQ_SUCCESS;
 }
 
+static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
+{
+    TraceContext* tc = (TraceContext*) handle;
+
+    switch (cmd)
+    {
+        case DIOCTL_CREATE_EXPECTED_FLOW:
+        {
+            DIOCTL_CreateExpectedFlow *cef = (DIOCTL_CreateExpectedFlow *) arg;
+            const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) cef->ctrl_msg->hdr;
+            DAQ_EFlow_Key_t *key = (DAQ_EFlow_Key_t *) &cef->key;
+            char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
+
+            fprintf(tc->outfile, "EF: %lu.%lu(%u):\n", (unsigned long) hdr->ts.tv_sec,
+                    (unsigned long) hdr->ts.tv_usec, cef->ctrl_msg->data_len);
+            if (key->src_af == AF_INET)
+                inet_ntop(AF_INET, &key->sa.src_ip4, src_addr_str, sizeof(src_addr_str));
+            else
+                inet_ntop(AF_INET6, &key->sa.src_ip6, src_addr_str, sizeof(src_addr_str));
+            if (key->dst_af == AF_INET)
+                inet_ntop(AF_INET, &key->da.dst_ip4, dst_addr_str, sizeof(dst_addr_str));
+            else
+                inet_ntop(AF_INET6, &key->da.dst_ip6, dst_addr_str, sizeof(dst_addr_str));
+            fprintf(tc->outfile, "    %s:%hu -> %s:%hu (%hhu)\n", src_addr_str, key->src_port,
+                    dst_addr_str, key->dst_port, key->protocol);
+            fprintf(tc->outfile, "    %hu %hu %hu %hu 0x%X %u\n", key->address_space_id, key->tunnel_type,
+                    key->vlan_id, key->vlan_cnots, cef->flags, cef->timeout_ms);
+            break;
+        }
+
+        default:
+            fprintf(tc->outfile, "IOC: %d %zu\n", cmd, arglen);
+            hexdump(tc->outfile, arg, arglen, "    ");
+            break;
+    }
+
+    if (CHECK_SUBAPI(tc, ioctl))
+        return CALL_SUBAPI(tc, ioctl, cmd, arg, arglen);
+
+    return DAQ_SUCCESS;
+}
+
 static int trace_daq_get_stats(void* handle, DAQ_Stats_t* stats)
 {
     TraceContext *tc = (TraceContext*) handle;
@@ -242,49 +284,6 @@ static uint32_t trace_daq_get_capabilities(void* handle)
     uint32_t caps = CHECK_SUBAPI(tc, get_capabilities) ? CALL_SUBAPI_NOARGS(tc, get_capabilities) : 0;
     caps |= DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT;
     return caps;
-}
-
-static int trace_daq_modify_flow(void *handle, const DAQ_Msg_t *msg, const DAQ_ModFlow_t *modify)
-{
-    TraceContext* tc = (TraceContext*) handle;
-
-    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
-    fprintf(tc->outfile, "MF: %lu.%lu(%u): %d %u \n", (unsigned long) hdr->ts.tv_sec,
-            (unsigned long) hdr->ts.tv_usec, msg->data_len, modify->type, modify->length);
-    hexdump(tc->outfile, modify->value, modify->length, "    ");
-
-    if (CHECK_SUBAPI(tc, modify_flow))
-        return CALL_SUBAPI(tc, modify_flow, msg, modify);
-
-    return DAQ_SUCCESS;
-}
-
-static int trace_daq_dp_add_dc(void *handle, const DAQ_Msg_t *msg, DAQ_DP_key_t *dp_key,
-                                const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params)
-{
-    TraceContext* tc = (TraceContext*) handle;
-    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
-    char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
-
-    fprintf(tc->outfile, "DP: %lu.%lu(%u):\n", (unsigned long) hdr->ts.tv_sec,
-            (unsigned long) hdr->ts.tv_usec, msg->data_len);
-    if (dp_key->src_af == AF_INET)
-        inet_ntop(AF_INET, &dp_key->sa.src_ip4, src_addr_str, sizeof(src_addr_str));
-    else
-        inet_ntop(AF_INET6, &dp_key->sa.src_ip6, src_addr_str, sizeof(src_addr_str));
-    if (dp_key->dst_af == AF_INET)
-        inet_ntop(AF_INET, &dp_key->da.dst_ip4, dst_addr_str, sizeof(dst_addr_str));
-    else
-        inet_ntop(AF_INET6, &dp_key->da.dst_ip6, dst_addr_str, sizeof(dst_addr_str));
-    fprintf(tc->outfile, "    %s:%hu -> %s:%hu (%hhu)\n", src_addr_str, dp_key->src_port,
-            dst_addr_str, dp_key->dst_port, dp_key->protocol);
-    fprintf(tc->outfile, "    %hu %hu %hu %hu 0x%X %u\n", dp_key->address_space_id, dp_key->tunnel_type,
-            dp_key->vlan_id, dp_key->vlan_cnots, params ? params->flags : 0, params ? params->timeout_ms : 0);
-
-    if (CHECK_SUBAPI(tc, dp_add_dc))
-        return CALL_SUBAPI(tc, dp_add_dc, msg, dp_key, packet_data, params);
-
-    return DAQ_SUCCESS;
 }
 
 // We don't have access to daq_verdict_string() because we're not linking
@@ -340,18 +339,15 @@ DAQ_ModuleAPI_t trace_daq_module_data =
     /* .inject = */ trace_daq_inject,
     /* .breakloop = */ NULL,
     /* .stop = */ trace_daq_stop,
+    /* .ioctl = */ trace_daq_ioctl,
     /* .get_stats = */ trace_daq_get_stats,
     /* .reset_stats = */ trace_daq_reset_stats,
     /* .get_snaplen = */ NULL,
     /* .get_capabilities = */ trace_daq_get_capabilities,
     /* .get_datalink_type = */ NULL,
-    /* .get_device_index = */ NULL,
-    /* .modify_flow = */ trace_daq_modify_flow,
-    /* .query_flow = */ NULL,
     /* .config_load = */ NULL,
     /* .config_swap = */ NULL,
     /* .config_free = */ NULL,
-    /* .dp_add_dc = */ trace_daq_dp_add_dc,
     /* .msg_receive = */ NULL,
     /* .msg_finalize = */ trace_daq_msg_finalize,
     /* .get_msg_pool_info = */ NULL,

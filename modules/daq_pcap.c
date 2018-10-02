@@ -554,11 +554,6 @@ static int pcap_daq_get_datalink_type(void *handle)
     return DLT_NULL;
 }
 
-static int pcap_daq_get_device_index(void *handle, const char *device)
-{
-    return DAQ_ERROR_NOTSUP;
-}
-
 static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     struct pcap_pkthdr *pcaphdr;
@@ -698,18 +693,15 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .inject = */ pcap_daq_inject,
     /* .breakloop = */ pcap_daq_breakloop,
     /* .stop = */ pcap_daq_stop,
+    /* .ioctl = */ NULL,
     /* .get_stats = */ pcap_daq_get_stats,
     /* .reset_stats = */ pcap_daq_reset_stats,
     /* .get_snaplen = */ pcap_daq_get_snaplen,
     /* .get_capabilities = */ pcap_daq_get_capabilities,
     /* .get_datalink_type = */ pcap_daq_get_datalink_type,
-    /* .get_device_index = */ pcap_daq_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .query_flow = */ NULL,
     /* .config_load = */ NULL,
     /* .config_swap = */ NULL,
     /* .config_free = */ NULL,
-    /* .dp_add_dc = */ NULL,
     /* .msg_receive = */ pcap_daq_msg_receive,
     /* .msg_finalize = */ pcap_daq_msg_finalize,
     /* .get_msg_pool_info = */ pcap_daq_get_msg_pool_info,

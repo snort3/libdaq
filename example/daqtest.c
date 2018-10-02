@@ -872,12 +872,10 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
 
     if (cfg->modify_opaque_value)
     {
-        DAQ_ModFlow_t modify;
-
-        modify.type = DAQ_MODFLOW_TYPE_OPAQUE;
-        modify.length = sizeof(uint32_t);
-        modify.value = &ctxt->packet_count;
-        daq_instance_modify_flow(ctxt->instance, msg, &modify);
+        DIOCTL_SetFlowOpaque d_sfo;
+        d_sfo.msg = msg;
+        d_sfo.value = ctxt->packet_count;
+        daq_instance_ioctl(ctxt->instance, DIOCTL_SET_FLOW_OPAQUE, &d_sfo, sizeof(d_sfo));
     }
 
     DAQTestPacket dtp;

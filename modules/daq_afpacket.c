@@ -1132,6 +1132,34 @@ static int afpacket_daq_stop(void *handle)
     return DAQ_SUCCESS;
 }
 
+static int afpacket_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
+{
+    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+
+    /* Only supports GET_DEVICE_INDEX for now */
+    if (cmd != DIOCTL_GET_DEVICE_INDEX || arglen != sizeof(DIOCTL_QueryDeviceIndex))
+        return DAQ_ERROR_NOTSUP;
+
+    DIOCTL_QueryDeviceIndex *qdi = (DIOCTL_QueryDeviceIndex *) arg;
+
+    if (!qdi->device)
+    {
+        SET_ERROR(afpc->modinst, "No device name to find the index of!");
+        return DAQ_ERROR_INVAL;
+    }
+
+    for (AFPacketInstance *instance = afpc->instances; instance; instance = instance->next)
+    {
+        if (!strcmp(qdi->device, instance->name))
+        {
+            qdi->index = instance->index;
+            return DAQ_SUCCESS;
+        }
+    }
+
+    return DAQ_ERROR_NODEV;
+}
+
 static int afpacket_daq_get_stats(void *handle, DAQ_Stats_t *stats)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
@@ -1173,20 +1201,6 @@ static uint32_t afpacket_daq_get_capabilities(void *handle)
 static int afpacket_daq_get_datalink_type(void *handle)
 {
     return DLT_EN10MB;
-}
-
-static int afpacket_daq_get_device_index(void *handle, const char *device)
-{
-    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    AFPacketInstance *instance;
-
-    for (instance = afpc->instances; instance; instance = instance->next)
-    {
-        if (!strcmp(device, instance->name))
-            return instance->index;
-    }
-
-    return DAQ_ERROR_NODEV;
 }
 
 static inline AFPacketEntry *find_packet(AFPacket_Context_t *afpc)
@@ -1481,18 +1495,15 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .inject = */ afpacket_daq_inject,
     /* .breakloop = */ afpacket_daq_breakloop,
     /* .stop = */ afpacket_daq_stop,
+    /* .ioctl = */ afpacket_daq_ioctl,
     /* .get_stats = */ afpacket_daq_get_stats,
     /* .reset_stats = */ afpacket_daq_reset_stats,
     /* .get_snaplen = */ afpacket_daq_get_snaplen,
     /* .get_capabilities = */ afpacket_daq_get_capabilities,
     /* .get_datalink_type = */ afpacket_daq_get_datalink_type,
-    /* .get_device_index = */ afpacket_daq_get_device_index,
-    /* .modify_flow = */ NULL,
-    /* .query_flow = */ NULL,
     /* .config_load = */ NULL,
     /* .config_swap = */ NULL,
     /* .config_free = */ NULL,
-    /* .dp_add_dc = */ NULL,
     /* .msg_receive = */ afpacket_daq_msg_receive,
     /* .msg_finalize = */ afpacket_daq_msg_finalize,
     /* .get_msg_pool_info = */ afpacket_daq_get_msg_pool_info,

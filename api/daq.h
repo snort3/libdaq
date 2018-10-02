@@ -96,6 +96,7 @@ DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_Msg_h msg, cons
                                         uint32_t len, int reverse);
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_ioctl(DAQ_Instance_h instance, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
 DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_stats(DAQ_Instance_h instance, DAQ_Stats_t *stats);
 DAQ_LINKAGE void daq_instance_reset_stats(DAQ_Instance_h instance);
@@ -103,14 +104,9 @@ DAQ_LINKAGE int daq_instance_get_snaplen(DAQ_Instance_h instance);
 DAQ_LINKAGE uint32_t daq_instance_get_capabilities(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_get_datalink_type(DAQ_Instance_h instance);
 DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_h instance);
-DAQ_LINKAGE int daq_instance_get_device_index(DAQ_Instance_h instance, const char *device);
-DAQ_LINKAGE int daq_instance_modify_flow(DAQ_Instance_h instance, DAQ_Msg_h msg, const DAQ_ModFlow_t *modify);
-DAQ_LINKAGE int daq_instance_query_flow(DAQ_Instance_h instance, DAQ_Msg_h msg, DAQ_QueryFlow_t *query);
 DAQ_LINKAGE int daq_instance_config_load(DAQ_Instance_h instance, void **new_config);
 DAQ_LINKAGE int daq_instance_config_swap(DAQ_Instance_h instance, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_h instance, void *old_config);
-DAQ_LINKAGE int daq_instance_dp_add_dc(DAQ_Instance_h instance, DAQ_Msg_h msg, DAQ_DP_key_t *dp_key,
-                                        const uint8_t *packet_data, DAQ_Data_Channel_Params_t *params);
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
 DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
 DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info);
