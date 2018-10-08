@@ -161,10 +161,11 @@ if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
     AC_CHECK_DECLS([TPACKET2_HDRLEN, PACKET_TX_RING], [], [enable_afpacket_module=no], [[#include <linux/if_packet.h>]])
     if test "$enable_afpacket_module" = yes -a "$LIBPCAP_AVAILABLE" = yes ; then
-        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+        DAQ_AFPACKET_LIBS="-lpcap"
     fi
 fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
+AM_COND_IF([BUILD_AFPACKET_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_afpacket.pc])])
 
 # BPF Wrapper Module
 AC_ARG_ENABLE(bpf-module,
@@ -172,13 +173,14 @@ AC_ARG_ENABLE(bpf-module,
               [enable_bpf_module="$enableval"], [enable_bpf_module="$DEFAULT_ENABLE"])
 if test "$enable_bpf_module" = yes; then
     if test "$LIBPCAP_AVAILABLE" = yes ; then
-        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+        DAQ_BPF_LIBS="-lpcap"
     else
         AC_MSG_WARN([LibPCAP not available, disabling the BPF DAQ module])
         enable_bpf_module=no
     fi
 fi
 AM_CONDITIONAL([BUILD_BPF_MODULE], [test "$enable_bpf_module" = yes])
+AM_COND_IF([BUILD_BPF_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_bpf.pc])])
 
 # Dump Module
 AC_ARG_ENABLE(dump-module,
@@ -186,13 +188,14 @@ AC_ARG_ENABLE(dump-module,
               [enable_dump_module="$enableval"], [enable_dump_module="$DEFAULT_ENABLE"])
 if test "$enable_dump_module" = yes; then
     if test "$LIBPCAP_AVAILABLE" = yes ; then
-        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+        DAQ_DUMP_LIBS="-lpcap"
     else
         AC_MSG_WARN([LibPCAP not available, disabling the Dump DAQ module])
         enable_dump_module=no
     fi
 fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
+AM_COND_IF([BUILD_DUMP_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_dump.pc])])
 
 # IPFW Module
 AC_ARG_ENABLE(ipfw-module,
@@ -202,6 +205,7 @@ if test "$enable_ipfw_module" = yes; then
     AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_ipfw_module=no], [[#include <netinet/in.h>]])
 fi
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
+AM_COND_IF([BUILD_IPFW_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_ipfw.pc])])
 
 # NFQ Module
 AC_ARG_ENABLE(nfq-module,
@@ -211,10 +215,11 @@ if test "$enable_nfq_module" = yes; then
     AC_CHECK_HEADERS([linux/netfilter.h linux/netfilter/nfnetlink_queue.h libmnl/libmnl.h], [], [enable_nfq_module=no])
     AC_CHECK_LIB([mnl], [mnl_socket_open], [], [enable_nfq_module=no])
     if test "$enable_nfq_module" = yes; then
-        STATIC_LIBS="${STATIC_LIBS} -lmnl"
+        DAQ_NFQ_LIBS="-lmnl"
     fi
 fi
 AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
+AM_COND_IF([BUILD_NFQ_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_nfq.pc])])
 
 # PCAP Module
 AC_ARG_ENABLE(pcap-module,
@@ -222,13 +227,14 @@ AC_ARG_ENABLE(pcap-module,
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
     if test "$LIBPCAP_AVAILABLE" = yes ; then
-        STATIC_LIBS="${STATIC_LIBS} -lpcap"
+        DAQ_PCAP_LIBS="-lpcap"
     else
         AC_MSG_WARN([LibPCAP not available, disabling the PCAP DAQ module])
         enable_pcap_module=no
     fi
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
+AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_pcap.pc])])
 
 # netmap Module
 #AC_ARG_ENABLE(netmap-module,
@@ -290,6 +296,7 @@ AC_ARG_ENABLE(trace-module,
               AS_HELP_STRING([--disable-trace-module],[do not build the bundled Trace module]),
               [enable_trace_module="$enableval"], [enable_trace_module="$DEFAULT_ENABLE"])
 AM_CONDITIONAL([BUILD_TRACE_MODULE], [test "$enable_trace_module" = yes])
+AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_trace.pc])])
 
 #AC_SUBST(DNET_LDFLAGS)
 
@@ -302,8 +309,6 @@ AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_trace_module" = yes])
 
 LIBS=${save_LIBS}
-
-AC_SUBST(STATIC_LIBS)
 
 AC_CHECK_LIB([dl], [dlopen], [LIBDL="-ldl"])
 
@@ -335,6 +340,13 @@ AC_SUBST(DAQ_PATCH_VERSION)
 AC_SUBST(PCAP_CPPFLAGS)
 AC_SUBST(PCAP_LDFLAGS)
 
+# Module-specific Substitutions
+AC_SUBST(DAQ_AFPACKET_LIBS)
+AC_SUBST(DAQ_BPF_LIBS)
+AC_SUBST(DAQ_DUMP_LIBS)
+AC_SUBST(DAQ_NFQ_LIBS)
+AC_SUBST(DAQ_PCAP_LIBS)
+
 if test "${CODE_COVERAGE_ENABLED}" = yes ; then
     CFLAGS=`echo $CFLAGS | ${SED} 's/-O\w//g'`
 fi
@@ -344,7 +356,6 @@ AC_CONFIG_FILES([Makefile
                  api/Makefile
                  example/Makefile
                  modules/Makefile
-                 modules/daq-modules-config
                  test/Makefile
                  libdaq.pc
                  ])

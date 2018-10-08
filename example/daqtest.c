@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #include <daq.h>
+#include <daq_api.h>
 #include <daq_dlt.h>
 
 #include "netinet_compat.h"
@@ -129,7 +130,59 @@ typedef struct _VlanTagHdr
 
 
 #ifdef USE_STATIC_MODULES
-extern DAQ_Module_h static_modules[];
+#ifdef BUILD_AFPACKET_MODULE
+extern const DAQ_ModuleAPI_t afpacket_daq_module_data;
+#endif
+#ifdef BUILD_BPF_MODULE
+extern const DAQ_ModuleAPI_t bpf_daq_module_data;
+#endif
+#ifdef BUILD_DUMP_MODULE
+extern const DAQ_ModuleAPI_t dump_daq_module_data;
+#endif
+#ifdef BUILD_IPFW_MODULE
+extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
+#endif
+#ifdef BUILD_NFQ_MODULE
+extern const DAQ_ModuleAPI_t nfq_daq_module_data;
+#endif
+#ifdef BUILD_PCAP_MODULE
+extern const DAQ_ModuleAPI_t pcap_daq_module_data;
+#endif
+#ifdef BUILD_NETMAP_MODULE
+extern const DAQ_ModuleAPI_t netmap_daq_module_data;
+#endif
+#ifdef BUILD_TRACE_MODULE
+extern const DAQ_ModuleAPI_t trace_daq_module_data;
+#endif
+
+static DAQ_Module_h static_modules[] =
+{
+#ifdef BUILD_AFPACKET_MODULE
+    &afpacket_daq_module_data,
+#endif
+#ifdef BUILD_BPF_MODULE
+    &bpf_daq_module_data,
+#endif
+#ifdef BUILD_DUMP_MODULE
+    &dump_daq_module_data,
+#endif
+#ifdef BUILD_IPFW_MODULE
+    &ipfw_daq_module_data,
+#endif
+#ifdef BUILD_NFQ_MODULE
+    &nfq_daq_module_data,
+#endif
+#ifdef BUILD_PCAP_MODULE
+    &pcap_daq_module_data,
+#endif
+#ifdef BUILD_NETMAP_MODULE
+    &netmap_daq_module_data,
+#endif
+#ifdef BUILD_TRACE_MODULE
+    &trace_daq_module_data,
+#endif
+    NULL
+};
 #endif
 
 static uint8_t normal_ping_data[IP_MAXPACKET];

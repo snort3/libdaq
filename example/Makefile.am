@@ -3,10 +3,36 @@ AM_CFLAGS = -Wall -I$(top_srcdir)/api
 
 bin_PROGRAMS = daqtest daqtest-static
 
-daqtest_SOURCES = daqtest.c
+# Dynamic modules build
+daqtest_SOURCES = daqtest.c netinet_compat.h
 daqtest_LDADD = ${top_builddir}/api/libdaq.la -lpthread
 
+# Static modules build
 daqtest_static_CFLAGS = $(AM_CFLAGS) -DUSE_STATIC_MODULES
 daqtest_static_SOURCES = daqtest.c
 daqtest_static_LDFLAGS = -static-libtool-libs $(PCAP_LDFLAGS)
-daqtest_static_LDADD = ${top_builddir}/api/libdaq.la ${top_builddir}/modules/libdaq_static_modules.la $(STATIC_LIBS) -lpthread
+daqtest_static_LDADD = ${top_builddir}/api/libdaq.la -lpthread
+if BUILD_AFPACKET_MODULE
+daqtest_static_CFLAGS += -DBUILD_AFPACKET_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_afpacket.la $(DAQ_AFPACKET_LIBS)
+endif
+if BUILD_BPF_MODULE
+daqtest_static_CFLAGS += -DBUILD_BPF_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_bpf.la $(DAQ_BPF_LIBS)
+endif
+if BUILD_DUMP_MODULE
+daqtest_static_CFLAGS += -DBUILD_DUMP_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_dump.la $(DAQ_DUMP_LIBS)
+endif
+if BUILD_NFQ_MODULE
+daqtest_static_CFLAGS += -DBUILD_NFQ_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_nfq.la $(DAQ_NFQ_LIBS)
+endif
+if BUILD_PCAP_MODULE
+daqtest_static_CFLAGS += -DBUILD_PCAP_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_pcap.la $(DAQ_PCAP_LIBS)
+endif
+if BUILD_TRACE_MODULE
+daqtest_static_CFLAGS += -DBUILD_TRACE_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_trace.la
+endif

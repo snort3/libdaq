@@ -1,0 +1,15 @@
+# libdaq_static_dump pkg-config file
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libdaq_static_dump
+Description: Dump static DAQ module
+URL: https://snort.org/downloads
+Version: @VERSION@
+Requires:
+Conflicts:
+Libs: -L${libdir} -ldaq_static_dump @DAQ_DUMP_LIBS@
+Cflags:

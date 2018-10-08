@@ -55,7 +55,7 @@ daq-*-coverage.info
 # Locally generated artifacts
 libdaq.pc
 api/daq_version.h
-modules/daq-modules-config
+modules/libdaq_static_*.pc
 example/daqtest
 example/daqtest-static
 
