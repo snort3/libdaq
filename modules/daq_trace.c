@@ -209,21 +209,146 @@ static int trace_daq_stop (void* handle)
     return DAQ_SUCCESS;
 }
 
+static void print_msg(TraceContext* tc, const DAQ_Msg_t *msg)
+{
+    if (msg->type == DAQ_MSG_TYPE_PACKET)
+    {
+        const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
+        fprintf(tc->outfile, "%lu.%lu(%u)", (unsigned long) hdr->ts.tv_sec,
+                    (unsigned long) hdr->ts.tv_usec, msg->data_len);
+    }
+}
+
 static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
 {
     TraceContext* tc = (TraceContext*) handle;
 
     switch (cmd)
     {
+        case DIOCTL_GET_DEVICE_INDEX:
+        {
+            if (arglen != sizeof(DIOCTL_QueryDeviceIndex))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_QueryDeviceIndex *qdi = (DIOCTL_QueryDeviceIndex *) arg;
+            if (!qdi->device)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: QueryDeviceIndex: '%s'\n", qdi->device);
+            break;
+        }
+        case DIOCTL_SET_FLOW_OPAQUE:
+        {
+            if (arglen != sizeof(DIOCTL_SetFlowOpaque))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_SetFlowOpaque *sfo = (DIOCTL_SetFlowOpaque *) arg;
+            if (!sfo->msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetFlowOpaque: ");
+            print_msg(tc, sfo->msg);
+            fprintf(tc->outfile, " Value: %u\n", sfo->value);
+            break;
+        }
+        case DIOCTL_SET_FLOW_HA_STATE:
+        {
+            if (arglen != sizeof(DIOCTL_FlowHAState))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_FlowHAState *fhs = (DIOCTL_FlowHAState *) arg;
+            if (!fhs->msg || (!fhs->data && fhs->length != 0))
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetFlowHAState: ");
+            print_msg(tc, fhs->msg);
+            fprintf(tc->outfile, " (%u)\n", fhs->length);
+            hexdump(tc->outfile, fhs->data, fhs->length, "    ");
+            break;
+        }
+        case DIOCTL_GET_FLOW_HA_STATE:
+        {
+            if (arglen != sizeof(DIOCTL_FlowHAState))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_FlowHAState *fhs = (DIOCTL_FlowHAState *) arg;
+            if (!fhs->msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: GetFlowHAState: ");
+            print_msg(tc, fhs->msg);
+            fprintf(tc->outfile, "\n");
+            break;
+        }
+        case DIOCTL_SET_FLOW_QOS_ID:
+        {
+            if (arglen != sizeof(DIOCTL_SetFlowQosID))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_SetFlowQosID *sfq = (DIOCTL_SetFlowQosID *) arg;
+            if (!sfq->msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetFlowQosID: ");
+            print_msg(tc, sfq->msg);
+            fprintf(tc->outfile, "%u/0x%x\n", (unsigned) (sfq->qos_id & 0xFFFFFFFF),
+                    (unsigned) (sfq->qos_id >> 32));
+            break;
+        }
+        case DIOCTL_SET_PACKET_TRACE_DATA:
+        {
+            if (arglen != sizeof(DIOCTL_SetPacketTraceData))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_SetPacketTraceData *sptd = (DIOCTL_SetPacketTraceData *) arg;
+            if (!sptd->msg || (!sptd->trace_data && sptd->trace_data_len != 0))
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetPacketTraceData: ");
+            print_msg(tc, sptd->msg);
+            fprintf(tc->outfile, " VR: %hhu (%u):\n", sptd->verdict_reason, sptd->trace_data_len);
+            fprintf(tc->outfile, "    %.*s\n", sptd->trace_data_len, sptd->trace_data);
+            break;
+        }
+        case DIOCTL_SET_PACKET_VERDICT_REASON:
+        {
+            if (arglen != sizeof(DIOCTL_SetPacketVerdictReason))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_SetPacketVerdictReason *spvr = (DIOCTL_SetPacketVerdictReason *) arg;
+            if (!spvr->msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetPacketVerdictReason: ");
+            print_msg(tc, spvr->msg);
+            fprintf(tc->outfile, " VR: %hhu\n", spvr->verdict_reason);
+            break;
+        }
+        case DIOCTL_SET_FLOW_PRESERVE:
+        {
+            if (arglen != sizeof(DAQ_Msg_h))
+                return DAQ_ERROR_INVAL;
+            DAQ_Msg_h msg = (DAQ_Msg_h) arg;
+            if (!msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: SetFlowPreserve: ");
+            print_msg(tc, msg);
+            fprintf(tc->outfile, "\n");
+            break;
+        }
+        case DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN:
+        case DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN_ACK:
+        {
+            if (arglen != sizeof(DIOCTL_GetPacketScrubbedTcp))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_GetPacketScrubbedTcp *gpst = (DIOCTL_GetPacketScrubbedTcp *) arg;
+            if (!gpst->msg)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: %s: ", (cmd == DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN) ?
+                    "GetFlowTcpScrubbedSyn" : "GetFlowTcpScrubbedSynAck");
+            print_msg(tc, gpst->msg);
+            fprintf(tc->outfile, "\n");
+            break;
+        }
         case DIOCTL_CREATE_EXPECTED_FLOW:
         {
+            if (arglen != sizeof(DIOCTL_CreateExpectedFlow))
+                return DAQ_ERROR_INVAL;
             DIOCTL_CreateExpectedFlow *cef = (DIOCTL_CreateExpectedFlow *) arg;
-            const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) cef->ctrl_msg->hdr;
+            if (!cef->ctrl_msg || cef->ctrl_msg->type != DAQ_MSG_TYPE_PACKET)
+                return DAQ_ERROR_INVAL;
+            fprintf(tc->outfile, "IOCTL: CreateExpectedFlow: ");
+            print_msg(tc, cef->ctrl_msg);
+            fprintf(tc->outfile, ":\n");
+
             DAQ_EFlow_Key_t *key = (DAQ_EFlow_Key_t *) &cef->key;
             char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
-
-            fprintf(tc->outfile, "EF: %lu.%lu(%u):\n", (unsigned long) hdr->ts.tv_sec,
-                    (unsigned long) hdr->ts.tv_usec, cef->ctrl_msg->data_len);
             if (key->src_af == AF_INET)
                 inet_ntop(AF_INET, &key->sa.src_ip4, src_addr_str, sizeof(src_addr_str));
             else
@@ -240,7 +365,7 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
         }
 
         default:
-            fprintf(tc->outfile, "IOC: %d %zu\n", cmd, arglen);
+            fprintf(tc->outfile, "IOCTL: %d (%zu)\n", cmd, arglen);
             hexdump(tc->outfile, arg, arglen, "    ");
             break;
     }
