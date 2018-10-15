@@ -168,7 +168,7 @@ DAQ_LINKAGE const DAQ_Module_t *daq_find_module(const char *name)
     return NULL;
 }
 
-static int register_module(const DAQ_Module_t *dm, void *dl_handle)
+static int register_module(const DAQ_Module_t *dm, void *dl_handle, const char *filename)
 {
     DAQ_ListNode_t *node;
 
@@ -176,7 +176,7 @@ static int register_module(const DAQ_Module_t *dm, void *dl_handle)
     if (dm->api_version != DAQ_API_VERSION)
     {
         fprintf(stderr, "%s: Module API version (0x%x) differs from expected version (0x%x)\n",
-                dm->name, dm->api_version, DAQ_API_VERSION);
+                filename, dm->api_version, DAQ_API_VERSION);
         return DAQ_ERROR;
     }
 
@@ -256,7 +256,7 @@ static int daq_load_module(const char *filename)
         return DAQ_ERROR;
     }
 
-    if ((rval = register_module(dm, dl_handle)) != DAQ_SUCCESS)
+    if ((rval = register_module(dm, dl_handle, filename)) != DAQ_SUCCESS)
     {
         if (rval != DAQ_ERROR_EXISTS)
             fprintf(stderr, "%s: Failed to register DAQ module.\n", filename);
@@ -277,7 +277,7 @@ static void load_static_modules(void)
     for (i = 0; i < num_static_modules; i++)
     {
         dm = static_modules[i];
-        if (register_module(dm, NULL) != DAQ_SUCCESS)
+        if (register_module(dm, NULL, "[static]") != DAQ_SUCCESS)
             fprintf(stderr, "%s (%d): Failed to register static DAQ module.\n", dm->name, i);
     }
 }
