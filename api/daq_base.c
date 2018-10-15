@@ -151,7 +151,7 @@ DAQ_LINKAGE const DAQ_ModuleAPI_t *daq_find_module(const char *name)
     return NULL;
 }
 
-static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
+static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const char *filename)
 {
     DAQ_ListNode_t *node;
     DAQ_BaseAPI_t base_api;
@@ -161,7 +161,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     if (dm->api_version != DAQ_MODULE_API_VERSION)
     {
         fprintf(stderr, "%s: Module API version (0x%x) differs from expected version (0x%x)\n",
-                dm->name, dm->api_version, DAQ_MODULE_API_VERSION);
+                filename, dm->api_version, DAQ_MODULE_API_VERSION);
         return DAQ_ERROR;
     }
 
@@ -169,7 +169,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle)
     if (dm->api_size != sizeof(DAQ_ModuleAPI_t))
     {
         fprintf(stderr, "%s: Module API structure size (%u) differs from the expected size (%zu)\n",
-                dm->name, dm->api_version, sizeof(DAQ_ModuleAPI_t));
+                filename, dm->api_version, sizeof(DAQ_ModuleAPI_t));
         return DAQ_ERROR;
     }
 
@@ -255,7 +255,7 @@ static int daq_load_dynamic_module(const char *filename)
         return DAQ_ERROR;
     }
 
-    if ((rval = register_module(dm, dl_handle)) != DAQ_SUCCESS)
+    if ((rval = register_module(dm, dl_handle, filename)) != DAQ_SUCCESS)
     {
         if (rval != DAQ_ERROR_EXISTS)
             fprintf(stderr, "%s: Failed to register DAQ module.\n", filename);
@@ -273,7 +273,7 @@ DAQ_LINKAGE int daq_load_static_modules(const DAQ_ModuleAPI_t **modules)
 
     for (dmptr = modules; dmptr && (dm = *dmptr) != NULL; dmptr++)
     {
-        if (register_module(dm, NULL) != DAQ_SUCCESS)
+        if (register_module(dm, NULL, "[static]") != DAQ_SUCCESS)
             fprintf(stderr, "%s (%d): Failed to register static DAQ module.\n", dm->name, i);
         i++;
     }
