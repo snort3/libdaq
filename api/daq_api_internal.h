@@ -23,7 +23,7 @@
 
 #include <stdio.h>
 
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 extern int daq_verbosity;
 

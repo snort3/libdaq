@@ -38,7 +38,7 @@
 #endif /* HAVE_LINUX_IF_PACKET_H */
 #include <unistd.h>
 
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 #define DAQ_PCAP_VERSION 4
 

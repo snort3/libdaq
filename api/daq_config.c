@@ -26,9 +26,9 @@
 #include <string.h>
 
 #include "daq.h"
-#include "daq_api.h"
 #include "daq_api_internal.h"
 #include "daq_common.h"
+#include "daq_module_api.h"
 
 typedef struct _daq_dict_entry
 {

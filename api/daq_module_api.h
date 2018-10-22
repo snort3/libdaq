@@ -19,8 +19,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
-#ifndef _DAQ_API_H
-#define _DAQ_API_H
+#ifndef _DAQ_MODULE_API_H
+#define _DAQ_MODULE_API_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -156,4 +156,4 @@ typedef struct _daq_module_api
 }
 #endif
 
-#endif /* _DAQ_API_H */
+#endif /* _DAQ_MODULE_API_H */

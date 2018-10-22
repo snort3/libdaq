@@ -27,7 +27,7 @@
 #include <string.h>
 
 #include "daq.h"
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 #define DAQ_BPF_VERSION 1
 

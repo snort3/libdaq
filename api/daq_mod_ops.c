@@ -30,9 +30,9 @@
 #include <string.h>
 
 #include "daq.h"
-#include "daq_api.h"
 #include "daq_api_internal.h"
 #include "daq_instance_api_defaults.h"
+#include "daq_module_api.h"
 
 /*
  * The DAQ instance contains a top-level API dispatch array that points to the first instance

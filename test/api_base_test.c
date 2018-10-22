@@ -33,7 +33,6 @@
 #include <cmocka.h>
 
 #include "daq.h"
-#include "daq_api.h"
 #include "mock_stdio.h"
 
 #include "daq_test_module.h"

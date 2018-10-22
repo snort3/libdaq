@@ -28,8 +28,8 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "daq_api.h"
 #include "daq_dlt.h"
+#include "daq_module_api.h"
 
 #define DAQ_IPFW_VERSION 4
 

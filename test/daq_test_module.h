@@ -1,7 +1,7 @@
 #ifndef _DAQ_TEST_MODULE_H
 #define _DAQ_TEST_MODULE_H
 
-#include <daq_api.h>
+#include <daq_module_api.h>
 
 #define TEST_MODULE_VERSION 1
 #define TEST_MODULE_NAME    "Test"

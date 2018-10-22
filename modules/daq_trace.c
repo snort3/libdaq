@@ -24,6 +24,7 @@
 #endif
 
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,8 +32,7 @@
 #include <sys/socket.h>
 #endif
 
-#include "daq.h"
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 #define DAQ_TRACE_VERSION 1
 

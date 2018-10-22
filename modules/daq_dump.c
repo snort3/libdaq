@@ -28,8 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "daq.h"
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 #define DAQ_DUMP_VERSION 5
 

@@ -34,8 +34,8 @@
 #include <unistd.h>
 
 #include <daq.h>
-#include <daq_api.h>
 #include <daq_dlt.h>
+#include <daq_module_api.h>
 
 #include "netinet_compat.h"
 

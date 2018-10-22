@@ -49,7 +49,7 @@
 #include "daq_dlt.h"
 #endif
 
-#include "daq_api.h"
+#include "daq_module_api.h"
 
 #define DAQ_AFPACKET_VERSION 6
 
