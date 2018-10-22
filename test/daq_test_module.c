@@ -26,7 +26,12 @@
 
 #include <daq_dlt.h>
 
-static int daq_test_prepare(const DAQ_BaseAPI_t *base_api)
+static int daq_test_module_load(const DAQ_BaseAPI_t *base_api)
+{
+    return DAQ_SUCCESS;
+}
+
+static int daq_test_module_unload(void)
 {
     return DAQ_SUCCESS;
 }
@@ -108,7 +113,8 @@ DAQ_ModuleAPI_t test_module =
     /* .module_version = */ TEST_MODULE_VERSION,
     /* .name = */ TEST_MODULE_NAME,
     /* .type = */ TEST_MODULE_TYPE,
-    /* .prepare = */ daq_test_prepare,
+    /* .load = */ daq_test_module_load,
+    /* .unload = */ daq_test_module_unload,
     /* .get_variable_descs = */ daq_test_get_variable_descs,
     /* .instantiate = */ daq_test_instantiate,
     /* .destroy = */ daq_test_destroy,

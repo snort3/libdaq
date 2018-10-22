@@ -66,13 +66,19 @@ DAQ_BaseAPI_t daq_base_api;
 
 //-------------------------------------------------------------------------
 
-static int dump_daq_prepare(const DAQ_BaseAPI_t *base_api)
+static int dump_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
 
     daq_base_api = *base_api;
 
+    return DAQ_SUCCESS;
+}
+
+static int dump_daq_module_unload(void)
+{
+    memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
@@ -308,7 +314,8 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .module_version = */ DAQ_DUMP_VERSION,
     /* .name = */ "dump",
     /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
-    /* .prepare = */ dump_daq_prepare,
+    /* .load = */ dump_daq_module_load,
+    /* .unload = */ dump_daq_module_unload,
     /* .get_variable_descs = */ dump_daq_get_variable_descs,
     /* .instantiate = */ dump_daq_instantiate,
     /* .destroy = */ dump_daq_destroy,

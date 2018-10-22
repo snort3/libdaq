@@ -213,13 +213,19 @@ static inline int set_nonblocking(Pcap_Context_t *pc, bool nonblocking)
     return 0;
 }
 
-static int pcap_daq_prepare(const DAQ_BaseAPI_t *base_api)
+static int pcap_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
 
     daq_base_api = *base_api;
 
+    return DAQ_SUCCESS;
+}
+
+static int pcap_daq_module_unload(void)
+{
+    memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
@@ -684,7 +690,8 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .module_version = */ DAQ_PCAP_VERSION,
     /* .name = */ "pcap",
     /* .type = */ DAQ_TYPE_FILE_CAPABLE | DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    /* .prepare = */ pcap_daq_prepare,
+    /* .load = */ pcap_daq_module_load,
+    /* .unload = */ pcap_daq_module_unload,
     /* .get_variable_descs = */ pcap_daq_get_variable_descs,
     /* .instantiate = */ pcap_daq_instantiate,
     /* .destroy = */ pcap_daq_destroy,

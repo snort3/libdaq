@@ -57,13 +57,19 @@ static DAQ_VariableDesc_t bpf_variable_descriptions[] = {
 DAQ_BaseAPI_t daq_base_api;
 
 
-static int bpf_daq_prepare(const DAQ_BaseAPI_t *base_api)
+static int bpf_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
 
     daq_base_api = *base_api;
 
+    return DAQ_SUCCESS;
+}
+
+static int bpf_daq_module_unload(void)
+{
+    memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
@@ -236,7 +242,8 @@ DAQ_ModuleAPI_t bpf_daq_module_data =
     /* .module_version = */ DAQ_BPF_VERSION,
     /* .name = */ "bpf",
     /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
-    /* .prepare = */ bpf_daq_prepare,
+    /* .load = */ bpf_daq_module_load,
+    /* .unload = */ bpf_daq_module_unload,
     /* .get_variable_descs = */ bpf_daq_get_variable_descs,
     /* .instantiate = */ bpf_daq_instantiate,
     /* .destroy = */ bpf_daq_destroy,

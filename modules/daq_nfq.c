@@ -361,14 +361,21 @@ static int process_message_cb(const struct nlmsghdr *nlh, void *data)
  * DAQ Module API Implementation
  */
 
-/* Module->prepare() */
-static int nfq_daq_prepare(const DAQ_BaseAPI_t *base_api)
+/* Module->load() */
+static int nfq_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
 
     daq_base_api = *base_api;
 
+    return DAQ_SUCCESS;
+}
+
+/* Module->unload() */
+static int nfq_daq_module_unload(void)
+{
+    memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
@@ -810,7 +817,8 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .module_version = */ DAQ_NFQ_VERSION,
     /* .name = */ "nfq",
     /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE | DAQ_TYPE_NO_UNPRIV,
-    /* .prepare = */ nfq_daq_prepare,
+    /* .load = */ nfq_daq_module_load,
+    /* .unload = */ nfq_daq_module_unload,
     /* .get_variable_descs = */ nfq_daq_get_variable_descs,
     /* .instantiate = */ nfq_daq_instantiate,
     /* .destroy = */ nfq_daq_destroy,

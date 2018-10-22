@@ -174,7 +174,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
     }
 
     /* Check to make sure that all of the required function pointers are populated. */
-    if (!dm->prepare || !dm->get_variable_descs || !dm->instantiate || !dm->destroy)
+    if (!dm->load || !dm->get_variable_descs || !dm->instantiate || !dm->destroy)
     {
         fprintf(stderr, "%s: Module API is missing required functions!\n", dm->name);
         return DAQ_ERROR;
@@ -213,7 +213,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
 
     /* Prepare the DAQ module for future use. */
     populate_base_api(&base_api);
-    if ((rval = dm->prepare(&base_api)) != DAQ_SUCCESS)
+    if ((rval = dm->load(&base_api)) != DAQ_SUCCESS)
     {
         fprintf(stderr, "%s: Error preparing module for use! (%d)\n", dm->name, rval);
         return rval;
@@ -401,10 +401,10 @@ DAQ_LINKAGE void daq_unload_modules(void)
     {
         node = module_list;
         module_list = node->next;
+        if (node->module->unload)
+            node->module->unload();
         if (node->dl_handle)
-        {
             dlclose(node->dl_handle);
-        }
         free(node);
         num_modules--;
     }

@@ -107,7 +107,9 @@ typedef struct _daq_module_api
     /* Various flags describing the module and its capabilities (Inline-capabale, etc.) */
     const uint32_t type;
     /* The function the module loader *must* call first to prepare the module for any other function calls. */
-    int (*prepare) (const DAQ_BaseAPI_t *base_api);
+    int (*load) (const DAQ_BaseAPI_t *base_api);
+    /* Called when the module is unloaded.  No more calls will be made without calling load() again first. */
+    int (*unload) (void);
     /* Get a pointer to an array describing the DAQ variables accepted by this module.
         Returns the size of the retrieved array. */
     int (*get_variable_descs) (const DAQ_VariableDesc_t **var_desc_table);

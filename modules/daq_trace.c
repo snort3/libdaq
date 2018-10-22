@@ -82,13 +82,19 @@ static void hexdump(FILE *fp, const uint8_t *data, unsigned int len, const char 
     fprintf(fp, "\n");
 }
 
-static int trace_daq_prepare(const DAQ_BaseAPI_t *base_api)
+static int trace_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
 
     daq_base_api = *base_api;
 
+    return DAQ_SUCCESS;
+}
+
+static int trace_daq_module_unload(void)
+{
+    memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
@@ -455,7 +461,8 @@ DAQ_ModuleAPI_t trace_daq_module_data =
     /* .module_version = */ DAQ_TRACE_VERSION,
     /* .name = */ "trace",
     /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
-    /* .prepare = */ trace_daq_prepare,
+    /* .load = */ trace_daq_module_load,
+    /* .unload = */ trace_daq_module_unload,
     /* .get_variable_descs = */ trace_daq_get_variable_descs,
     /* .instantiate = */ trace_daq_instantiate,
     /* .destroy = */ trace_daq_destroy,
