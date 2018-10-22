@@ -69,9 +69,6 @@ typedef struct _ipfw_context {
 
 static void ipfw_daq_destroy(void *);
 
-static DAQ_VariableDesc_t ipfw_variable_descriptions[] = {
-};
-
 static DAQ_BaseAPI_t daq_base_api;
 
 
@@ -153,13 +150,6 @@ static int ipfw_daq_module_unload(void)
 {
     memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
-}
-
-static int ipfw_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
-{
-    *var_desc_table = ipfw_variable_descriptions;
-
-    return sizeof(ipfw_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
 static int ipfw_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
@@ -499,7 +489,7 @@ const DAQ_ModuleAPI_t ipfw_daq_module_data =
     /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
     /* .load = */ ipfw_daq_module_load,
     /* .unload = */ ipfw_daq_module_unload,
-    /* .get_variable_descs = */ ipfw_daq_get_variable_descs,
+    /* .get_variable_descs = */ NULL,
     /* .instantiate = */ ipfw_daq_instantiate,
     /* .destroy = */ ipfw_daq_destroy,
     /* .set_filter = */ NULL,

@@ -51,9 +51,6 @@ typedef struct
     uint64_t filtered;
 } BPF_Context_t;
 
-static DAQ_VariableDesc_t bpf_variable_descriptions[] = {
-};
-
 DAQ_BaseAPI_t daq_base_api;
 
 
@@ -71,13 +68,6 @@ static int bpf_daq_module_unload(void)
 {
     memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
-}
-
-static int bpf_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
-{
-    *var_desc_table = bpf_variable_descriptions;
-
-    return sizeof(bpf_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
 }
 
 static int bpf_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
@@ -244,7 +234,7 @@ DAQ_ModuleAPI_t bpf_daq_module_data =
     /* .type = */ DAQ_TYPE_WRAPPER | DAQ_TYPE_INLINE_CAPABLE,
     /* .load = */ bpf_daq_module_load,
     /* .unload = */ bpf_daq_module_unload,
-    /* .get_variable_descs = */ bpf_daq_get_variable_descs,
+    /* .get_variable_descs = */ NULL,
     /* .instantiate = */ bpf_daq_instantiate,
     /* .destroy = */ bpf_daq_destroy,
     /* .set_filter = */ bpf_daq_set_filter,
