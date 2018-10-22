@@ -239,6 +239,7 @@ DAQ_ModuleAPI_t bpf_daq_module_data =
     /* .destroy = */ bpf_daq_destroy,
     /* .set_filter = */ bpf_daq_set_filter,
     /* .start = */ NULL,
+    /* .inject = */ NULL,
     /* .inject_relative = */ NULL,
     /* .breakloop = */ NULL,
     /* .stop = */ NULL,

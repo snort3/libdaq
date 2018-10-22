@@ -157,19 +157,43 @@ static void trace_daq_destroy(void *handle)
     free(tc);
 }
 
-static int trace_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
+static int trace_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len)
+{
+    TraceContext *tc = (TraceContext*) handle;
+
+    if (type == DAQ_MSG_TYPE_PACKET)
+    {
+        const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) hdr;
+        fprintf(tc->outfile, "I: %lu.%lu(%u)\n", (unsigned long) pkthdr->ts.tv_sec,
+               (unsigned long) pkthdr->ts.tv_usec, data_len);
+        hexdump(tc->outfile, data, data_len, "    ");
+        fprintf(tc->outfile, "\n");
+    }
+
+    if (CHECK_SUBAPI(tc, inject))
+    {
+        int rval = CALL_SUBAPI(tc, inject, type, hdr, data, data_len);
+        if (rval != DAQ_SUCCESS)
+            return rval;
+    }
+
+    tc->stats.packets_injected++;
+    return DAQ_SUCCESS;
+}
+
+static int trace_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
 {
     TraceContext *tc = (TraceContext*) handle;
     const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
 
     fprintf(tc->outfile, "%cI: %lu.%lu(%u): %u\n", reverse ? 'R' : 'F',
-            (unsigned long) hdr->ts.tv_sec, (unsigned long) hdr->ts.tv_usec, msg->data_len, len);
-    hexdump(tc->outfile, data, len, "    ");
+            (unsigned long) hdr->ts.tv_sec, (unsigned long) hdr->ts.tv_usec, msg->data_len, data_len);
+    hexdump(tc->outfile, data, data_len, "    ");
     fprintf(tc->outfile, "\n");
 
     if (CHECK_SUBAPI(tc, inject_relative))
     {
-        int rval = CALL_SUBAPI(tc, inject_relative, msg, data, len, reverse);
+        int rval = CALL_SUBAPI(tc, inject_relative, msg, data, data_len, reverse);
         if (rval != DAQ_SUCCESS)
             return rval;
     }
@@ -468,6 +492,7 @@ DAQ_ModuleAPI_t trace_daq_module_data =
     /* .destroy = */ trace_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ trace_daq_start,
+    /* .inject = */ trace_daq_inject,
     /* .inject_relative = */ trace_daq_inject_relative,
     /* .breakloop = */ NULL,
     /* .stop = */ trace_daq_stop,

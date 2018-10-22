@@ -22,7 +22,8 @@
     
 int daq_default_set_filter(void *handle, const char *filter);
 int daq_default_start(void *handle);
-int daq_default_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
+int daq_default_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len);
+int daq_default_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *data, uint32_t data_len, int reverse);
 int daq_default_breakloop(void *handle);
 int daq_default_stop(void *handle);
 int daq_default_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen);

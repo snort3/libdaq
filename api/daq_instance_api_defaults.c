@@ -35,7 +35,12 @@ int daq_default_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-int daq_default_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse)
+int daq_default_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len)
+{
+    return DAQ_ERROR_NOTSUP;
+}
+
+int daq_default_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *data, uint32_t data_len, int reverse)
 {
     return DAQ_ERROR_NOTSUP;
 }

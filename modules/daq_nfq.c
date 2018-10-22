@@ -36,6 +36,8 @@
 #include "daq_dlt.h"
 #include "daq_module_api.h"
 
+/* FIXIT-M Need to figure out how to reimplement inject for NFQ */
+
 #define DAQ_NFQ_VERSION 8
 
 #define NFQ_DEFAULT_POOL_SIZE   16
@@ -617,13 +619,6 @@ static int nfq_daq_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-/* Module->inject_relative() */
-static int nfq_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
-{
-    /* FIXIT-M Need to figure out how to reimplement inject for NFQ */
-    return DAQ_ERROR_NOTSUP;
-}
-
 /* Module->breakloop() */
 static int nfq_daq_breakloop(void *handle)
 {
@@ -824,7 +819,8 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .destroy = */ nfq_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ nfq_daq_start,
-    /* .inject_relative = */ nfq_daq_inject_relative,
+    /* .inject = */ NULL,
+    /* .inject_relative = */ NULL,
     /* .breakloop = */ nfq_daq_breakloop,
     /* .stop = */ nfq_daq_stop,
     /* .ioctl = */ NULL,

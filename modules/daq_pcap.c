@@ -461,11 +461,14 @@ fail:
     return DAQ_ERROR;
 }
 
-static int pcap_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int pcap_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
 
-    if (pcap_inject(pc->handle, packet_data, len) < 0)
+    if (type != DAQ_MSG_TYPE_PACKET)
+        return DAQ_ERROR_NOTSUP;
+
+    if (pcap_inject(pc->handle, data, data_len) < 0)
     {
         SET_ERROR(pc->modinst, "%s", pcap_geterr(pc->handle));
         return DAQ_ERROR;
@@ -697,7 +700,8 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .destroy = */ pcap_daq_destroy,
     /* .set_filter = */ pcap_daq_set_filter,
     /* .start = */ pcap_daq_start,
-    /* .inject_relative = */ pcap_daq_inject_relative,
+    /* .inject = */ pcap_daq_inject,
+    /* .inject_relative = */ NULL,
     /* .breakloop = */ pcap_daq_breakloop,
     /* .stop = */ pcap_daq_stop,
     /* .ioctl = */ NULL,

@@ -1086,27 +1086,16 @@ static inline int afpacket_transmit_packet(AFPacketInstance *egress, const uint8
     return DAQ_SUCCESS;
 }
 
-static int afpacket_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int afpacket_inject_packet(AFPacket_Context_t *afpc, AFPacketInstance *egress, const uint8_t *data, uint32_t data_len)
 {
-    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
-    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
-    AFPacketInstance *egress;
-    int rval;
-
-    /* Find the instance that the packet was received on. */
-    for (egress = afpc->instances; egress; egress = egress->next)
-    {
-        if (egress->index == hdr->ingress_index)
-            break;
-    }
-
-    if (!egress || (!reverse && !(egress = egress->peer)))
+    if (!egress)
     {
         SET_ERROR(afpc->modinst, "%s: Could not determine which instance to inject the packet out of!", __func__);
         return DAQ_ERROR;
     }
 
-    if ((rval = afpacket_transmit_packet(egress, packet_data, len)) != DAQ_SUCCESS)
+    int rval = afpacket_transmit_packet(egress, data, data_len);
+    if (rval != DAQ_SUCCESS)
     {
         if (rval == DAQ_ERROR_AGAIN)
             SET_ERROR(afpc->modinst, "%s: Could not send packet because the TX ring is full.", __func__);
@@ -1118,6 +1107,34 @@ static int afpacket_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, cons
     afpc->stats.packets_injected++;
 
     return DAQ_SUCCESS;
+}
+
+static int afpacket_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len)
+{
+    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+
+    if (type != DAQ_MSG_TYPE_PACKET)
+        return DAQ_ERROR_NOTSUP;
+
+    const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) hdr;
+    AFPacketInstance *egress;
+
+    for (egress = afpc->instances; egress; egress = egress->next)
+    {
+        if (egress->index == pkthdr->ingress_index)
+            break;
+    }
+
+    return afpacket_inject_packet(afpc, egress, data, data_len);
+}
+
+static int afpacket_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
+{
+    AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
+    AFPacketPktDesc *desc = (AFPacketPktDesc *) msg->priv;
+    AFPacketInstance *egress = reverse ? desc->instance : desc->instance->peer;
+
+    return afpacket_inject_packet(afpc, egress, data, data_len);
 }
 
 static int afpacket_daq_breakloop(void *handle)
@@ -1499,6 +1516,7 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .destroy = */ afpacket_daq_destroy,
     /* .set_filter = */ afpacket_daq_set_filter,
     /* .start = */ afpacket_daq_start,
+    /* .inject = */ afpacket_daq_inject,
     /* .inject_relative = */ afpacket_daq_inject_relative,
     /* .breakloop = */ afpacket_daq_breakloop,
     /* .stop = */ afpacket_daq_stop,

@@ -263,25 +263,46 @@ DAQ_LINKAGE int daq_instance_start(DAQ_Instance_t *instance)
     return rval;
 }
 
+DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, DAQ_MsgType type, const void *hdr,
+                                    const uint8_t *data, uint32_t data_len)
+{
+    if (!instance)
+        return DAQ_ERROR_NOCTX;
+
+    if (!hdr)
+    {
+        daq_instance_set_errbuf(instance, "No message header given!");
+        return DAQ_ERROR_INVAL;
+    }
+
+    if (!data)
+    {
+        daq_instance_set_errbuf(instance, "No message data specified!");
+        return DAQ_ERROR_INVAL;
+    }
+
+    return instance->api.inject.func(instance->api.inject.context, type, hdr, data, data_len);
+}
+
 DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_t *instance, DAQ_Msg_h msg,
-                                        const uint8_t *packet_data, uint32_t len, int reverse)
+                                                const uint8_t *data, uint32_t data_len, int reverse)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
     if (!msg)
     {
-        daq_instance_set_errbuf(instance, "No originating packet header specified!");
+        daq_instance_set_errbuf(instance, "No original message header given!");
         return DAQ_ERROR_INVAL;
     }
 
-    if (!packet_data)
+    if (!data)
     {
-        daq_instance_set_errbuf(instance, "No packet data specified!");
+        daq_instance_set_errbuf(instance, "No message data given!");
         return DAQ_ERROR_INVAL;
     }
 
-    return instance->api.inject_relative.func(instance->api.inject_relative.context, msg, packet_data, len, reverse);
+    return instance->api.inject_relative.func(instance->api.inject_relative.context, msg, data, data_len, reverse);
 }
 
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_t *instance)

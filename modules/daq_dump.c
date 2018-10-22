@@ -153,40 +153,6 @@ static void dump_daq_destroy(void *handle)
     free(dc);
 }
 
-static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
-{
-    DumpContext *dc = (DumpContext*) handle;
-    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
-
-    if (dc->dumper)
-    {
-        struct pcap_pkthdr phdr;
-
-        // Reuse the timestamp from the original packet for the injected packet
-        phdr.ts = hdr->ts;
-        phdr.caplen = len;
-        phdr.len = len;
-
-        pcap_dump((u_char*)dc->dumper, &phdr, data);
-
-        if (ferror(pcap_dump_file(dc->dumper)))
-        {
-            SET_ERROR(dc->modinst, "inject can't write to dump file");
-            return DAQ_ERROR;
-        }
-    }
-
-    if (CHECK_SUBAPI(dc, inject_relative))
-    {
-        int rval = CALL_SUBAPI(dc, inject_relative, msg, data, len, reverse);
-        if (rval != DAQ_SUCCESS)
-            return rval;
-    }
-
-    dc->stats.packets_injected++;
-    return DAQ_SUCCESS;
-}
-
 static int dump_daq_start(void *handle)
 {
     DumpContext *dc = (DumpContext*) handle;
@@ -221,6 +187,61 @@ static int dump_daq_start(void *handle)
         pcap_close(pcap);
     }
 
+    return DAQ_SUCCESS;
+}
+
+static int dump_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len)
+{
+    DumpContext *dc = (DumpContext*) handle;
+
+    if (dc->dumper && type == DAQ_MSG_TYPE_PACKET)
+    {
+        const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) hdr;
+        struct pcap_pkthdr phdr;
+
+        phdr.ts = pkthdr->ts;
+        phdr.caplen = data_len;
+        phdr.len = data_len;
+
+        pcap_dump((u_char*)dc->dumper, &phdr, data);
+    }
+
+    if (CHECK_SUBAPI(dc, inject))
+    {
+        int rval = CALL_SUBAPI(dc, inject, type, hdr, data, data_len);
+        if (rval != DAQ_SUCCESS)
+            return rval;
+    }
+
+    dc->stats.packets_injected++;
+    return DAQ_SUCCESS;
+}
+
+static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
+{
+    DumpContext *dc = (DumpContext*) handle;
+    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
+
+    if (dc->dumper)
+    {
+        struct pcap_pkthdr phdr;
+
+        // Reuse the timestamp from the original packet for the injected packet
+        phdr.ts = hdr->ts;
+        phdr.caplen = data_len;
+        phdr.len = data_len;
+
+        pcap_dump((u_char*)dc->dumper, &phdr, data);
+    }
+
+    if (CHECK_SUBAPI(dc, inject_relative))
+    {
+        int rval = CALL_SUBAPI(dc, inject_relative, msg, data, data_len, reverse);
+        if (rval != DAQ_SUCCESS)
+            return rval;
+    }
+
+    dc->stats.packets_injected++;
     return DAQ_SUCCESS;
 }
 
@@ -321,6 +342,7 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .destroy = */ dump_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ dump_daq_start,
+    /* .inject = */ dump_daq_inject,
     /* .inject_relative = */ dump_daq_inject_relative,
     /* .breakloop = */ NULL,
     /* .stop = */ dump_daq_stop,

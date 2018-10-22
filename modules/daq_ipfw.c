@@ -241,15 +241,15 @@ static int ipfw_daq_stop(void *handle)
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int ipfw_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
 {
     Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
     IpfwPktDesc *desc = (IpfwPktDesc *) msg->priv;
 
     /* We don't appear to need to respect the reverse aspect as long as the packet is well-formed enough to be
         routed successfully. */
-    ssize_t wrote = sendto(ipfwc->sock, packet_data, len, 0, (struct sockaddr*) &desc->addr, sizeof(desc->addr));
-    if (wrote < 0 || (unsigned) wrote != len)
+    ssize_t wrote = sendto(ipfwc->sock, data, data_len, 0, (struct sockaddr*) &desc->addr, sizeof(desc->addr));
+    if (wrote < 0 || (unsigned) wrote != data_len)
     {
         SET_ERROR(ipfwc->modinst, "%s: Couldn't send to the DIVERT socket: %s", __func__, strerror(errno));
         return DAQ_ERROR;
@@ -494,6 +494,7 @@ const DAQ_ModuleAPI_t ipfw_daq_module_data =
     /* .destroy = */ ipfw_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ ipfw_daq_start,
+    /* .inject = */ NULL,
     /* .inject_relative = */ ipfw_daq_inject_relative,
     /* .breakloop = */ ipfw_daq_breakloop,
     /* .stop = */ ipfw_daq_stop,

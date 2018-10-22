@@ -92,8 +92,10 @@ DAQ_LINKAGE int daq_instance_instantiate(const DAQ_Config_h config, DAQ_Instance
 DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
 DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);
-DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_h instance, DAQ_Msg_h msg, const uint8_t *packet_data,
-                                        uint32_t len, int reverse);
+DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_MsgType type, const void *hdr,
+        const uint8_t *data, uint32_t data_len);
+DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_h instance, DAQ_Msg_h msg,
+        const uint8_t *data, uint32_t data_len, int reverse);
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_ioctl(DAQ_Instance_h instance, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
@@ -107,7 +109,8 @@ DAQ_LINKAGE const char *daq_instance_get_error(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_config_load(DAQ_Instance_h instance, void **new_config);
 DAQ_LINKAGE int daq_instance_config_swap(DAQ_Instance_h instance, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_h instance, void *old_config);
-DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
+DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv,
+        const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
 DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
 DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info);
 
