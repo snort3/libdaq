@@ -1086,7 +1086,7 @@ static inline int afpacket_transmit_packet(AFPacketInstance *egress, const uint8
     return DAQ_SUCCESS;
 }
 
-static int afpacket_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int afpacket_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
     const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
@@ -1499,7 +1499,7 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .destroy = */ afpacket_daq_destroy,
     /* .set_filter = */ afpacket_daq_set_filter,
     /* .start = */ afpacket_daq_start,
-    /* .inject = */ afpacket_daq_inject,
+    /* .inject_relative = */ afpacket_daq_inject_relative,
     /* .breakloop = */ afpacket_daq_breakloop,
     /* .stop = */ afpacket_daq_stop,
     /* .ioctl = */ afpacket_daq_ioctl,

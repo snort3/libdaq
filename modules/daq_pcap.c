@@ -461,7 +461,7 @@ fail:
     return DAQ_ERROR;
 }
 
-static int pcap_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int pcap_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
 
@@ -697,7 +697,7 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .destroy = */ pcap_daq_destroy,
     /* .set_filter = */ pcap_daq_set_filter,
     /* .start = */ pcap_daq_start,
-    /* .inject = */ pcap_daq_inject,
+    /* .inject_relative = */ pcap_daq_inject_relative,
     /* .breakloop = */ pcap_daq_breakloop,
     /* .stop = */ pcap_daq_stop,
     /* .ioctl = */ NULL,

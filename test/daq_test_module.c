@@ -56,7 +56,7 @@ static int daq_test_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-static int daq_test_inject(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int daq_test_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     return DAQ_SUCCESS;
 }
@@ -120,7 +120,7 @@ DAQ_ModuleAPI_t test_module =
     /* .destroy = */ daq_test_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ daq_test_start,
-    /* .inject = */ daq_test_inject,
+    /* .inject_relative = */ daq_test_inject_relative,
     /* .breakloop = */ daq_test_breakloop,
     /* .stop = */ daq_test_stop,
     /* .ioctl = */ NULL,

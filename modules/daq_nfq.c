@@ -617,8 +617,8 @@ static int nfq_daq_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-/* Module->inject() */
-static int nfq_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+/* Module->inject_relative() */
+static int nfq_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     /* FIXIT-M Need to figure out how to reimplement inject for NFQ */
     return DAQ_ERROR_NOTSUP;
@@ -824,7 +824,7 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .destroy = */ nfq_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ nfq_daq_start,
-    /* .inject = */ nfq_daq_inject,
+    /* .inject_relative = */ nfq_daq_inject_relative,
     /* .breakloop = */ nfq_daq_breakloop,
     /* .stop = */ nfq_daq_stop,
     /* .ioctl = */ NULL,

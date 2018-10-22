@@ -92,7 +92,7 @@ DAQ_LINKAGE int daq_instance_instantiate(const DAQ_Config_h config, DAQ_Instance
 DAQ_LINKAGE int daq_instance_destroy(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_set_filter(DAQ_Instance_h instance, const char *filter);
 DAQ_LINKAGE int daq_instance_start(DAQ_Instance_h instance);
-DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_Msg_h msg, const uint8_t *packet_data,
+DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_h instance, DAQ_Msg_h msg, const uint8_t *packet_data,
                                         uint32_t len, int reverse);
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);

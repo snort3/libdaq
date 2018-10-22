@@ -241,7 +241,7 @@ static int ipfw_daq_stop(void *handle)
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
+static int ipfw_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *packet_data, uint32_t len, int reverse)
 {
     Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
     IpfwPktDesc *desc = (IpfwPktDesc *) msg->priv;
@@ -494,7 +494,7 @@ const DAQ_ModuleAPI_t ipfw_daq_module_data =
     /* .destroy = */ ipfw_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ ipfw_daq_start,
-    /* .inject = */ ipfw_daq_inject,
+    /* .inject_relative = */ ipfw_daq_inject_relative,
     /* .breakloop = */ ipfw_daq_breakloop,
     /* .stop = */ ipfw_daq_stop,
     /* .ioctl = */ NULL,

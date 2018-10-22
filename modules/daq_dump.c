@@ -153,7 +153,7 @@ static void dump_daq_destroy(void *handle)
     free(dc);
 }
 
-static int dump_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
+static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t len, int reverse)
 {
     DumpContext *dc = (DumpContext*) handle;
     const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
@@ -176,9 +176,9 @@ static int dump_daq_inject(void *handle, const DAQ_Msg_t *msg, const uint8_t *da
         }
     }
 
-    if (CHECK_SUBAPI(dc, inject))
+    if (CHECK_SUBAPI(dc, inject_relative))
     {
-        int rval = CALL_SUBAPI(dc, inject, msg, data, len, reverse);
+        int rval = CALL_SUBAPI(dc, inject_relative, msg, data, len, reverse);
         if (rval != DAQ_SUCCESS)
             return rval;
     }
@@ -321,7 +321,7 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .destroy = */ dump_daq_destroy,
     /* .set_filter = */ NULL,
     /* .start = */ dump_daq_start,
-    /* .inject = */ dump_daq_inject,
+    /* .inject_relative = */ dump_daq_inject_relative,
     /* .breakloop = */ NULL,
     /* .stop = */ dump_daq_stop,
     /* .ioctl = */ NULL,

@@ -86,7 +86,7 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     memset(api, 0, sizeof(*api));
     RESOLVE_INSTANCE_API(api, modinst, set_filter, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, start, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
+    RESOLVE_INSTANCE_API(api, modinst, inject_relative, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, ioctl, default_impl);
@@ -263,7 +263,7 @@ DAQ_LINKAGE int daq_instance_start(DAQ_Instance_t *instance)
     return rval;
 }
 
-DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, DAQ_Msg_h msg,
+DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_t *instance, DAQ_Msg_h msg,
                                         const uint8_t *packet_data, uint32_t len, int reverse)
 {
     if (!instance)
@@ -281,7 +281,7 @@ DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_t *instance, DAQ_Msg_h msg,
         return DAQ_ERROR_INVAL;
     }
 
-    return instance->api.inject.func(instance->api.inject.context, msg, packet_data, len, reverse);
+    return instance->api.inject_relative.func(instance->api.inject_relative.context, msg, packet_data, len, reverse);
 }
 
 DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_t *instance)

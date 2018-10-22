@@ -32,7 +32,7 @@ typedef struct _daq_module_instance *DAQ_ModuleInstance_h;
 
 typedef int (*daq_module_set_filter_func) (void *handle, const char *filter);
 typedef int (*daq_module_start_func) (void *handle);
-typedef int (*daq_module_inject_func) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
+typedef int (*daq_module_inject_relative_func) (void *handle, DAQ_Msg_h msg, const uint8_t *packet_data, uint32_t len, int reverse);
 typedef int (*daq_module_breakloop_func) (void *handle);
 typedef int (*daq_module_stop_func) (void *handle);
 typedef int (*daq_module_ioctl_func) (void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
@@ -52,7 +52,7 @@ typedef int (*daq_module_get_msg_pool_info_func) (void *handle, DAQ_MsgPoolInfo_
 typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(set_filter);
     DAQ_INSTANCE_API_STRUCT(start);
-    DAQ_INSTANCE_API_STRUCT(inject);
+    DAQ_INSTANCE_API_STRUCT(inject_relative);
     DAQ_INSTANCE_API_STRUCT(breakloop);
     DAQ_INSTANCE_API_STRUCT(stop);
     DAQ_INSTANCE_API_STRUCT(ioctl);
@@ -123,7 +123,7 @@ typedef struct _daq_module_api
     /* Complete device opening and begin queuing packets if they have not been already. */
     daq_module_start_func start;
     /* Inject a new packet going either the same or opposite direction as the specified message. */
-    daq_module_inject_func inject;
+    daq_module_inject_relative_func inject_relative;
     /* Force breaking out of the acquisition loop after the current iteration. */
     daq_module_breakloop_func breakloop;
     /* Stop queuing packets, if possible */

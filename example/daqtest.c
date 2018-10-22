@@ -466,7 +466,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
 
                 reply_len = forge_icmp_reply(dtp, &reply);
                 printf("Injecting forged ICMP reply back to source! (%zu bytes)\n", reply_len);
-                rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1);
+                rc = daq_instance_inject_relative(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1);
                 if (rc == DAQ_ERROR_NOTSUP)
                     printf("This module does not support packet injection.\n");
                 else if (rc != DAQ_SUCCESS)
@@ -494,7 +494,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
 
         case PING_ACTION_CLONE:
             printf("Injecting cloned ICMP packet.\n");
-            rc = daq_instance_inject(dtp->ctxt->instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
+            rc = daq_instance_inject_relative(dtp->ctxt->instance, dtp->msg, dtp->packet, daq_msg_get_data_len(dtp->msg), 0);
             if (rc == DAQ_ERROR_NOTSUP)
                 printf("This module does not support packet injection.\n");
             else if (rc != DAQ_SUCCESS)
@@ -583,7 +583,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     reply = forge_etharp_reply(dtp, local_mac_addr);
     reply_len = sizeof(*dtp->eth) + dtp->vlan_tags * sizeof(VlanTagHdr) + sizeof(EthArp);
     printf("Injecting forged Ethernet ARP reply back to source (%zu bytes)!\n", reply_len);
-    if (daq_instance_inject(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1))
+    if (daq_instance_inject_relative(dtp->ctxt->instance, dtp->msg, reply, reply_len, 1))
         printf("Failed to inject ARP reply: %s\n", daq_instance_get_error(dtp->ctxt->instance));
     free(reply);
 
