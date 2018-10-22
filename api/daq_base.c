@@ -197,9 +197,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
             return DAQ_ERROR_EXISTS;
         }
         if (node->dl_handle)
-        {
             dlclose(node->dl_handle);
-        }
     }
     else
     {

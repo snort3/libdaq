@@ -1157,13 +1157,14 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 'm':
                 cfg->num_module_paths++;
-                cfg->module_paths = realloc(cfg->module_paths, cfg->num_module_paths * sizeof(char *));
+                cfg->module_paths = realloc(cfg->module_paths, (cfg->num_module_paths + 1) * sizeof(char *));
                 if (!cfg->module_paths)
                 {
                     fprintf(stderr, "Failed to allocate space for a module path pointer!\n\n");
                     return -1;
                 }
                 cfg->module_paths[cfg->num_module_paths - 1] = optarg;
+                cfg->module_paths[cfg->num_module_paths] = NULL;
                 break;
 
             case 'M':
@@ -1272,7 +1273,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 break;
 
             default:
-                fprintf(stderr, "Invalid argument specified (%c)!\n", ch);
+                fprintf(stderr, "Invalid argument specified (-%c)!\n", optopt);
                 return -1;
         }
     }
@@ -1521,6 +1522,25 @@ static int create_daq_config(DAQTestConfig *cfg, DAQ_Config_h *daqcfg_ptr)
     return 0;
 }
 
+static void clear_daqtest_config(DAQTestConfig *cfg)
+{
+    free(cfg->module_paths);
+    while (cfg->module_configs)
+    {
+        DAQTestModuleConfig *dtmc = cfg->module_configs;
+        cfg->module_configs = dtmc->next;
+        free(dtmc->variables);
+        free(dtmc);
+    }
+    while (cfg->ip_addrs)
+    {
+        IPv4Addr *ip = cfg->ip_addrs;
+        cfg->ip_addrs = ip->next;
+        free(ip);
+    }
+    memset(cfg, 0, sizeof(*cfg));
+}
+
 int main(int argc, char *argv[])
 {
     DAQTestConfig cfg;
@@ -1678,6 +1698,11 @@ int main(int argc, char *argv[])
         }
         daq_instance_destroy(dttc->instance);
     }
+
+    /* Clean up remaining memory to make Valgrind-like tools happy. */
+    free(threads);
+    clear_daqtest_config(&cfg);
+    daq_unload_modules();
 
     return 0;
 }
