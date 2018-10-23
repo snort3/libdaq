@@ -432,6 +432,26 @@ DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const un
         return 0;
     }
 
+    if (!msgs)
+    {
+        daq_instance_set_errbuf(instance, "No message vector given to populate!");
+        *rstat = DAQ_RSTAT_INVALID;
+        return 0;
+    }
+
+    if (!rstat)
+    {
+        daq_instance_set_errbuf(instance, "No receive status given to set!");
+        *rstat = DAQ_RSTAT_INVALID;
+        return 0;
+    }
+
+    if (!max_recv)
+    {
+        *rstat = DAQ_RSTAT_OK;
+        return 0;
+    }
+
     return instance->api.msg_receive.func(instance->api.msg_receive.context, max_recv, msgs, rstat);
 }
 
@@ -439,6 +459,12 @@ DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_t *instance, const DAQ_Ms
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
+
+    if (!msg)
+    {
+        daq_instance_set_errbuf(instance, "No message given to finalize!");
+        return DAQ_ERROR_INVAL;
+    }
 
     return instance->api.msg_finalize.func(instance->api.msg_finalize.context, msg, verdict);
 }
