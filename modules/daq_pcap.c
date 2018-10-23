@@ -82,6 +82,7 @@ typedef struct _pcap_context
     FILE *fp;
     uint32_t netmask;
     bool nonblocking;
+    volatile bool break_loop;
     /* Stats tracking */
     uint32_t base_recv;
     uint32_t base_drop;
@@ -485,6 +486,8 @@ static int pcap_daq_breakloop(void *handle)
     if (!pc->handle)
         return DAQ_ERROR;
 
+    pc->break_loop = true;
+
     pcap_breakloop(pc->handle);
 
     return DAQ_SUCCESS;
@@ -617,10 +620,15 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             }
             else if (pcap_rval == -2)
             {
-                if (pc->mode == DAQ_MODE_READ_FILE)
+                /* LibPCAP brilliantly decides to return -2 if it hit EOF in readback OR pcap_breakloop()
+                    was called.  Let's try to differentiate by checking to see if we asked for a break. */
+                if (!pc->break_loop && pc->mode == DAQ_MODE_READ_FILE)
                     *rstat = DAQ_RSTAT_EOF;
                 else
+                {
                     *rstat = DAQ_RSTAT_INTERRUPTED;
+                    pc->break_loop = false;
+                }
             }
             break;
         }
