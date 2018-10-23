@@ -86,6 +86,7 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     memset(api, 0, sizeof(*api));
     RESOLVE_INSTANCE_API(api, modinst, set_filter, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, start, default_impl);
+    RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, inject_relative, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
