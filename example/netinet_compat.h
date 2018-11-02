@@ -41,7 +41,7 @@ typedef struct icmp6_hdr Icmp6Hdr;
 
 #else
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
 #include <inttypes.h>
 #endif
 
@@ -176,7 +176,7 @@ typedef struct _icmp6_hdr
 #define icmp6_id        icmp6_data16[0]  /* echo request/reply */
 #define icmp6_seq       icmp6_data16[1]  /* echo request/reply */
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
 #define s6_addr16 __u6_addr.__u6_addr16
 #define s6_addr32 __u6_addr.__u6_addr32
 #endif

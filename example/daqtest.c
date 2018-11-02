@@ -118,7 +118,7 @@ typedef struct _DAQTestPacket
     uint16_t vlan_tags;
 } DAQTestPacket;
 
-#define VTH_PRIORITY(vh)  ((ntohs((vh)->vth_pri_cfi_vlan) & 0xe000) >> 13)
+#define VTH_PRIORITY(vh)  ((unsigned short)((ntohs((vh)->vth_pri_cfi_vlan) & 0xe000) >> 13))
 #define VTH_CFI(vh)       ((ntohs((vh)->vth_pri_cfi_vlan) & 0x0100) >> 12)
 #define VTH_VLAN(vh)      ((unsigned short)(ntohs((vh)->vth_pri_cfi_vlan) & 0x0FFF))
 
@@ -229,7 +229,7 @@ static void usage(void)
 
 static void print_mac(const uint8_t *addr)
 {
-    printf("%.2hx:%.2hx:%.2hx:%.2hx:%.2hx:%.2hx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+    printf("%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 }
 
 static void print_hex_dump(const uint8_t *data, unsigned int len)
@@ -510,7 +510,7 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
     unsigned int dlen;
 
     dlen = ntohs(dtp->ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
-    printf("  ICMP: Type %hu  Code %hu  Checksum %hu  (%u bytes of data)\n",
+    printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
            dtp->icmp->type, dtp->icmp->code, dtp->icmp->checksum, dlen);
     if (dtp->icmp->type == ICMP_ECHO || dtp->icmp->type == ICMP_ECHOREPLY)
     {
@@ -527,7 +527,7 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
     unsigned int dlen;
 
     dlen = ntohs(dtp->ip6->ip6_plen) - sizeof(Ip6Hdr) - sizeof(Icmp6Hdr);
-    printf("  ICMP: Type %hu  Code %hu  Checksum %hu  (%u bytes of data)\n",
+    printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
            dtp->icmp6->icmp6_type, dtp->icmp6->icmp6_code, dtp->icmp6->icmp6_cksum, dlen);
     if (dtp->icmp6->icmp6_type == ICMP6_ECHO_REQUEST || dtp->icmp6->icmp6_type == ICMP6_ECHO_REPLY)
     {
@@ -547,7 +547,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     uint8_t *reply;
     size_t reply_len;
 
-    printf(" ARP: Hardware Type %hu (%hu)  Protocol Type %.4hX (%hu)  Operation %hu\n",
+    printf(" ARP: Hardware Type %hu (%hhu)  Protocol Type %.4hX (%hhu)  Operation %hu\n",
             ntohs(dtp->arp->ar_hrd), dtp->arp->ar_hln, ntohs(dtp->arp->ar_pro),
             dtp->arp->ar_pln, ntohs(dtp->arp->ar_op));
 
@@ -986,9 +986,9 @@ static void handle_flow_stats_message(DAQ_Msg_h msg)
     printf("\n");
     if (msg->type == DAQ_MSG_TYPE_EOF)
         printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->responderBytes, stats->responderPkts);
-    printf("  First Packet: %lu seconds, %lu microseconds\n", stats->sof_timestamp.tv_sec, stats->sof_timestamp.tv_usec);
+    printf("  First Packet: %lu seconds, %lu microseconds\n", (unsigned long)stats->sof_timestamp.tv_sec, (unsigned long)stats->sof_timestamp.tv_usec);
     if (msg->type == DAQ_MSG_TYPE_EOF)
-        printf("  Last Packet: %lu seconds, %lu microseconds\n", stats->eof_timestamp.tv_sec, stats->eof_timestamp.tv_usec);
+        printf("  Last Packet: %lu seconds, %lu microseconds\n", (unsigned long)stats->eof_timestamp.tv_sec, (unsigned long)stats->eof_timestamp.tv_usec);
 }
 
 static void print_daq_stats(DAQ_Stats_t *stats)
@@ -1290,7 +1290,7 @@ static void print_config(DAQTestConfig *cfg)
 
     printf("[Config]\n");
     printf("  Input: %s\n", cfg->input);
-    printf("  Snaplen: %hu\n", cfg->snaplen);
+    printf("  Snaplen: %d\n", cfg->snaplen);
     printf("  Timeout: %ums (Allowance: ", cfg->timeout);
     if (cfg->timeout_limit)
         printf("%lu)\n", cfg->timeout_limit);
