@@ -33,9 +33,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <pcap.h>
-#ifdef HAVE_LINUX_IF_PACKET_H
-#include <linux/if_packet.h>
-#endif /* HAVE_LINUX_IF_PACKET_H */
+#include <pthread.h>
 #include <unistd.h>
 
 #include "daq_module_api.h"
@@ -102,6 +100,7 @@ static DAQ_VariableDesc_t pcap_variable_descriptions[] = {
 };
 
 static DAQ_BaseAPI_t daq_base_api;
+static pthread_mutex_t bpf_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void destroy_packet_pool(Pcap_Context_t *pc)
 {
@@ -330,11 +329,14 @@ static int pcap_daq_install_filter(Pcap_Context_t *pc, const char *filter)
 {
     struct bpf_program fcode;
 
+    pthread_mutex_lock(&bpf_mutex);
     if (pcap_compile(pc->handle, &fcode, filter, 1, pc->netmask) < 0)
     {
+        pthread_mutex_unlock(&bpf_mutex);
         SET_ERROR(pc->modinst, "%s: pcap_compile: %s", __func__, pcap_geterr(pc->handle));
         return DAQ_ERROR;
     }
+    pthread_mutex_unlock(&bpf_mutex);
 
     if (pcap_setfilter(pc->handle, &fcode) < 0)
     {
@@ -369,11 +371,14 @@ static int pcap_daq_set_filter(void *handle, const char *filter)
             SET_ERROR(pc->modinst, "%s: Could not allocate a dead PCAP handle!", __func__);
             return DAQ_ERROR_NOMEM;
         }
+        pthread_mutex_lock(&bpf_mutex);
         if (pcap_compile(dead_handle, &fcode, filter, 1, pc->netmask) < 0)
         {
+            pthread_mutex_unlock(&bpf_mutex);
             SET_ERROR(pc->modinst, "%s: pcap_compile: %s", __func__, pcap_geterr(dead_handle));
             return DAQ_ERROR;
         }
+        pthread_mutex_unlock(&bpf_mutex);
         pcap_freecode(&fcode);
         pcap_close(dead_handle);
 

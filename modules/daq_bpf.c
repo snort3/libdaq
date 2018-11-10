@@ -23,6 +23,7 @@
 #endif
 
 #include <pcap.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,6 +53,7 @@ typedef struct
 } BPF_Context_t;
 
 static DAQ_BaseAPI_t daq_base_api;
+static pthread_mutex_t bpf_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 static int bpf_daq_module_load(const DAQ_BaseAPI_t *base_api)
@@ -121,12 +123,15 @@ static int bpf_daq_set_filter(void *handle, const char *filter)
         return DAQ_ERROR;
     }
 
+    pthread_mutex_lock(&bpf_mutex);
     /* FIXIT-M Should really try to get actual snaplen and DLT from submodule */
     if (pcap_compile_nopcap(bc->snaplen, DLT_EN10MB, &fcode, bc->filter, 1, PCAP_NETMASK_UNKNOWN) == -1)
     {
+        pthread_mutex_unlock(&bpf_mutex);
         SET_ERROR(bc->modinst, "%s: BPF state machine compilation failed!", __func__);
         return DAQ_ERROR;
     }
+    pthread_mutex_unlock(&bpf_mutex);
 
     pcap_freecode(&bc->fcode);
     bc->fcode.bf_len = fcode.bf_len;

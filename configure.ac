@@ -161,7 +161,7 @@ if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
     AC_CHECK_DECLS([TPACKET2_HDRLEN, PACKET_TX_RING], [], [enable_afpacket_module=no], [[#include <linux/if_packet.h>]])
     if test "$enable_afpacket_module" = yes -a "$LIBPCAP_AVAILABLE" = yes ; then
-        DAQ_AFPACKET_LIBS="-lpcap"
+        DAQ_AFPACKET_LIBS="-lpcap -lpthread"
     fi
 fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
@@ -173,7 +173,7 @@ AC_ARG_ENABLE(bpf-module,
               [enable_bpf_module="$enableval"], [enable_bpf_module="$DEFAULT_ENABLE"])
 if test "$enable_bpf_module" = yes; then
     if test "$LIBPCAP_AVAILABLE" = yes ; then
-        DAQ_BPF_LIBS="-lpcap"
+        DAQ_BPF_LIBS="-lpcap -lpthread"
     else
         AC_MSG_WARN([LibPCAP not available, disabling the BPF DAQ module])
         enable_bpf_module=no
@@ -227,7 +227,7 @@ AC_ARG_ENABLE(pcap-module,
               [enable_pcap_module="$enableval"], [enable_pcap_module="$DEFAULT_ENABLE"])
 if test "$enable_pcap_module" = yes; then
     if test "$LIBPCAP_AVAILABLE" = yes ; then
-        DAQ_PCAP_LIBS="-lpcap"
+        DAQ_PCAP_LIBS="-lpcap -lpthread"
     else
         AC_MSG_WARN([LibPCAP not available, disabling the PCAP DAQ module])
         enable_pcap_module=no

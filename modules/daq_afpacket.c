@@ -45,6 +45,7 @@
 
 #ifdef LIBPCAP_AVAILABLE
 #include <pcap.h>
+#include <pthread.h>
 #else
 #include "daq_dlt.h"
 #endif
@@ -167,6 +168,9 @@ static DAQ_VariableDesc_t afpacket_variable_descriptions[] = {
 
 static const int vlan_offset = 2 * ETH_ALEN;
 static DAQ_BaseAPI_t daq_base_api;
+#ifdef LIBPCAP_AVAILABLE
+static pthread_mutex_t bpf_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 static void destroy_packet_pool(AFPacket_Context_t *afpc)
 {
@@ -1019,11 +1023,14 @@ static int afpacket_daq_set_filter(void *handle, const char *filter)
         return DAQ_ERROR;
     }
 
+    pthread_mutex_lock(&bpf_mutex);
     if (pcap_compile_nopcap(afpc->snaplen, DLT_EN10MB, &fcode, afpc->filter, 1, PCAP_NETMASK_UNKNOWN) == -1)
     {
+        pthread_mutex_unlock(&bpf_mutex);
         SET_ERROR(afpc->modinst, "%s: BPF state machine compilation failed!", __func__);
         return DAQ_ERROR;
     }
+    pthread_mutex_unlock(&bpf_mutex);
 
     pcap_freecode(&afpc->fcode);
     afpc->fcode.bf_len = fcode.bf_len;
