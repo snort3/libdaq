@@ -64,7 +64,7 @@ static DAQ_VariableDesc_t trace_variable_descriptions[] = {
     { "file", "Filename to write text traces to (default: " DAQ_TRACE_FILENAME ")", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
 };
 
-DAQ_BaseAPI_t daq_base_api;
+static DAQ_BaseAPI_t daq_base_api;
 
 //-------------------------------------------------------------------------
 

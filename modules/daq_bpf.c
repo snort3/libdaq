@@ -51,7 +51,7 @@ typedef struct
     uint64_t filtered;
 } BPF_Context_t;
 
-DAQ_BaseAPI_t daq_base_api;
+static DAQ_BaseAPI_t daq_base_api;
 
 
 static int bpf_daq_module_load(const DAQ_BaseAPI_t *base_api)

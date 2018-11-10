@@ -62,7 +62,7 @@ static DAQ_VariableDesc_t dump_variable_descriptions[] = {
     { "output", "Set to none to prevent output from being written to file (deprecated)", DAQ_VAR_DESC_REQUIRES_ARGUMENT }
 };
 
-DAQ_BaseAPI_t daq_base_api;
+static DAQ_BaseAPI_t daq_base_api;
 
 //-------------------------------------------------------------------------
 
