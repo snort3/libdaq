@@ -1338,7 +1338,7 @@ static void *processing_thread(void *arg)
     const DAQTestConfig *cfg = ctxt->cfg;
     DAQ_Stats_t stats;
     uint64_t recv_counters[MAX_DAQ_RSTAT];
-    unsigned int i, max_recv, timeout_count;
+    unsigned int i, max_recv, recv_cnt, timeout_count;
     int rval;
 
     if (cfg->filter && (rval = daq_instance_set_filter(ctxt->instance, cfg->filter)) != 0)
@@ -1367,7 +1367,7 @@ static void *processing_thread(void *arg)
     dlt = daq_instance_get_datalink_type(ctxt->instance);
 
     memset(recv_counters, 0, sizeof(recv_counters));
-    max_recv = timeout_count = 0;
+    max_recv = recv_cnt = timeout_count = 0;
     while (!ctxt->done && (!cfg->packet_limit || ctxt->packet_count < cfg->packet_limit))
     {
         /* Check to see if a config swap is pending. */
@@ -1389,6 +1389,9 @@ static void *processing_thread(void *arg)
         recv_counters[rstat]++;
         if (num_recv > max_recv)
             max_recv = num_recv;
+
+        if (num_recv > 0)
+            recv_cnt++;
 
         for (unsigned idx = 0; idx < num_recv; idx++)
         {
@@ -1451,7 +1454,12 @@ static void *processing_thread(void *arg)
     if ((rval = daq_instance_get_stats(ctxt->instance, &stats)) != 0)
         fprintf(stderr, "Could not get DAQ module stats: (%d: %s)\n", rval, daq_instance_get_error(ctxt->instance));
     else
+    {
+        if (recv_cnt > 0)
+            printf("Average number of packets received per receive call: %.2f\n\n", (double)stats.packets_received / (double)recv_cnt);
+
         print_daq_stats(&stats);
+    }
 
     daq_instance_stop(ctxt->instance);
 
