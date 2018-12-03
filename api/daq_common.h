@@ -552,7 +552,7 @@ typedef struct
 {
     DAQ_Msg_h msg;              // [in] Message associated with the flow being queried
     DAQ_TCP_Opts_t *tcp_opts;   // [out] Original TCP options prior to modification by the dataplane
-} DIOCTL_GetPacketScrubbedTcp;
+} DIOCTL_GetFlowScrubbedTcp;
 
 /*
  * Command: DIOCTL_CREATE_EXPECTED_FLOW

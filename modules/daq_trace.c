@@ -355,9 +355,9 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
         case DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN:
         case DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN_ACK:
         {
-            if (arglen != sizeof(DIOCTL_GetPacketScrubbedTcp))
+            if (arglen != sizeof(DIOCTL_GetFlowScrubbedTcp))
                 return DAQ_ERROR_INVAL;
-            DIOCTL_GetPacketScrubbedTcp *gpst = (DIOCTL_GetPacketScrubbedTcp *) arg;
+            DIOCTL_GetFlowScrubbedTcp *gpst = (DIOCTL_GetFlowScrubbedTcp *) arg;
             if (!gpst->msg)
                 return DAQ_ERROR_INVAL;
             fprintf(tc->outfile, "IOCTL: %s: ", (cmd == DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN) ?
