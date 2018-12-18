@@ -269,7 +269,7 @@ typedef struct _daq_ha_state_data
     void *data;
 } DAQ_HA_State_Data_t;
 
-/* Flow statistics structure used for DAQ_MSG_TYPE_TYPE_SOF and DAQ_MSG_TYPE_TYPE_EOF. */
+/* Flow statistics structure used for DAQ_MSG_TYPE_SOF and DAQ_MSG_TYPE_EOF. */
 typedef struct _flow_stats
 {
     int32_t ingressZone;
@@ -299,7 +299,7 @@ typedef struct _flow_stats
     uint8_t protocol;
 } Flow_Stats_t;
 
-/* VPN session type used by DAQ_VPN_Login_Info_t for DAQ_MSG_TYPE_TYPE_VPN_LOGIN. */
+/* VPN session type used by DAQ_VPN_Login_Info_t for DAQ_MSG_TYPE_VPN_LOGIN. */
 typedef enum {
     NP_IDFW_VPN_SESSION_TYPE_UNKNOWN = 0,
     NP_IDFW_VPN_SESSION_TYPE_RA_IKEV1 = 1,
@@ -311,14 +311,14 @@ typedef enum {
     NP_IDFW_VPN_SESSION_TYPE_MAX,
 } np_idfw_vpn_session_type_t;
 
-/* VPN logout info used for DAQ_VPN_Login_Info_t and DAQ_MSG_TYPE_TYPE_VPN_LOGOUT. */
+/* VPN logout info used for DAQ_VPN_Login_Info_t and DAQ_MSG_TYPE_VPN_LOGOUT. */
 typedef struct _daq_vpn_info
 {
     uint8_t ip[16];
     uint32_t id;
 } DAQ_VPN_Info_t, *DAQ_VPN_Info_p;
 
-/* VPN login info used for DAQ_MSG_TYPE_TYPE_VPN_LOGIN. */
+/* VPN login info used for DAQ_MSG_TYPE_VPN_LOGIN. */
 #define DAQ_VPN_INFO_MAX_USER_NAME_LEN  256
 typedef struct _daq_vpn_login_info
 {
