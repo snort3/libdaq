@@ -80,7 +80,7 @@ typedef struct _nfq_context
     struct mnl_socket *nlsock;
     int nlsock_fd;
     unsigned portid;
-    volatile bool break_loop;
+    volatile bool interrupted;
 } Nfq_Context_t;
 
 static DAQ_VariableDesc_t nfq_variable_descriptions[] = {
@@ -620,12 +620,12 @@ static int nfq_daq_start(void *handle)
     return DAQ_SUCCESS;
 }
 
-/* Module->breakloop() */
-static int nfq_daq_breakloop(void *handle)
+/* Module->interrupt() */
+static int nfq_daq_interrupt(void *handle)
 {
     Nfq_Context_t *nfqc = (Nfq_Context_t *) handle;
 
-    nfqc->break_loop = true;
+    nfqc->interrupted = true;
 
     return DAQ_SUCCESS;
 }
@@ -680,7 +680,7 @@ static int nfq_daq_get_snaplen(void *handle)
 /* Module->get_capabilities() */
 static uint32_t nfq_daq_get_capabilities(void *handle)
 {
-    return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_BREAKLOOP;
+    return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INTERRUPT;
 }
 
 /* Module->get_datalink_type() */
@@ -718,8 +718,9 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
                 *rstat = (idx == 0) ? DAQ_RSTAT_TIMEOUT : DAQ_RSTAT_WOULD_BLOCK;
             else if (errno == EINTR)
             {
-                if (!nfqc->break_loop)
+                if (!nfqc->interrupted)
                     continue;
+                nfqc->interrupted = false;
                 *rstat = DAQ_RSTAT_INTERRUPTED;
             }
             else
@@ -822,7 +823,7 @@ const DAQ_ModuleAPI_t nfq_daq_module_data =
     /* .start = */ nfq_daq_start,
     /* .inject = */ NULL,
     /* .inject_relative = */ NULL,
-    /* .breakloop = */ nfq_daq_breakloop,
+    /* .interrupt = */ nfq_daq_interrupt,
     /* .stop = */ nfq_daq_stop,
     /* .ioctl = */ NULL,
     /* .get_stats = */ nfq_daq_get_stats,

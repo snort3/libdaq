@@ -404,7 +404,7 @@ typedef struct _daq_msg_pool_info
 #define DAQ_CAPA_WHITELIST      0x00000008   /* can whitelist flows */
 #define DAQ_CAPA_BLACKLIST      0x00000010   /* can blacklist flows */
 #define DAQ_CAPA_UNPRIV_START   0x00000020   /* can call start() without root privileges */
-#define DAQ_CAPA_BREAKLOOP      0x00000040   /* can call breakloop() to break acquisition loop */
+#define DAQ_CAPA_INTERRUPT      0x00000040   /* can call interrupt() to abort a receive call early */
 #define DAQ_CAPA_BPF            0x00000080   /* can call set_filter() to establish a BPF */
 #define DAQ_CAPA_DEVICE_INDEX   0x00000100   /* can consistently fill the device_index field in DAQ_PktHdr */
 #define DAQ_CAPA_INJECT_RAW     0x00000200   /* injection of raw packets (no layer-2 headers) */

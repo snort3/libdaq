@@ -96,7 +96,7 @@ DAQ_LINKAGE int daq_instance_inject(DAQ_Instance_h instance, DAQ_MsgType type, c
         const uint8_t *data, uint32_t data_len);
 DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_h instance, DAQ_Msg_h msg,
         const uint8_t *data, uint32_t data_len, int reverse);
-DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_h instance);
+DAQ_LINKAGE int daq_instance_interrupt(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_h instance);
 DAQ_LINKAGE int daq_instance_ioctl(DAQ_Instance_h instance, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
 DAQ_LINKAGE DAQ_State daq_instance_check_status(DAQ_Instance_h instance);

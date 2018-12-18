@@ -63,7 +63,7 @@ typedef struct _ipfw_context {
     int sock;
     DAQ_ModuleInstance_h modinst;
     IpfwMsgPool pool;
-    volatile bool break_loop;
+    volatile bool interrupted;
     DAQ_Stats_t stats;
 } Ipfw_Context_t;
 
@@ -286,8 +286,9 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
             rval = 0;
             while (timeout != 0 && rval == 0)
             {
-                if (ipfwc->break_loop)
+                if (ipfwc->interrupted)
                 {
+                    ipfwc->interrupted = false;
                     *rstat = DAQ_RSTAT_INTERRUPTED;
                     return 0;
                 }
@@ -427,11 +428,11 @@ static int ipfw_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_breakloop(void *handle)
+static int ipfw_daq_interrupt(void *handle)
 {
     Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
 
-    ipfwc->break_loop = true;
+    ipfwc->interrupted = true;
 
     return DAQ_SUCCESS;
 }
@@ -460,7 +461,7 @@ static int ipfw_daq_get_snaplen(void *handle)
 static uint32_t ipfw_daq_get_capabilities(void *handle)
 {
     return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT | DAQ_CAPA_INJECT_RAW
-        | DAQ_CAPA_BREAKLOOP | DAQ_CAPA_UNPRIV_START;
+        | DAQ_CAPA_INTERRUPT | DAQ_CAPA_UNPRIV_START;
 }
 
 static int ipfw_daq_get_datalink_type(void *handle)
@@ -497,7 +498,7 @@ const DAQ_ModuleAPI_t ipfw_daq_module_data =
     /* .start = */ ipfw_daq_start,
     /* .inject = */ NULL,
     /* .inject_relative = */ ipfw_daq_inject_relative,
-    /* .breakloop = */ ipfw_daq_breakloop,
+    /* .interrupt = */ ipfw_daq_interrupt,
     /* .stop = */ ipfw_daq_stop,
     /* .ioctl = */ NULL,
     /* .get_stats = */ ipfw_daq_get_stats,

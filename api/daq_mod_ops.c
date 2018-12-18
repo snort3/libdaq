@@ -88,7 +88,7 @@ static void resolve_instance_api(DAQ_InstanceAPI_t *api, DAQ_ModuleInstance_t *m
     RESOLVE_INSTANCE_API(api, modinst, start, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, inject, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, inject_relative, default_impl);
-    RESOLVE_INSTANCE_API(api, modinst, breakloop, default_impl);
+    RESOLVE_INSTANCE_API(api, modinst, interrupt, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, stop, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, ioctl, default_impl);
     RESOLVE_INSTANCE_API(api, modinst, get_stats, default_impl);
@@ -306,12 +306,12 @@ DAQ_LINKAGE int daq_instance_inject_relative(DAQ_Instance_t *instance, DAQ_Msg_h
     return instance->api.inject_relative.func(instance->api.inject_relative.context, msg, data, data_len, reverse);
 }
 
-DAQ_LINKAGE int daq_instance_breakloop(DAQ_Instance_t *instance)
+DAQ_LINKAGE int daq_instance_interrupt(DAQ_Instance_t *instance)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;
 
-    return instance->api.breakloop.func(instance->api.breakloop.context);
+    return instance->api.interrupt.func(instance->api.interrupt.context);
 }
 
 DAQ_LINKAGE int daq_instance_stop(DAQ_Instance_t *instance)

@@ -66,7 +66,7 @@ static int daq_test_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *
     return DAQ_SUCCESS;
 }
 
-static int daq_test_breakloop(void *handle)
+static int daq_test_interrupt(void *handle)
 {
     return DAQ_SUCCESS;
 }
@@ -127,7 +127,7 @@ DAQ_ModuleAPI_t test_module =
     /* .start = */ daq_test_start,
     /* .inject = */ daq_test_inject,
     /* .inject_relative = */ daq_test_inject_relative,
-    /* .breakloop = */ daq_test_breakloop,
+    /* .interrupt = */ daq_test_interrupt,
     /* .stop = */ daq_test_stop,
     /* .ioctl = */ NULL,
     /* .get_stats = */ daq_test_get_stats,

@@ -1516,12 +1516,12 @@ int main(int argc, char *argv[])
             {
                 case SIGTERM:
                 case SIGINT:
-                    printf("Sending breakloop to all instances.\n");
+                    printf("Sending interrupt to all instances.\n");
                     for (unsigned i = 0; i < cfg.thread_count; i++)
                     {
                         DAQTestThreadContext *dttc = &threads[i];
                         dttc->done = true;
-                        daq_instance_breakloop(dttc->instance);
+                        daq_instance_interrupt(dttc->instance);
                     }
                     break;
 

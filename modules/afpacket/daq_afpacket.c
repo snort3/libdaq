@@ -146,7 +146,7 @@ typedef struct _afpacket_context
 #ifdef LIBPCAP_AVAILABLE
     struct bpf_program fcode;
 #endif
-    volatile bool break_loop;
+    volatile bool interrupted;
     DAQ_Stats_t stats;
     /* Message receive state */
     AFPacketInstance *curr_instance;
@@ -1145,11 +1145,11 @@ static int afpacket_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, cons
     return afpacket_inject_packet(afpc, egress, data, data_len);
 }
 
-static int afpacket_daq_breakloop(void *handle)
+static int afpacket_daq_interrupt(void *handle)
 {
     AFPacket_Context_t *afpc = (AFPacket_Context_t *) handle;
 
-    afpc->break_loop = 1;
+    afpc->interrupted = true;
 
     return DAQ_SUCCESS;
 }
@@ -1222,7 +1222,7 @@ static int afpacket_daq_get_snaplen(void *handle)
 static uint32_t afpacket_daq_get_capabilities(void *handle)
 {
     uint32_t capabilities = DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT |
-                            DAQ_CAPA_UNPRIV_START | DAQ_CAPA_BREAKLOOP | DAQ_CAPA_DEVICE_INDEX;
+                            DAQ_CAPA_UNPRIV_START | DAQ_CAPA_INTERRUPT | DAQ_CAPA_DEVICE_INDEX;
 #ifdef LIBPCAP_AVAILABLE
     capabilities |= DAQ_CAPA_BPF;
 #endif
@@ -1269,14 +1269,14 @@ static inline DAQ_RecvStatus wait_for_packet(AFPacket_Context_t *afpc)
         pfd[i].events = POLLIN;
     }
     /* Chop the timeout into one second chunks (plus any remainer) to improve responsiveness to
-        breakloop interruption when there is no traffic and the timeout is very long (or unlimited). */
+        interruption when there is no traffic and the timeout is very long (or unlimited). */
     int timeout = afpc->timeout;
     while (timeout != 0)
     {
         /* If the receive has been canceled, break out of the loop and return. */
-        if (afpc->break_loop)
+        if (afpc->interrupted)
         {
-            afpc->break_loop = false;
+            afpc->interrupted = false;
             return DAQ_RSTAT_INTERRUPTED;
         }
 
@@ -1314,7 +1314,7 @@ static inline DAQ_RecvStatus wait_for_packet(AFPacket_Context_t *afpc)
             /* All good! A packet should be waiting for us somewhere. */
             return DAQ_RSTAT_OK;
         }
-        /* If we were interrupted by a signal, start the loop over.  The user should call daq_breakloop to actually exit. */
+        /* If we were interrupted by a signal, start the loop over.  The user should call daq_interrupt to actually exit. */
         if (ret < 0 && errno != EINTR)
         {
             SET_ERROR(afpc->modinst, "%s: Poll failed: %s (%d)", __func__, strerror(errno), errno);
@@ -1335,9 +1335,9 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
     while (idx < max_recv)
     {
         /* Check to see if the receive has been canceled.  If so, reset it and return appropriately. */
-        if (afpc->break_loop)
+        if (afpc->interrupted)
         {
-            afpc->break_loop = false;
+            afpc->interrupted = false;
             status = DAQ_RSTAT_INTERRUPTED;
             break;
         }
@@ -1526,7 +1526,7 @@ const DAQ_ModuleAPI_t afpacket_daq_module_data =
     /* .start = */ afpacket_daq_start,
     /* .inject = */ afpacket_daq_inject,
     /* .inject_relative = */ afpacket_daq_inject_relative,
-    /* .breakloop = */ afpacket_daq_breakloop,
+    /* .interrupt = */ afpacket_daq_interrupt,
     /* .stop = */ afpacket_daq_stop,
     /* .ioctl = */ afpacket_daq_ioctl,
     /* .get_stats = */ afpacket_daq_get_stats,

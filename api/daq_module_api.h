@@ -32,7 +32,7 @@ typedef int (*daq_module_set_filter_func) (void *handle, const char *filter);
 typedef int (*daq_module_start_func) (void *handle);
 typedef int (*daq_module_inject_func) (void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len);
 typedef int (*daq_module_inject_relative_func) (void *handle, DAQ_Msg_h msg, const uint8_t *data, uint32_t data_len, int reverse);
-typedef int (*daq_module_breakloop_func) (void *handle);
+typedef int (*daq_module_interrupt_func) (void *handle);
 typedef int (*daq_module_stop_func) (void *handle);
 typedef int (*daq_module_ioctl_func) (void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen);
 typedef int (*daq_module_get_stats_func) (void *handle, DAQ_Stats_t *stats);
@@ -53,7 +53,7 @@ typedef struct _daq_instance_api {
     DAQ_INSTANCE_API_STRUCT(start);
     DAQ_INSTANCE_API_STRUCT(inject);
     DAQ_INSTANCE_API_STRUCT(inject_relative);
-    DAQ_INSTANCE_API_STRUCT(breakloop);
+    DAQ_INSTANCE_API_STRUCT(interrupt);
     DAQ_INSTANCE_API_STRUCT(stop);
     DAQ_INSTANCE_API_STRUCT(ioctl);
     DAQ_INSTANCE_API_STRUCT(get_stats);
@@ -126,8 +126,8 @@ typedef struct _daq_module_api
     daq_module_inject_func inject;
     /* Inject a new message going either the same or opposite direction as the specified message. */
     daq_module_inject_relative_func inject_relative;
-    /* Force breaking out of the acquisition loop after the current iteration. */
-    daq_module_breakloop_func breakloop;
+    /* Attempt to interrupt the current message receive call. */
+    daq_module_interrupt_func interrupt;
     /* Stop queuing packets, if possible */
     daq_module_stop_func stop;
     /* Send an I/O control command (read and/or write) */

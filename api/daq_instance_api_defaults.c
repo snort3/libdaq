@@ -45,7 +45,7 @@ int daq_default_inject_relative(void *handle, DAQ_Msg_h msg, const uint8_t *data
     return DAQ_ERROR_NOTSUP;
 }
 
-int daq_default_breakloop(void *handle)
+int daq_default_interrupt(void *handle)
 {
     return DAQ_ERROR_NOTSUP;
 }

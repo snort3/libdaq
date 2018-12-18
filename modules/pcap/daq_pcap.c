@@ -80,7 +80,7 @@ typedef struct _pcap_context
     FILE *fp;
     uint32_t netmask;
     bool nonblocking;
-    volatile bool break_loop;
+    volatile bool interrupted;
     /* Stats tracking */
     uint32_t base_recv;
     uint32_t base_drop;
@@ -485,16 +485,11 @@ static int pcap_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, cons
     return DAQ_SUCCESS;
 }
 
-static int pcap_daq_breakloop(void *handle)
+static int pcap_daq_interrupt(void *handle)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
 
-    if (!pc->handle)
-        return DAQ_ERROR;
-
-    pc->break_loop = true;
-
-    pcap_breakloop(pc->handle);
+    pc->interrupted = true;
 
     return DAQ_SUCCESS;
 }
@@ -554,7 +549,7 @@ static int pcap_daq_get_snaplen(void *handle)
 static uint32_t pcap_daq_get_capabilities(void *handle)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
-    uint32_t capabilities = DAQ_CAPA_BPF | DAQ_CAPA_BREAKLOOP;
+    uint32_t capabilities = DAQ_CAPA_BPF | DAQ_CAPA_INTERRUPT;
 
     if (pc->device)
         capabilities |= DAQ_CAPA_INJECT;
@@ -582,6 +577,14 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
     *rstat = DAQ_RSTAT_OK;
     for (idx = 0; idx < max_recv; idx++)
     {
+        /* Check to see if the receive has been canceled.  If so, reset it and return appropriately. */
+        if (pc->interrupted)
+        {
+            pc->interrupted = false;
+            *rstat = DAQ_RSTAT_INTERRUPTED;
+            break;
+        }
+
         /* Make sure that we have a packet descriptor available to populate *before*
             calling into libpcap. */
         PcapPktDesc *desc = pc->pool.freelist;
@@ -628,12 +631,12 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             {
                 /* LibPCAP brilliantly decides to return -2 if it hit EOF in readback OR pcap_breakloop()
                     was called.  Let's try to differentiate by checking to see if we asked for a break. */
-                if (!pc->break_loop && pc->mode == DAQ_MODE_READ_FILE)
+                if (!pc->interrupted && pc->mode == DAQ_MODE_READ_FILE)
                     *rstat = DAQ_RSTAT_EOF;
                 else
                 {
+                    pc->interrupted = false;
                     *rstat = DAQ_RSTAT_INTERRUPTED;
-                    pc->break_loop = false;
                 }
             }
             break;
@@ -716,7 +719,7 @@ const DAQ_ModuleAPI_t pcap_daq_module_data =
     /* .start = */ pcap_daq_start,
     /* .inject = */ pcap_daq_inject,
     /* .inject_relative = */ NULL,
-    /* .breakloop = */ pcap_daq_breakloop,
+    /* .interrupt = */ pcap_daq_interrupt,
     /* .stop = */ pcap_daq_stop,
     /* .ioctl = */ NULL,
     /* .get_stats = */ pcap_daq_get_stats,
