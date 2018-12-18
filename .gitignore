@@ -13,6 +13,7 @@
 # Autotools stuff
 .deps/
 .libs/
+.dirstamp
 /autom4te.cache/
 /aclocal.m4
 /ar-lib
@@ -55,7 +56,7 @@ daq-*-coverage.info
 # Locally generated artifacts
 libdaq.pc
 api/daq_version.h
-modules/libdaq_static_*.pc
+modules/*/libdaq_static_*.pc
 example/daqtest
 example/daqtest-static
 

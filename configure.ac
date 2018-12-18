@@ -165,7 +165,7 @@ if test "$enable_afpacket_module" = yes; then
     fi
 fi
 AM_CONDITIONAL([BUILD_AFPACKET_MODULE], [test "$enable_afpacket_module" = yes])
-AM_COND_IF([BUILD_AFPACKET_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_afpacket.pc])])
+AM_COND_IF([BUILD_AFPACKET_MODULE], [AC_CONFIG_FILES([modules/afpacket/libdaq_static_afpacket.pc])])
 
 # BPF Wrapper Module
 AC_ARG_ENABLE(bpf-module,
@@ -180,7 +180,7 @@ if test "$enable_bpf_module" = yes; then
     fi
 fi
 AM_CONDITIONAL([BUILD_BPF_MODULE], [test "$enable_bpf_module" = yes])
-AM_COND_IF([BUILD_BPF_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_bpf.pc])])
+AM_COND_IF([BUILD_BPF_MODULE], [AC_CONFIG_FILES([modules/bpf/libdaq_static_bpf.pc])])
 
 # Dump Module
 AC_ARG_ENABLE(dump-module,
@@ -195,7 +195,7 @@ if test "$enable_dump_module" = yes; then
     fi
 fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
-AM_COND_IF([BUILD_DUMP_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_dump.pc])])
+AM_COND_IF([BUILD_DUMP_MODULE], [AC_CONFIG_FILES([modules/dump/libdaq_static_dump.pc])])
 
 # IPFW Module
 AC_ARG_ENABLE(ipfw-module,
@@ -205,7 +205,7 @@ if test "$enable_ipfw_module" = yes; then
     AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_ipfw_module=no], [[#include <netinet/in.h>]])
 fi
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
-AM_COND_IF([BUILD_IPFW_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_ipfw.pc])])
+AM_COND_IF([BUILD_IPFW_MODULE], [AC_CONFIG_FILES([modules/ipfw/libdaq_static_ipfw.pc])])
 
 # NFQ Module
 AC_ARG_ENABLE(nfq-module,
@@ -219,7 +219,7 @@ if test "$enable_nfq_module" = yes; then
     fi
 fi
 AM_CONDITIONAL([BUILD_NFQ_MODULE], [test "$enable_nfq_module" = yes])
-AM_COND_IF([BUILD_NFQ_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_nfq.pc])])
+AM_COND_IF([BUILD_NFQ_MODULE], [AC_CONFIG_FILES([modules/nfq/libdaq_static_nfq.pc])])
 
 # PCAP Module
 AC_ARG_ENABLE(pcap-module,
@@ -234,7 +234,7 @@ if test "$enable_pcap_module" = yes; then
     fi
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
-AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_pcap.pc])])
+AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/pcap/libdaq_static_pcap.pc])])
 
 # netmap Module
 #AC_ARG_ENABLE(netmap-module,
@@ -296,7 +296,7 @@ AC_ARG_ENABLE(trace-module,
               AS_HELP_STRING([--disable-trace-module],[do not build the bundled Trace module]),
               [enable_trace_module="$enableval"], [enable_trace_module="$DEFAULT_ENABLE"])
 AM_CONDITIONAL([BUILD_TRACE_MODULE], [test "$enable_trace_module" = yes])
-AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/libdaq_static_trace.pc])])
+AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/trace/libdaq_static_trace.pc])])
 
 #AC_SUBST(DNET_LDFLAGS)
 

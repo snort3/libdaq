@@ -1,3 +1,4 @@
+AUTOMAKE_OPTIONS = subdir-objects
 
 lib_LTLIBRARIES =
 pkglib_LTLIBRARIES =
@@ -5,125 +6,125 @@ pkgconfig_DATA =
 
 if BUILD_AFPACKET_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_afpacket.la
-    pkgconfig_DATA += libdaq_static_afpacket.pc
-    daq_afpacket_la_SOURCES = daq_afpacket.c
-    daq_afpacket_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_afpacket_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    pkglib_LTLIBRARIES += afpacket/daq_afpacket.la
+    pkgconfig_DATA += afpacket/libdaq_static_afpacket.pc
+    afpacket_daq_afpacket_la_SOURCES = afpacket/daq_afpacket.c
+    afpacket_daq_afpacket_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    afpacket_daq_afpacket_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
 if LIBPCAP_AVAILABLE
-    daq_afpacket_la_CPPFLAGS += $(PCAP_CPPFLAGS)
-    daq_afpacket_la_LDFLAGS += $(PCAP_LDFLAGS)
-    daq_afpacket_la_LIBADD = $(DAQ_AFPACKET_LIBS)
+    afpacket_daq_afpacket_la_CPPFLAGS += $(PCAP_CPPFLAGS)
+    afpacket_daq_afpacket_la_LDFLAGS += $(PCAP_LDFLAGS)
+    afpacket_daq_afpacket_la_LIBADD = $(DAQ_AFPACKET_LIBS)
 endif
 endif
-    lib_LTLIBRARIES += libdaq_static_afpacket.la
-    libdaq_static_afpacket_la_SOURCES = daq_afpacket.c
-    libdaq_static_afpacket_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_afpacket_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += afpacket/libdaq_static_afpacket.la
+    afpacket_libdaq_static_afpacket_la_SOURCES = afpacket/daq_afpacket.c
+    afpacket_libdaq_static_afpacket_la_CPPFLAGS = $(AM_CPPFLAGS)
+    afpacket_libdaq_static_afpacket_la_LDFLAGS = -static -avoid-version
 if LIBPCAP_AVAILABLE
-    libdaq_static_afpacket_la_CPPFLAGS += $(PCAP_CPPFLAGS)
+    afpacket_libdaq_static_afpacket_la_CPPFLAGS += $(PCAP_CPPFLAGS)
 endif
 endif
 
 if BUILD_BPF_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_bpf.la
-    pkgconfig_DATA += libdaq_static_bpf.pc
-    daq_bpf_la_SOURCES = daq_bpf.c
-    daq_bpf_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
-    daq_bpf_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
-    daq_bpf_la_LIBADD = $(DAQ_BPF_LIBS)
+    pkglib_LTLIBRARIES += bpf/daq_bpf.la
+    pkgconfig_DATA += bpf/libdaq_static_bpf.pc
+    bpf_daq_bpf_la_SOURCES = bpf/daq_bpf.c
+    bpf_daq_bpf_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
+    bpf_daq_bpf_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
+    bpf_daq_bpf_la_LIBADD = $(DAQ_BPF_LIBS)
 endif
-    lib_LTLIBRARIES += libdaq_static_bpf.la
-    libdaq_static_bpf_la_SOURCES = daq_bpf.c
-    libdaq_static_bpf_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_bpf_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += bpf/libdaq_static_bpf.la
+    bpf_libdaq_static_bpf_la_SOURCES = bpf/daq_bpf.c
+    bpf_libdaq_static_bpf_la_CPPFLAGS = $(AM_CPPFLAGS)
+    bpf_libdaq_static_bpf_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_DUMP_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_dump.la
-    pkgconfig_DATA += libdaq_static_dump.pc
-    daq_dump_la_SOURCES = daq_dump.c
-    daq_dump_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
-    daq_dump_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
-    daq_dump_la_LIBADD = $(DAQ_DUMP_LIBS)
+    pkglib_LTLIBRARIES += dump/daq_dump.la
+    pkgconfig_DATA += dump/libdaq_static_dump.pc
+    dump_daq_dump_la_SOURCES = dump/daq_dump.c
+    dump_daq_dump_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
+    dump_daq_dump_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
+    dump_daq_dump_la_LIBADD = $(DAQ_DUMP_LIBS)
 endif
-    lib_LTLIBRARIES += libdaq_static_dump.la
-    libdaq_static_dump_la_SOURCES = daq_dump.c
-    libdaq_static_dump_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
-    libdaq_static_dump_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += dump/libdaq_static_dump.la
+    dump_libdaq_static_dump_la_SOURCES = dump/daq_dump.c
+    dump_libdaq_static_dump_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
+    dump_libdaq_static_dump_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_IPFW_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_ipfw.la
-    pkgconfig_DATA += libdaq_static_ipfw.pc
-    daq_ipfw_la_SOURCES = daq_ipfw.c
-    daq_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_ipfw_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    pkglib_LTLIBRARIES += ipfw/daq_ipfw.la
+    pkgconfig_DATA += ipfw/libdaq_static_ipfw.pc
+    ipfw_daq_ipfw_la_SOURCES = ipfw/daq_ipfw.c
+    ipfw_daq_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    ipfw_daq_ipfw_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
 endif
-    lib_LTLIBRARIES += libdaq_static_ipfw.la
-    libdaq_static_ipfw_la_SOURCES = daq_ipfw.c
-    libdaq_static_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_ipfw_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += ipfw/libdaq_static_ipfw.la
+    ipfw_libdaq_static_ipfw_la_SOURCES = ipfw/daq_ipfw.c
+    ipfw_libdaq_static_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS)
+    ipfw_libdaq_static_ipfw_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_NETMAP_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_netmap.la
-    daq_netmap_la_SOURCES = daq_netmap.c
-    daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_netmap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    pkglib_LTLIBRARIES += netmap/daq_netmap.la
+    netmap_daq_netmap_la_SOURCES = netmap/daq_netmap.c
+    netmap_daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    netmap_daq_netmap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
 endif
-    lib_LTLIBRARIES += libdaq_static_netmap.la
-    libdaq_static_netmap_la_SOURCES = daq_netmap.c
-    libdaq_static_netmap_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_netmap_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += netmap/libdaq_static_netmap.la
+    netmap_libdaq_static_netmap_la_SOURCES = netmap/daq_netmap.c
+    netmap_libdaq_static_netmap_la_CPPFLAGS = $(AM_CPPFLAGS)
+    netmap_libdaq_static_netmap_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_NFQ_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_nfq.la
-    pkgconfig_DATA += libdaq_static_nfq.pc
-    daq_nfq_la_SOURCES = daq_nfq.c
-    daq_nfq_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_nfq_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
-    daq_nfq_la_LIBADD = $(DAQ_NFQ_LIBS)
+    pkglib_LTLIBRARIES += nfq/daq_nfq.la
+    pkgconfig_DATA += nfq/libdaq_static_nfq.pc
+    nfq_daq_nfq_la_SOURCES = nfq/daq_nfq.c
+    nfq_daq_nfq_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    nfq_daq_nfq_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    nfq_daq_nfq_la_LIBADD = $(DAQ_NFQ_LIBS)
 endif
-    lib_LTLIBRARIES += libdaq_static_nfq.la
-    libdaq_static_nfq_la_SOURCES = daq_nfq.c
-    libdaq_static_nfq_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_nfq_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += nfq/libdaq_static_nfq.la
+    nfq_libdaq_static_nfq_la_SOURCES = nfq/daq_nfq.c
+    nfq_libdaq_static_nfq_la_CPPFLAGS = $(AM_CPPFLAGS)
+    nfq_libdaq_static_nfq_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_PCAP_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_pcap.la
-    pkgconfig_DATA += libdaq_static_pcap.pc
-    daq_pcap_la_SOURCES = daq_pcap.c
-    daq_pcap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
-    daq_pcap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
-    daq_pcap_la_LIBADD = $(DAQ_PCAP_LIBS)
+    pkglib_LTLIBRARIES += pcap/daq_pcap.la
+    pkgconfig_DATA += pcap/libdaq_static_pcap.pc
+    pcap_daq_pcap_la_SOURCES = pcap/daq_pcap.c
+    pcap_daq_pcap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(PCAP_CPPFLAGS)
+    pcap_daq_pcap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared $(PCAP_LDFLAGS)
+    pcap_daq_pcap_la_LIBADD = $(DAQ_PCAP_LIBS)
 endif
-    lib_LTLIBRARIES += libdaq_static_pcap.la
-    libdaq_static_pcap_la_SOURCES = daq_pcap.c
-    libdaq_static_pcap_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
-    libdaq_static_pcap_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += pcap/libdaq_static_pcap.la
+    pcap_libdaq_static_pcap_la_SOURCES = pcap/daq_pcap.c
+    pcap_libdaq_static_pcap_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
+    pcap_libdaq_static_pcap_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_TRACE_MODULE
 if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += daq_trace.la
-    pkgconfig_DATA += libdaq_static_trace.pc
-    daq_trace_la_SOURCES = daq_trace.c
-    daq_trace_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    daq_trace_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+    pkglib_LTLIBRARIES += trace/daq_trace.la
+    pkgconfig_DATA += trace/libdaq_static_trace.pc
+    trace_daq_trace_la_SOURCES = trace/daq_trace.c
+    trace_daq_trace_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    trace_daq_trace_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
 endif
-    lib_LTLIBRARIES += libdaq_static_trace.la
-    libdaq_static_trace_la_SOURCES = daq_trace.c
-    libdaq_static_trace_la_CPPFLAGS = $(AM_CPPFLAGS)
-    libdaq_static_trace_la_LDFLAGS = -static -avoid-version
+    lib_LTLIBRARIES += trace/libdaq_static_trace.la
+    trace_libdaq_static_trace_la_SOURCES = trace/daq_trace.c
+    trace_libdaq_static_trace_la_CPPFLAGS = $(AM_CPPFLAGS)
+    trace_libdaq_static_trace_la_LDFLAGS = -static -avoid-version
 endif
 
 AM_CPPFLAGS = @AM_CPPFLAGS@ -I$(top_srcdir)/api

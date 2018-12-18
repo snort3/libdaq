@@ -14,25 +14,29 @@ daqtest_static_LDFLAGS = -static-libtool-libs $(PCAP_LDFLAGS)
 daqtest_static_LDADD = ${top_builddir}/api/libdaq.la -lpthread
 if BUILD_AFPACKET_MODULE
 daqtest_static_CFLAGS += -DBUILD_AFPACKET_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_afpacket.la $(DAQ_AFPACKET_LIBS)
+daqtest_static_LDADD += ${top_builddir}/modules/afpacket/libdaq_static_afpacket.la $(DAQ_AFPACKET_LIBS)
 endif
 if BUILD_BPF_MODULE
 daqtest_static_CFLAGS += -DBUILD_BPF_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_bpf.la $(DAQ_BPF_LIBS)
+daqtest_static_LDADD += ${top_builddir}/modules/bpf/libdaq_static_bpf.la $(DAQ_BPF_LIBS)
 endif
 if BUILD_DUMP_MODULE
 daqtest_static_CFLAGS += -DBUILD_DUMP_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_dump.la $(DAQ_DUMP_LIBS)
+daqtest_static_LDADD += ${top_builddir}/modules/dump/libdaq_static_dump.la $(DAQ_DUMP_LIBS)
+endif
+if BUILD_IPFW_MODULE
+daqtest_static_CFLAGS += -DBUILD_IPFW_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/ipfw/libdaq_static_ipfw.la
 endif
 if BUILD_NFQ_MODULE
 daqtest_static_CFLAGS += -DBUILD_NFQ_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_nfq.la $(DAQ_NFQ_LIBS)
+daqtest_static_LDADD += ${top_builddir}/modules/nfq/libdaq_static_nfq.la $(DAQ_NFQ_LIBS)
 endif
 if BUILD_PCAP_MODULE
 daqtest_static_CFLAGS += -DBUILD_PCAP_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_pcap.la $(DAQ_PCAP_LIBS)
+daqtest_static_LDADD += ${top_builddir}/modules/pcap/libdaq_static_pcap.la $(DAQ_PCAP_LIBS)
 endif
 if BUILD_TRACE_MODULE
 daqtest_static_CFLAGS += -DBUILD_TRACE_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/libdaq_static_trace.la
+daqtest_static_LDADD += ${top_builddir}/modules/trace/libdaq_static_trace.la
 endif
