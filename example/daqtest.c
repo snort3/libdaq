@@ -945,21 +945,32 @@ static void handle_flow_stats_message(DAQ_Msg_h msg)
     const Flow_Stats_t *stats = (const Flow_Stats_t *) daq_msg_get_hdr(msg);
     char addr_str[INET6_ADDRSTRLEN];
     const struct in6_addr* tmpIp;
+    struct tm tm;
+    char timestr[64];
 
-    if (msg->type == DAQ_MSG_TYPE_SOF)
-        printf("Received SoF metapacket.\n");
-    else if (msg->type == DAQ_MSG_TYPE_EOF)
-        printf("Received EoF metapacket.\n");
+    printf("\nReceived %s message.\n", msg->type == DAQ_MSG_TYPE_SOF ? "SoF" : "EoF");
 
-    printf("  Ingress:\n");
-    printf("    Interface: %d\n", stats->ingressIntf);
-    printf("    Zone: %d\n", stats->ingressZone);
-    printf("  Egress:\n");
-    printf("    Interface: %d\n", stats->egressIntf);
-    printf("    Zone: %d\n", stats->egressZone);
+    if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN || stats->ingressZone != DAQ_PKTHDR_UNKNOWN)
+    {
+        printf("  Ingress:\n");
+        if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN)
+            printf("    Interface: %d\n", stats->ingressIntf);
+        if (stats->ingressZone != DAQ_PKTHDR_UNKNOWN)
+            printf("    Zone: %d\n", stats->ingressZone);
+    }
+    if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN || stats->egressZone != DAQ_PKTHDR_UNKNOWN)
+    {
+        printf("  Egress:\n");
+        if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN)
+            printf("    Interface: %d\n", stats->egressIntf);
+        if (stats->egressZone != DAQ_PKTHDR_UNKNOWN)
+            printf("    Zone: %d\n", stats->egressZone);
+    }
     printf("  Protocol: %hhu\n", stats->protocol);
-    printf("  VLAN: %hu\n", stats->vlan_tag);
-    printf("  Opaque: %u\n", stats->opaque);
+    if (stats->vlan_tag != 0)
+        printf("  VLAN: %hu\n", stats->vlan_tag);
+    if (stats->opaque != 0)
+        printf("  Opaque: %u\n", stats->opaque);
     printf("  Initiator:\n");
     tmpIp = (const struct in6_addr*)stats->initiatorIp;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
@@ -986,9 +997,16 @@ static void handle_flow_stats_message(DAQ_Msg_h msg)
     printf("\n");
     if (msg->type == DAQ_MSG_TYPE_EOF)
         printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->responderBytes, stats->responderPkts);
-    printf("  First Packet: %lu seconds, %lu microseconds\n", (unsigned long)stats->sof_timestamp.tv_sec, (unsigned long)stats->sof_timestamp.tv_usec);
+
+    gmtime_r(&stats->sof_timestamp.tv_sec, &tm);
+    strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", &tm);
+    printf("  First Packet: %s.%06lu\n", timestr, (unsigned long)stats->sof_timestamp.tv_usec);
     if (msg->type == DAQ_MSG_TYPE_EOF)
-        printf("  Last Packet: %lu seconds, %lu microseconds\n", (unsigned long)stats->eof_timestamp.tv_sec, (unsigned long)stats->eof_timestamp.tv_usec);
+    {
+        gmtime_r(&stats->eof_timestamp.tv_sec, &tm);
+        strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", &tm);
+        printf("  Last Packet:  %s.%06lu\n", timestr, (unsigned long)stats->eof_timestamp.tv_usec);
+    }
 }
 
 static void print_daq_stats(DAQ_Stats_t *stats)
