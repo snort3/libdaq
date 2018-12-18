@@ -56,6 +56,26 @@ endif
     dump_libdaq_static_dump_la_LDFLAGS = -static -avoid-version
 endif
 
+if BUILD_FST_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += fst/daq_fst.la
+    pkgconfig_DATA += fst/libdaq_static_fst.pc
+    fst_daq_fst_la_SOURCES = \
+						 fst/daq_fst.cc \
+						 fst/PMurHash.c \
+						 fst/PMurHash.h
+    fst_daq_fst_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/example -DBUILDING_SO
+    fst_daq_fst_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+endif
+    lib_LTLIBRARIES += fst/libdaq_static_fst.la
+    fst_libdaq_static_fst_la_SOURCES = \
+						 fst/daq_fst.cc \
+						 fst/PMurHash.c \
+						 fst/PMurHash.h
+    fst_libdaq_static_fst_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/example
+    fst_libdaq_static_fst_la_LDFLAGS = -static -avoid-version
+endif
+
 if BUILD_IPFW_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += ipfw/daq_ipfw.la

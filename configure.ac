@@ -11,7 +11,7 @@ AC_INIT([daq],[daq_version_str],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([api/daq.h])
 AC_CONFIG_HEADERS([config.h])
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 
 DAQ_MAJOR_VERSION=daq_major_version
 DAQ_MINOR_VERSION=daq_minor_version
@@ -19,6 +19,8 @@ DAQ_PATCH_VERSION=daq_patch_version
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CC_C99
+AC_PROG_CXX
 AM_PROG_AR
 AC_PROG_SED
 
@@ -33,26 +35,26 @@ AM_CPPFLAGS="$AM_CPPFLAGS $CFLAG_VISIBILITY"
 
 # Special compiler flags
 if test -n "$GCC" ; then
-    AX_CHECK_PREPROC_FLAG([-Wall], [AM_CPPFLAGS="$AM_CPPFLAGS -Wall"])
-    AX_CHECK_PREPROC_FLAG([-Wstrict-prototypes], [AM_CPPFLAGS="$AM_CPPFLAGS -Wstrict-prototypes"])
-    AX_CHECK_PREPROC_FLAG([-Wmissing-prototypes], [AM_CPPFLAGS="$AM_CPPFLAGS -Wmissing-prototypes"])
-    AX_CHECK_PREPROC_FLAG([-Wmissing-declarations], [AM_CPPFLAGS="$AM_CPPFLAGS -Wmissing-declarations"])
-    AX_CHECK_PREPROC_FLAG([-Wold-style-definition], [AM_CPPFLAGS="$AM_CPPFLAGS -Wold-style-definition"])
-    AX_CHECK_PREPROC_FLAG([-Wpointer-arith], [AM_CPPFLAGS="$AM_CPPFLAGS -Wpointer-arith"])
-    AX_CHECK_PREPROC_FLAG([-Wcast-align], [AM_CPPFLAGS="$AM_CPPFLAGS -Wcast-align"])
-    AX_CHECK_PREPROC_FLAG([-Wnested-externs], [AM_CPPFLAGS="$AM_CPPFLAGS -Wnested-externs"])
-    AX_CHECK_PREPROC_FLAG([-Wcast-qual], [AM_CPPFLAGS="$AM_CPPFLAGS -Wcast-qual"])
-    AX_CHECK_PREPROC_FLAG([-Wformat], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat"])
-    AX_CHECK_PREPROC_FLAG([-Wformat-nonliteral], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat-nonliteral"])
-    AX_CHECK_PREPROC_FLAG([-Wformat-security], [AM_CPPFLAGS="$AM_CPPFLAGS -Wformat-security"])
-    AX_CHECK_PREPROC_FLAG([-Wundef], [AM_CPPFLAGS="$AM_CPPFLAGS -Wundef"])
-    AX_CHECK_PREPROC_FLAG([-Wwrite-strings], [AM_CPPFLAGS="$AM_CPPFLAGS -Wwrite-strings"])
-    AX_CHECK_PREPROC_FLAG([-std=gnu99], [AM_CPPFLAGS="$AM_CPPFLAGS -std=gnu99"])
-    AX_CHECK_PREPROC_FLAG([-Wextra], [AM_CPPFLAGS="$AM_CPPFLAGS -Wextra"])
-    AX_CHECK_PREPROC_FLAG([-Wsign-compare], [AM_CPPFLAGS="$AM_CPPFLAGS -Wsign-compare"])
-    AX_CHECK_PREPROC_FLAG([-Wno-unused-parameter], [AM_CPPFLAGS="$AM_CPPFLAGS -Wno-unused-parameter"])
-    AX_CHECK_PREPROC_FLAG([-fno-strict-aliasing], [AM_CPPFLAGS="$AM_CPPFLAGS -fno-strict-aliasing"])
-    AX_CHECK_PREPROC_FLAG([-fdiagnostics-show-option], [AM_CPPFLAGS="$AM_CPPFLAGS -fdiagnostics-show-option"])
+    AX_CHECK_PREPROC_FLAG([-Wall], [AM_CPPFLAGS+=" -Wall"])
+    AX_CHECK_PREPROC_FLAG([-Wmissing-declarations], [AM_CPPFLAGS+=" -Wmissing-declarations"])
+    AX_CHECK_PREPROC_FLAG([-Wpointer-arith], [AM_CPPFLAGS+=" -Wpointer-arith"])
+    AX_CHECK_PREPROC_FLAG([-Wcast-align], [AM_CPPFLAGS+=" -Wcast-align"])
+    AX_CHECK_PREPROC_FLAG([-Wcast-qual], [AM_CPPFLAGS+=" -Wcast-qual"])
+    AX_CHECK_PREPROC_FLAG([-Wformat], [AM_CPPFLAGS+=" -Wformat"])
+    AX_CHECK_PREPROC_FLAG([-Wformat-nonliteral], [AM_CPPFLAGS+=" -Wformat-nonliteral"])
+    AX_CHECK_PREPROC_FLAG([-Wformat-security], [AM_CPPFLAGS+=" -Wformat-security"])
+    AX_CHECK_PREPROC_FLAG([-Wundef], [AM_CPPFLAGS+=" -Wundef"])
+    AX_CHECK_PREPROC_FLAG([-Wwrite-strings], [AM_CPPFLAGS+=" -Wwrite-strings"])
+    AX_CHECK_PREPROC_FLAG([-Wextra], [AM_CPPFLAGS+=" -Wextra"])
+    AX_CHECK_PREPROC_FLAG([-Wsign-compare], [AM_CPPFLAGS+=" -Wsign-compare"])
+    AX_CHECK_PREPROC_FLAG([-Wno-unused-parameter], [AM_CPPFLAGS+=" -Wno-unused-parameter"])
+    AX_CHECK_PREPROC_FLAG([-fno-strict-aliasing], [AM_CPPFLAGS+=" -fno-strict-aliasing"])
+    AX_CHECK_PREPROC_FLAG([-fdiagnostics-show-option], [AM_CPPFLAGS+=" -fdiagnostics-show-option"])
+    # C-only warnings
+    AX_CHECK_PREPROC_FLAG([-Wstrict-prototypes], [AM_CFLAGS+=" -Wstrict-prototypes"])
+    AX_CHECK_PREPROC_FLAG([-Wmissing-prototypes], [AM_CFLAGS+=" -Wmissing-prototypes"])
+    AX_CHECK_PREPROC_FLAG([-Wold-style-definition], [AM_CFLAGS+=" -Wold-style-definition"])
+    AX_CHECK_PREPROC_FLAG([-Wnested-externs], [AM_CFLAGS+=" -Wnested-externs"])
 fi
 
 # Set up code coverage
@@ -197,6 +199,16 @@ fi
 AM_CONDITIONAL([BUILD_DUMP_MODULE], [test "$enable_dump_module" = yes])
 AM_COND_IF([BUILD_DUMP_MODULE], [AC_CONFIG_FILES([modules/dump/libdaq_static_dump.pc])])
 
+# FST Module
+AC_ARG_ENABLE(fst-module,
+              AS_HELP_STRING([--disable-fst-module],[do not build the bundled FST module]),
+              [enable_fst_module="$enableval"], [enable_fst_module="$DEFAULT_ENABLE"])
+AM_CONDITIONAL([BUILD_FST_MODULE], [test "$enable_fst_module" = yes])
+if test "$enable_fst_module" = yes; then
+    DAQ_FST_LIBS="-lstdc++"
+fi
+AM_COND_IF([BUILD_FST_MODULE], [AC_CONFIG_FILES([modules/fst/libdaq_static_fst.pc])])
+
 # IPFW Module
 AC_ARG_ENABLE(ipfw-module,
               AS_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
@@ -303,6 +315,7 @@ AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/trace/libdaq_static_t
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_bpf_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
+                                      "$enable_fst_module" = yes -o \
                                       "$enable_ipfw_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
                                       "$enable_pcap_module" = yes -o \
@@ -333,6 +346,7 @@ AC_CHECK_FUNCS([gethostbyname getpagesize memset munmap socket strchr strcspn st
 # Substitutions
 AC_SUBST(LIBDL)
 AC_SUBST(AM_CPPFLAGS)
+AC_SUBST(AM_CFLAGS)
 AC_SUBST(CFLAGS)
 AC_SUBST(DAQ_MAJOR_VERSION)
 AC_SUBST(DAQ_MINOR_VERSION)
@@ -344,6 +358,7 @@ AC_SUBST(PCAP_LDFLAGS)
 AC_SUBST(DAQ_AFPACKET_LIBS)
 AC_SUBST(DAQ_BPF_LIBS)
 AC_SUBST(DAQ_DUMP_LIBS)
+AC_SUBST(DAQ_FST_LIBS)
 AC_SUBST(DAQ_NFQ_LIBS)
 AC_SUBST(DAQ_PCAP_LIBS)
 
@@ -386,6 +401,7 @@ AC_MSG_RESULT([
     Build AFPacket DAQ module.. : $enable_afpacket_module
     Build BPF DAQ module....... : $enable_bpf_module
     Build Dump DAQ module...... : $enable_dump_module
+    Build FST DAQ module....... : $enable_fst_module
     Build IPFW DAQ module...... : $enable_ipfw_module
     Build NFQ DAQ module....... : $enable_nfq_module
     Build PCAP DAQ module...... : $enable_pcap_module

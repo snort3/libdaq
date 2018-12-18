@@ -119,6 +119,9 @@ extern const DAQ_ModuleAPI_t bpf_daq_module_data;
 #ifdef BUILD_DUMP_MODULE
 extern const DAQ_ModuleAPI_t dump_daq_module_data;
 #endif
+#ifdef BUILD_FST_MODULE
+extern const DAQ_ModuleAPI_t fst_daq_module_data;
+#endif
 #ifdef BUILD_IPFW_MODULE
 extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
 #endif
@@ -145,6 +148,9 @@ static DAQ_Module_h static_modules[] =
 #endif
 #ifdef BUILD_DUMP_MODULE
     &dump_daq_module_data,
+#endif
+#ifdef BUILD_FST_MODULE
+    &fst_daq_module_data,
 #endif
 #ifdef BUILD_IPFW_MODULE
     &ipfw_daq_module_data,
@@ -795,8 +801,13 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     return process_packet(&dtp);
 }
 
-static void handle_flow_stats_message(DAQ_Msg_h msg)
+static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
 {
+    const DAQTestConfig *cfg = ctxt->cfg;
+
+    if (cfg->performance_mode)
+        return;
+
     const Flow_Stats_t *stats = (const Flow_Stats_t *) daq_msg_get_hdr(msg);
     char addr_str[INET6_ADDRSTRLEN];
     const struct in6_addr* tmpIp;
@@ -1277,7 +1288,7 @@ static void *processing_thread(void *arg)
                     break;
                 case DAQ_MSG_TYPE_SOF:
                 case DAQ_MSG_TYPE_EOF:
-                    handle_flow_stats_message(msg);
+                    handle_flow_stats_message(ctxt, msg);
                     break;
                 default:
                     break;

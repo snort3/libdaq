@@ -1,0 +1,15 @@
+# libdaq_static_fst pkg-config file
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libdaq_static_fst
+Description: FST static DAQ module
+URL: https://snort.org/downloads
+Version: @VERSION@
+Requires:
+Conflicts:
+Libs: -L${libdir} -ldaq_static_fst @DAQ_FST_LIBS@
+Cflags:
