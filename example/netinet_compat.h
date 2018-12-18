@@ -36,6 +36,7 @@ typedef struct ether_arp EthArp;
 typedef struct iphdr IpHdr;
 typedef struct icmphdr IcmpHdr;
 typedef struct ip6_hdr Ip6Hdr;
+typedef struct ip6_ext Ip6Ext;
 typedef struct ip6_frag Ip6Frag;
 typedef struct icmp6_hdr Icmp6Hdr;
 
@@ -146,8 +147,16 @@ typedef struct _ip6_hdr
     struct in6_addr ip6_src;      /* source address */
     struct in6_addr ip6_dst;      /* destination address */
 } Ip6Hdr;
+#define ip6_flow  ip6_ctlun.ip6_un1.ip6_un1_flow
 #define ip6_plen  ip6_ctlun.ip6_un1.ip6_un1_plen
 #define ip6_nxt   ip6_ctlun.ip6_un1.ip6_un1_nxt
+
+/* Generic extension header.  */
+typedef struct _ip6_ext
+{
+    uint8_t  ip6e_nxt;      /* next header.  */
+    uint8_t  ip6e_len;      /* length in units of 8 octets.  */
+} Ip6Ext;
 
 /* Fragment header */
 typedef struct _ip6_frag
@@ -182,5 +191,11 @@ typedef struct _icmp6_hdr
 #endif
 
 #endif
+
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+
+typedef struct tcphdr TcpHdr;
+typedef struct udphdr UdpHdr;
 
 #endif /* _NETINET_COMPAT_H */

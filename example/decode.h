@@ -1,0 +1,345 @@
+#ifndef _DECODE_H
+#define _DECODE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "netinet_compat.h"
+
+#define VTH_PRIORITY(vh)  ((unsigned short)((ntohs((vh)->vth_pri_cfi_vlan) & 0xe000) >> 13))
+#define VTH_CFI(vh)       ((ntohs((vh)->vth_pri_cfi_vlan) & 0x0100) >> 12)
+#define VTH_VLAN(vh)      ((unsigned short)(ntohs((vh)->vth_pri_cfi_vlan) & 0x0FFF))
+typedef struct
+{
+    uint16_t vth_pri_cfi_vlan;
+    uint16_t vth_proto;  /* protocol field... */
+} VlanTagHdr;
+
+typedef struct
+{
+    const uint8_t *packet_data;
+    uint32_t packet_data_len;
+    const EthHdr *eth;
+    const VlanTagHdr *vlan;
+    const EthArpHdr *arp;
+    const IpHdr *ip;
+    const Ip6Hdr *ip6;
+    const IcmpHdr *icmp;
+    const Icmp6Hdr *icmp6;
+    const TcpHdr *tcp;
+    const UdpHdr *udp;
+    uint16_t vlan_tags;
+} DecodeData;
+
+/*
+ * Simple implementation of "the Internet Checksum" AKA a one's complement of a one's complement summation (16-bit).
+ * Lifted from RFC1071 (+ errata).
+ * Takes a vector of pointers to data and lengths to handle things like including noncontiguous pseudoheaders.
+ */
+struct cksum_vec {
+    const uint16_t *addr;
+    uint32_t len;
+};
+static inline uint16_t in_cksum_vec(struct cksum_vec *vec, unsigned vec_len)
+{
+    uint32_t sum = 0;
+
+    for (; vec_len != 0; vec++, vec_len--)
+    {
+        const uint16_t *addr = vec->addr;
+        uint32_t len = vec->len;
+
+        /* Compute Internet Checksum for "len" bytes beginning at location "addr". */
+        while (len > 1) {
+            sum += *addr++;
+            len -= 2;
+        }
+
+        /* Add left-over byte, if any */
+        if (len > 0) {
+            uint16_t left_over = 0;
+            *(uint8_t *) &left_over = *(const uint8_t *) addr;
+            sum += left_over;
+        }
+    }
+
+    /* Fold 32-bit sum to 16 bits */
+    while (sum >> 16)
+        sum = (sum & 0xffff) + (sum >> 16);
+
+    return ~sum;
+}
+
+static inline uint16_t in_cksum_v4(const IpHdr *ip, const uint16_t *data, uint16_t len, uint8_t proto)
+{
+    struct {
+        uint32_t src;
+        uint32_t dst;
+        uint8_t zero;
+        uint8_t proto;
+        uint16_t len;
+    } ph;
+    ph.src = ip->saddr;
+    ph.dst = ip->daddr;
+    ph.zero = 0;
+    ph.proto = proto;
+    ph.len = htons(len);
+
+    struct cksum_vec vec[2];
+    vec[0].addr = (const uint16_t *) &ph;
+    vec[0].len = sizeof(ph);
+    vec[1].addr = (const uint16_t *) data;
+    vec[1].len = len;
+
+    return in_cksum_vec(vec, 2);
+}
+
+static inline uint16_t in_cksum_v6(const Ip6Hdr *ip6, const uint16_t *data, uint32_t len, uint8_t proto)
+{
+    struct {
+        struct in6_addr src;
+        struct in6_addr dst;
+        uint32_t len;
+        uint8_t zero[3];
+        uint8_t nxt;
+    } ph;
+    memcpy(&ph.src, &ip6->ip6_src, sizeof(ph.src));
+    memcpy(&ph.dst, &ip6->ip6_dst, sizeof(ph.dst));
+    ph.len = htonl(len);
+    ph.zero[0] = ph.zero[1] = ph.zero[2] = 0;
+    ph.nxt = proto;
+
+    struct cksum_vec vec[2];
+    vec[0].addr = (const uint16_t *) &ph;
+    vec[0].len = sizeof(ph);
+    vec[1].addr = (const uint16_t *) data;
+    vec[1].len = len;
+
+    return in_cksum_vec(vec, 2);
+}
+
+static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(IcmpHdr))
+        return false;
+    const IcmpHdr *icmp = (const IcmpHdr *) cursor;
+
+    struct cksum_vec vec = { (const uint16_t *) icmp, len };
+    if (in_cksum_vec(&vec, 1) != 0)
+        return false;
+
+    dd->icmp = icmp;
+    return true;
+}
+
+static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(Icmp6Hdr))
+        return false;
+    const Icmp6Hdr *icmp6 = (const Icmp6Hdr *) cursor;
+
+    if (in_cksum_v6(dd->ip6, (const uint16_t *) icmp6, len, IPPROTO_ICMPV6) != 0)
+        return false;
+
+    dd->icmp6 = icmp6;
+    return true;
+}
+
+static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(TcpHdr))
+        return false;
+    const TcpHdr *tcp = (const TcpHdr *) cursor;
+    uint16_t hlen = tcp->th_off * 4;
+    if (hlen < sizeof(*tcp) || hlen > len)
+        return false;
+
+    if (dd->ip)
+    {
+        if (in_cksum_v4(dd->ip, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
+            return false;
+    }
+    else
+    {
+        if (in_cksum_v6(dd->ip6, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
+            return false;
+    }
+
+    dd->tcp = tcp;
+    return true;
+}
+
+static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(UdpHdr))
+        return false;
+    const UdpHdr *udp = (const UdpHdr *) cursor;
+    uint16_t ulen = ntohs(udp->uh_ulen);
+    if (ulen < sizeof(*udp) || ulen != len)
+        return false;
+
+    if (dd->ip)
+    {
+        if (in_cksum_v4(dd->ip, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
+            return false;
+    }
+    else
+    {
+        if (in_cksum_v6(dd->ip6, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
+            return false;
+    }
+
+    dd->udp = udp;
+    return true;
+}
+
+static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(Ip6Hdr))
+        return false;
+
+    const Ip6Hdr *ip6 = (const Ip6Hdr *) cursor;
+    if ((ntohl(ip6->ip6_flow) >> 28) != 6)
+        return false;
+
+    uint32_t plen = ntohs(ip6->ip6_plen);
+    uint16_t offset = sizeof(*ip6);
+    if (offset + plen != len)
+        return false;
+
+    uint8_t next_hdr = ip6->ip6_nxt;
+    dd->ip6 = ip6;
+
+    while (offset < len)
+    {
+        switch (next_hdr)
+        {
+            case IPPROTO_FRAGMENT:
+            {
+                if (sizeof(Ip6Frag) > (len - offset))
+                    return false;
+                const Ip6Frag *frag = (const Ip6Frag *) (cursor + offset);
+                next_hdr = frag->ip6f_nxt;
+                offset += sizeof(*frag);
+                break;
+            }
+            case IPPROTO_HOPOPTS:
+            case IPPROTO_ROUTING:
+            case IPPROTO_DSTOPTS:
+            case IPPROTO_MH:
+            {
+                if (sizeof(Ip6Ext) > (len - offset))
+                    return false;
+                const Ip6Ext *ext = (const Ip6Ext *) (cursor + offset);
+                next_hdr = ext->ip6e_nxt;
+                offset += sizeof(*ext) + ext->ip6e_len;
+                break;
+            }
+            case IPPROTO_TCP:
+                return decode_tcp(cursor + offset, len - offset, dd);
+            case IPPROTO_UDP:
+                return decode_udp(cursor + offset, len - offset, dd);
+            case IPPROTO_ICMPV6:
+                return decode_icmp6(cursor + offset, len - offset, dd);
+        }
+    }
+
+    return false;
+}
+
+static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(IpHdr))
+        return false;
+
+    const IpHdr *ip = (const IpHdr *) cursor;
+    if (ip->version != 4)
+        return false;
+
+    uint16_t hlen = ip->ihl * 4;
+    if (hlen < 20)
+        return false;
+
+    uint32_t dlen = ntohs(ip->tot_len);
+    if (dlen < hlen || dlen != len)
+        return false;
+
+    struct cksum_vec vec = { (const uint16_t *) ip, len };
+    if (in_cksum_vec(&vec, 1) != 0)
+        return false;
+
+    uint16_t offset = hlen;
+    dd->ip = ip;
+
+    switch (dd->ip->protocol)
+    {
+        case IPPROTO_TCP:
+            return decode_tcp(cursor + offset, len - offset, dd);
+        case IPPROTO_UDP:
+            return decode_udp(cursor + offset, len - offset, dd);
+        case IPPROTO_ICMP:
+            return decode_icmp(cursor + offset, len - offset, dd);
+    }
+
+    return false;
+}
+
+static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(EthArpHdr))
+        return false;
+    dd->arp = (const EthArpHdr *) cursor;
+    return true;
+}
+
+static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < sizeof(EthHdr))
+        return false;
+
+    const EthHdr *eth = (const EthHdr *) cursor;
+    uint16_t ether_type = ntohs(eth->ether_type);
+    uint16_t offset = sizeof(*eth);
+
+    dd->eth = eth;
+    while (ether_type == ETH_P_8021Q)
+    {
+        if (offset + sizeof(VlanTagHdr) > len)
+            return false;
+        const VlanTagHdr *vlan = (const VlanTagHdr *) (cursor + offset);
+        ether_type = ntohs(vlan->vth_proto);
+        offset += sizeof(*vlan);
+        /* Keep track of the innermost VLAN tag and a count of the total */
+        dd->vlan = vlan;
+        dd->vlan_tags++;
+    }
+    switch (ether_type)
+    {
+        case ETH_P_ARP:
+            return decode_arp(cursor + offset, len - offset, dd);
+        case ETH_P_IP:
+            return decode_ip(cursor + offset, len - offset, dd);
+        case ETH_P_IPV6:
+            return decode_ip6(cursor + offset, len - offset, dd);
+    }
+    return false;
+}
+
+static inline bool decode_raw(const uint8_t *cursor, uint32_t len, DecodeData *dd)
+{
+    if (len < 1)
+        return false;
+    uint8_t ipver = (cursor[0] & 0xf0) >> 4;
+    if (ipver == 4)
+        return decode_ip(cursor, len, dd);
+    if (ipver == 6)
+        return decode_ip6(cursor, len, dd);
+    return false;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
