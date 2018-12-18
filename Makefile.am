@@ -1,8 +1,8 @@
 AUTOMAKE_OPTIONS = foreign
 
-pkgconfig_DATA = libdaq.pc
+include $(top_srcdir)/aminclude_static.am
 
-@CODE_COVERAGE_RULES@
+pkgconfig_DATA = libdaq.pc
 
 if BUILD_MODULES
     MODULES_DIR = modules
