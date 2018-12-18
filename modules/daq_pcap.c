@@ -154,6 +154,7 @@ static int create_packet_pool(Pcap_Context_t *pc, unsigned size)
         msg->hdr_len = sizeof(desc->pkthdr);
         msg->hdr = &desc->pkthdr;
         msg->data = desc->data;
+        msg->owner = pc->modinst;
         msg->priv = desc;
 
         /* Place it on the free list */

@@ -222,6 +222,7 @@ static int create_packet_pool(AFPacket_Context_t *afpc, unsigned size)
         msg->hdr_len = sizeof(desc->pkthdr);
         msg->hdr = &desc->pkthdr;
         msg->data = desc->data;
+        msg->owner = afpc->modinst;
         msg->priv = desc;
 
         /* Place it on the free list */

@@ -124,6 +124,7 @@ static int create_packet_pool(Ipfw_Context_t *ipfwc, unsigned size)
         msg->hdr_len = sizeof(desc->pkthdr);
         msg->hdr = &desc->pkthdr;
         msg->data = desc->data;
+        msg->owner = ipfwc->modinst;
         msg->priv = desc;
 
         /* Place it on the free list */

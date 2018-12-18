@@ -79,6 +79,7 @@ typedef const struct _daq_module_api *DAQ_Module_h;
 typedef struct _daq_module_config *DAQ_ModuleConfig_h;
 typedef struct _daq_config *DAQ_Config_h;
 typedef struct _daq_instance *DAQ_Instance_h;
+typedef struct _daq_module_instance *DAQ_ModuleInstance_h;
 typedef const struct _daq_msg *DAQ_Msg_h;
 
 #define DAQ_SUCCESS          0  /* Success! */
@@ -131,6 +132,7 @@ typedef struct _daq_msg
     void *hdr;                  /* Pointer to the message header structure for this message. */
     uint32_t data_len;          /* Length of the data pointed to by 'data'.  Should be 0 if 'data' is NULL. */
     uint8_t *data;              /* Pointer to the variable-length message data. (Optional) */
+    DAQ_ModuleInstance_h owner; /* Handle for the module instance this message belongs to. */
     void *priv;                 /* Pointer to module instance's private data for this message. (Optional) */
 } DAQ_Msg_t;
 

@@ -155,6 +155,7 @@ static int create_packet_pool(Nfq_Context_t *nfqc, unsigned size)
         msg->type = DAQ_MSG_TYPE_PACKET;
         msg->hdr_len = sizeof(desc->pkthdr);
         msg->hdr = &desc->pkthdr;
+        msg->owner = nfqc->modinst;
         msg->priv = desc;
 
         /* Place it on the free list */

@@ -28,8 +28,6 @@ extern "C" {
 
 #include <daq_common.h>
 
-typedef struct _daq_module_instance *DAQ_ModuleInstance_h;
-
 typedef int (*daq_module_set_filter_func) (void *handle, const char *filter);
 typedef int (*daq_module_start_func) (void *handle);
 typedef int (*daq_module_inject_func) (void *handle, DAQ_MsgType type, const void *hdr, const uint8_t *data, uint32_t data_len);
