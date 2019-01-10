@@ -281,14 +281,21 @@ static int pcap_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
     pc->mode = daq_base_api.config_get_mode(modcfg);
     if (pc->mode == DAQ_MODE_READ_FILE)
     {
-        pc->fp = fopen(daq_base_api.config_get_input(modcfg), "rb");
-        if (!pc->fp)
+        const char *fname = daq_base_api.config_get_input(modcfg);
+        /* Special case: "-" is an alias for stdin */
+        if (fname[0] == '-' && fname[1] == '\0')
+            pc->fp = stdin;
+        else
         {
-            SET_ERROR(modinst, "%s: Couldn't open file '%s' for reading: %s", __func__,
-                    daq_base_api.config_get_input(modcfg), strerror(errno));
-            destroy_packet_pool(pc);
-            free(pc);
-            return DAQ_ERROR_NOMEM;
+            pc->fp = fopen(daq_base_api.config_get_input(modcfg), "rb");
+            if (!pc->fp)
+            {
+                SET_ERROR(modinst, "%s: Couldn't open file '%s' for reading: %s", __func__,
+                        daq_base_api.config_get_input(modcfg), strerror(errno));
+                destroy_packet_pool(pc);
+                free(pc);
+                return DAQ_ERROR_NOMEM;
+            }
         }
     }
     else
