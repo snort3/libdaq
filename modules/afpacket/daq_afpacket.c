@@ -52,7 +52,7 @@
 
 #include "daq_module_api.h"
 
-#define DAQ_AFPACKET_VERSION 6
+#define DAQ_AFPACKET_VERSION 7
 
 #define AF_PACKET_DEFAULT_BUFFER_SIZE   128
 #define AF_PACKET_MAX_INTERFACES         32
@@ -95,7 +95,6 @@ typedef struct _af_packet_instance
     char *name;
     int index;
     struct _af_packet_instance *peer;
-    struct sockaddr_ll sll;
     int mtu;
     bool active;
 } AFPacketInstance;
@@ -137,6 +136,7 @@ typedef struct _afpacket_context
 #ifdef PACKET_FANOUT
     AFPacketFanoutCfg fanout_cfg;
 #endif
+    bool use_tx_ring;
     bool debug;
     /* State */
     DAQ_ModuleInstance_h modinst;
@@ -164,6 +164,7 @@ static DAQ_VariableDesc_t afpacket_variable_descriptions[] = {
     { "debug", "Enable debugging output to stdout", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
     { "fanout_type", "Fanout loadbalancing method", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
     { "fanout_flag", "Fanout loadbalancing option", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "use_tx_ring", "Use memory-mapped TX ring", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static const int vlan_offset = 2 * ETH_ALEN;
@@ -327,7 +328,8 @@ static void destroy_instance(AFPacketInstance *instance)
             /* Tell the kernel to destroy the rings. */
             memset(&req, 0, sizeof(req));
             setsockopt(instance->fd, SOL_PACKET, PACKET_RX_RING, (void *) &req, sizeof(req));
-            setsockopt(instance->fd, SOL_PACKET, PACKET_TX_RING, (void *) &req, sizeof(req));
+            if (instance->tx_ring.size)
+                setsockopt(instance->fd, SOL_PACKET, PACKET_TX_RING, (void *) &req, sizeof(req));
             close(instance->fd);
         }
         if (instance->name)
@@ -424,6 +426,22 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
         goto err;
     }
 
+    /* Bypass the kernel's qdisc layer when transmitting */
+    val = 1;
+    if (setsockopt(instance->fd, SOL_PACKET, PACKET_QDISC_BYPASS, &val, sizeof(val)) < 0)
+    {
+        SET_ERROR(afpc->modinst, "Couldn't configure bypassing qdisc: %s", val, strerror(errno));
+        goto err;
+    }
+
+    /* Don't block on malformed frames in the TX ring */
+    val = 1;
+    if (setsockopt(instance->fd, SOL_PACKET, PACKET_LOSS, &val, sizeof(val)) < 0)
+    {
+        SET_ERROR(afpc->modinst, "Couldn't configure bypassing qdisc: %s", val, strerror(errno));
+        goto err;
+    }
+
     /* Get the interface MTU */
     memset (&ifr, 0, sizeof(ifr));
     snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", instance->name);
@@ -478,11 +496,6 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
         SET_ERROR(afpc->modinst, "%s: setsockopt: %s", __func__, strerror(errno));
         goto err;
     }
-
-    /* Initialize the sockaddr for this instance's interface for later injection/forwarding use. */
-    instance->sll.sll_family = AF_PACKET;
-    instance->sll.sll_ifindex = instance->index;
-    instance->sll.sll_protocol = htons(ETH_P_ALL);
 
     if (afpc->debug)
     {
@@ -631,8 +644,11 @@ static int create_instance_rings(AFPacket_Context_t *afpc, AFPacketInstance *ins
     if (create_ring(afpc, instance, &instance->rx_ring, PACKET_RX_RING) != DAQ_SUCCESS)
         return DAQ_ERROR;
     /* ...request the kernel TX ring from af_packet if we're in inline mode... */
-    if (instance->peer && create_ring(afpc, instance, &instance->tx_ring, PACKET_TX_RING) != DAQ_SUCCESS)
-        return DAQ_ERROR;
+    if (instance->peer && afpc->use_tx_ring)
+    {
+        if (create_ring(afpc, instance, &instance->tx_ring, PACKET_TX_RING) != DAQ_SUCCESS)
+            return DAQ_ERROR;
+    }
     /* ...map the memory for the kernel ring(s) into userspace... */
     if (mmap_rings(afpc, instance) != DAQ_SUCCESS)
         return DAQ_ERROR;
@@ -640,8 +656,11 @@ static int create_instance_rings(AFPacket_Context_t *afpc, AFPacketInstance *ins
     if (set_up_ring(afpc, instance, &instance->rx_ring) != DAQ_SUCCESS)
         return DAQ_ERROR;
     /* ...as well as one for the TX ring if we're in inline mode... */
-    if (instance->peer && set_up_ring(afpc, instance, &instance->tx_ring) != DAQ_SUCCESS)
-        return DAQ_ERROR;
+    if (instance->peer && afpc->use_tx_ring)
+    {
+        if (set_up_ring(afpc, instance, &instance->tx_ring) != DAQ_SUCCESS)
+            return DAQ_ERROR;
+    }
 
     return DAQ_SUCCESS;
 }
@@ -882,6 +901,8 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
             }
         }
 #endif /* PACKET_FANOUT */
+        else if (!strcmp(varKey, "use_tx_ring"))
+            afpc->use_tx_ring = true;
 
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
@@ -955,7 +976,7 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
      */
     unsigned num_rings = 0;
     for (afi = afpc->instances; afi; afi = afi->next)
-        num_rings += afi->peer ? 2 : 1;
+        num_rings += (afi->peer && afpc->use_tx_ring) ? 2 : 1;
     afpc->ring_size = size / num_rings;
 
     /* Create the RX (and potentially TX) rings and map them into userspace. */
@@ -1069,25 +1090,34 @@ static inline int afpacket_transmit_packet(AFPacketInstance *egress, const uint8
 
             entry = egress->tx_ring.cursor;
             if (entry->hdr.h2->tp_status != TP_STATUS_AVAILABLE)
+            {
+                /* FIXME: This should probably wait for a TX slot to free up via poll(). */
                 return DAQ_ERROR_AGAIN;
+            }
             memcpy(entry->hdr.raw + TPACKET_ALIGN(egress->tp_hdrlen), packet_data, len);
             entry->hdr.h2->tp_len = len;
             entry->hdr.h2->tp_status = TP_STATUS_SEND_REQUEST;
+            /* FIXME: This should call sendto() with MSG_DONTWAIT and handle no-buffer conditions gracefully. 
+                Performance without MSG_DONTWAIT is apparently pretty miserable. */
             if (send(egress->fd, NULL, 0, 0) < 0)
                 return DAQ_ERROR;
             egress->tx_ring.cursor = entry->next;
         }
         else
         {
-            struct sockaddr_ll *sll;
-            const struct ethhdr *eth;
-
-            eth = (const struct ethhdr *) packet_data;
-            sll = &egress->sll;
-            sll->sll_protocol = eth->h_proto;
-
-            if (sendto(egress->fd, packet_data, len, 0, (struct sockaddr *) sll, sizeof(*sll)) < 0)
+            while (send(egress->fd, packet_data, len, 0) < 0)
+            {
+                if (errno == ENOBUFS)
+                {
+                    struct pollfd pfd;
+                    pfd.fd = egress->fd;
+                    pfd.revents = 0;
+                    pfd.events = POLLOUT;
+                    if (poll(&pfd, 1, 10) > 0 && (pfd.revents & POLLOUT))
+                        continue;
+                }
                 return DAQ_ERROR;
+            }
         }
     }
 
