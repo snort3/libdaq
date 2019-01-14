@@ -24,6 +24,8 @@ AC_PROG_CXX
 AM_PROG_AR
 AC_PROG_SED
 
+AX_CXX_COMPILE_STDCXX_11
+
 LT_INIT
 
 # Initialize pkg-config since we are installing a .pc file
@@ -205,7 +207,12 @@ AC_ARG_ENABLE(fst-module,
               [enable_fst_module="$enableval"], [enable_fst_module="$DEFAULT_ENABLE"])
 AM_CONDITIONAL([BUILD_FST_MODULE], [test "$enable_fst_module" = yes])
 if test "$enable_fst_module" = yes; then
-    DAQ_FST_LIBS="-lstdc++"
+    if test "$HAVE_CXX11" = 1 ; then
+        DAQ_FST_LIBS="-lstdc++"
+    else
+        AC_MSG_WARN([A compiler with C++11 support is not available, disabling the FST DAQ module])
+        enable_fst_module=no
+    fi
 fi
 AM_COND_IF([BUILD_FST_MODULE], [AC_CONFIG_FILES([modules/fst/libdaq_static_fst.pc])])
 
