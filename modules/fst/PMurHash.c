@@ -50,7 +50,7 @@ on big endian machines, or a byte-by-byte read if the endianess is unknown.
 
 #include "PMurHash.h"
 
-#include <endian.h>
+#include <sys/types.h>
 
 /* I used ugly type names in the header to avoid potential conflicts with
  * application or system typedefs & defines. Since I'm not including any more
