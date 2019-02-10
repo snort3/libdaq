@@ -21,18 +21,33 @@
 #ifndef _NETINET_COMPAT_H
 #define _NETINET_COMPAT_H
 
+#include <netinet/if_ether.h>
+
+typedef struct arphdr EthArpHdr;
+typedef struct ether_arp EthArp;
+typedef struct ether_header EthHdr;
+
+#include <netinet/in.h>
+
+#ifndef IPPROTO_MH
+#define IPPROTO_MH 135
+#endif
+
+#include <netinet/tcp.h>
+
+typedef struct tcphdr TcpHdr;
+
+#include <netinet/udp.h>
+
+typedef struct udphdr UdpHdr;
+
 #if defined(__linux__)
 
-#include <netinet/ether.h>
 #include <netinet/icmp6.h>
-#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
 
-typedef struct ether_header EthHdr;
-typedef struct arphdr EthArpHdr;
-typedef struct ether_arp EthArp;
 typedef struct iphdr IpHdr;
 typedef struct icmphdr IcmpHdr;
 typedef struct ip6_hdr Ip6Hdr;
@@ -45,43 +60,6 @@ typedef struct icmp6_hdr Icmp6Hdr;
 #if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
 #include <inttypes.h>
 #endif
-
-/*
- * Copies of protocol data structures and defines from Linux/glibc system headers.
- * Non-Linux systems are why we can't have nice things.
- */
-#define ETH_ALEN  6               /* Octets in one ethernet addr   */
-#define ETH_P_IP    0x0800      /* Internet Protocol packet */
-#define ETH_P_ARP   0x0806      /* Address Resolution packet    */
-#define ETH_P_8021Q 0x8100          /* 802.1Q VLAN Extended Header  */
-#define ETH_P_IPV6  0x86DD      /* IPv6 over bluebook       */
-typedef struct _ethernet_hdr
-{
-    uint8_t  ether_dhost[ETH_ALEN];   /* destination eth addr */
-    uint8_t  ether_shost[ETH_ALEN];   /* source ether addr    */
-    uint16_t ether_type;              /* packet type ID field */
-} __attribute__ ((__packed__)) EthHdr;
-
-#define ARPHRD_ETHER    1       /* Ethernet 10/100Mbps.  */
-#define ARPOP_REQUEST   1       /* ARP request.  */
-#define ARPOP_REPLY 2       /* ARP reply.  */
-typedef struct _ethernet_arp_hdr
-{
-    unsigned short int ar_hrd;      /* Format of hardware address.  */
-    unsigned short int ar_pro;      /* Format of protocol address.  */
-    unsigned char ar_hln;       /* Length of hardware address.  */
-    unsigned char ar_pln;       /* Length of protocol address.  */
-    unsigned short int ar_op;       /* ARP opcode (command).  */
-} EthArpHdr;
-
-typedef struct _ethernet_arp
-{
-    EthArpHdr ea_hdr;      /* fixed-size header */
-    uint8_t arp_sha[ETH_ALEN];  /* sender hardware address */
-    uint8_t arp_spa[4];     /* sender protocol address */
-    uint8_t arp_tha[ETH_ALEN];  /* target hardware address */
-    uint8_t arp_tpa[4];     /* target protocol address */
-} EthArp;
 
 #define       IP_MAXPACKET    65535           /* maximum packet size */
 typedef struct _ip_hdr
@@ -191,11 +169,5 @@ typedef struct _icmp6_hdr
 #endif
 
 #endif
-
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-
-typedef struct tcphdr TcpHdr;
-typedef struct udphdr UdpHdr;
 
 #endif /* _NETINET_COMPAT_H */

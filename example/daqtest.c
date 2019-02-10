@@ -173,7 +173,7 @@ static DAQ_Module_h static_modules[] =
 
 static uint8_t normal_ping_data[IP_MAXPACKET];
 static uint8_t fake_ping_data[IP_MAXPACKET];
-static uint8_t local_mac_addr[ETH_ALEN];
+static uint8_t local_mac_addr[ETHER_ADDR_LEN];
 
 static volatile sig_atomic_t pending_signal = 0;
 static int dlt;
@@ -315,9 +315,9 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
     /* Set up the ethernet header... */
     eth_request = dtp->dd.eth;
     eth_reply = (EthHdr *) reply;
-    memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
-    memcpy(eth_reply->ether_shost, mac_addr, ETH_ALEN);
-    memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, arphdr_offset - ETH_ALEN * 2);
+    memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETHER_ADDR_LEN);
+    memcpy(eth_reply->ether_shost, mac_addr, ETHER_ADDR_LEN);
+    memcpy(reply + ETHER_ADDR_LEN * 2, request + ETHER_ADDR_LEN * 2, arphdr_offset - ETHER_ADDR_LEN * 2);
 
     /* Now the ARP header... */
     etharp_request = (const EthArp *) dtp->dd.arp;
@@ -326,9 +326,9 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
     etharp_reply->ea_hdr.ar_op = htons(ARPOP_REPLY);
 
     /* Finally, the ethernet ARP reply... */
-    memcpy(etharp_reply->arp_sha, mac_addr, ETH_ALEN);
+    memcpy(etharp_reply->arp_sha, mac_addr, ETHER_ADDR_LEN);
     memcpy(etharp_reply->arp_spa, etharp_request->arp_tpa, 4);
-    memcpy(etharp_reply->arp_tha, etharp_request->arp_sha, ETH_ALEN);
+    memcpy(etharp_reply->arp_tha, etharp_request->arp_sha, ETHER_ADDR_LEN);
     memcpy(etharp_reply->arp_tpa, etharp_request->arp_spa, 4);
 
     return reply;
@@ -350,9 +350,9 @@ static size_t forge_icmp_reply(DAQTestPacket *dtp, uint8_t **reply_ptr)
         /* Set up the ethernet header... */
         const EthHdr *eth_request = dtp->dd.eth;
         EthHdr *eth_reply = (EthHdr *) reply;
-        memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETH_ALEN);
-        memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETH_ALEN);
-        memcpy(reply + ETH_ALEN * 2, request + ETH_ALEN * 2, iphdr_offset - ETH_ALEN * 2);
+        memcpy(eth_reply->ether_dhost, eth_request->ether_shost, ETHER_ADDR_LEN);
+        memcpy(eth_reply->ether_shost, eth_request->ether_dhost, ETHER_ADDR_LEN);
+        memcpy(reply + ETHER_ADDR_LEN * 2, request + ETHER_ADDR_LEN * 2, iphdr_offset - ETHER_ADDR_LEN * 2);
     }
     else
     {
@@ -540,7 +540,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     memcpy(&addr.s_addr, etharp->arp_tpa, 4);
     printf(" (%s)\n", inet_ntoa(addr));
 
-    if (ntohs(dtp->dd.arp->ar_op) != ARPOP_REQUEST || ntohs(dtp->dd.arp->ar_pro) != ETH_P_IP)
+    if (ntohs(dtp->dd.arp->ar_op) != ARPOP_REQUEST || ntohs(dtp->dd.arp->ar_pro) != ETHERTYPE_IP)
         return dtp->ctxt->cfg->default_verdict;
 
     for (ip = dtp->ctxt->cfg->ip_addrs; ip; ip = ip->next)
@@ -634,7 +634,7 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
         printf(" VLAN Tags (%hu):", dtp->dd.vlan_tags);
         ether_type = ntohs(dtp->dd.eth->ether_type);
         offset = sizeof(*dtp->dd.eth);
-        while (ether_type == ETH_P_8021Q)
+        while (ether_type == ETHERTYPE_VLAN)
         {
             const VlanTagHdr *vlan;
 

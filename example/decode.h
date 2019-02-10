@@ -323,7 +323,7 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     uint16_t offset = sizeof(*eth);
 
     dd->eth = eth;
-    while (ether_type == ETH_P_8021Q)
+    while (ether_type == ETHERTYPE_VLAN)
     {
         if (offset + sizeof(VlanTagHdr) > len)
             return false;
@@ -336,11 +336,11 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     }
     switch (ether_type)
     {
-        case ETH_P_ARP:
+        case ETHERTYPE_ARP:
             return decode_arp(cursor + offset, len - offset, dd);
-        case ETH_P_IP:
+        case ETHERTYPE_IP:
             return decode_ip(cursor + offset, len - offset, dd);
-        case ETH_P_IPV6:
+        case ETHERTYPE_IPV6:
             return decode_ip6(cursor + offset, len - offset, dd);
     }
     return false;
