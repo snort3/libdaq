@@ -345,8 +345,7 @@ static int iface_get_arptype(AFPacketInstance *instance)
 {
     struct ifreq ifr;
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, instance->name, sizeof(ifr.ifr_name));
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", instance->name);
 
     if (ioctl(instance->fd, SIOCGIFHWADDR, &ifr) == -1)
     {
