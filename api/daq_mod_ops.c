@@ -424,7 +424,7 @@ DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_t *instance, void *old_con
     return instance->api.config_free.func(instance->api.config_free.context, old_config);
 }
 
-DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
+DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const unsigned max_recv, DAQ_Msg_h msgs[], DAQ_RecvStatus *rstat)
 {
     if (!instance)
     {
@@ -455,7 +455,7 @@ DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const un
     return instance->api.msg_receive.func(instance->api.msg_receive.context, max_recv, msgs, rstat);
 }
 
-DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_t *instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_t *instance, DAQ_Msg_h msg, DAQ_Verdict verdict)
 {
     if (!instance)
         return DAQ_ERROR_NOCTX;

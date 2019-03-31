@@ -110,8 +110,8 @@ DAQ_LINKAGE int daq_instance_config_load(DAQ_Instance_h instance, void **new_con
 DAQ_LINKAGE int daq_instance_config_swap(DAQ_Instance_h instance, void *new_config, void **old_config);
 DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_h instance, void *old_config);
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_h instance, const unsigned max_recv,
-        const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat);
-DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, const DAQ_Msg_t *msg, DAQ_Verdict verdict);
+        DAQ_Msg_h msgs[], DAQ_RecvStatus *rstat);
+DAQ_LINKAGE int daq_instance_msg_finalize(DAQ_Instance_h instance, DAQ_Msg_h msg, DAQ_Verdict verdict);
 DAQ_LINKAGE int daq_instance_get_msg_pool_info(DAQ_Instance_h instance, DAQ_MsgPoolInfo_t *info);
 
 /* DAQ Message convenience functions */
