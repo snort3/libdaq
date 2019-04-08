@@ -560,6 +560,8 @@ static uint32_t pcap_daq_get_capabilities(void *handle)
 
     if (pc->device)
         capabilities |= DAQ_CAPA_INJECT;
+    else
+        capabilities |= DAQ_CAPA_UNPRIV_START;
 
     return capabilities;
 }
