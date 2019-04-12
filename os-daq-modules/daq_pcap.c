@@ -31,9 +31,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <pcap.h>
-# ifdef HAVE_LINUX_IF_PACKET_H
-#include <linux/if_packet.h>
-# endif /* HAVE_LINUX_IF_PACKET_H */
 #include <unistd.h>
 
 #include "daq_api.h"
@@ -70,37 +67,6 @@ typedef struct _pcap_context
 } Pcap_Context_t;
 
 static void pcap_daq_reset_stats(void *handle);
-
-/* Attempt to convert from the PCAP_FRAMES environment variable used by Phil Wood's PCAP-Ring
-    to a buffer size I can pass to PCAP 1.0.0's pcap_set_buffer_size(). */
-static int translate_PCAP_FRAMES(int snaplen)
-{
-# ifdef HAVE_LINUX_IF_PACKET_H
-    char *frames_str = getenv("PCAP_FRAMES");
-    int frame_size, block_size, frames_per_block;
-    int frames;
-
-    if (!frames_str)
-        return 0;
-
-    /* Look, I didn't make these numbers and calculations up, I'm just using them. */
-    frame_size = TPACKET_ALIGN(snaplen + TPACKET_ALIGN(TPACKET_HDRLEN) + sizeof(struct sockaddr_ll));
-    block_size = getpagesize();
-    while (block_size < frame_size)
-        block_size <<= 1;
-    frames_per_block = block_size / frame_size;
-
-    if (strncmp(frames_str, "max", 3) && strncmp(frames_str, "MAX", 3))
-        frames = strtol(frames_str, NULL, 10);
-    else
-        frames = 0x8000; /* Default maximum of 32k frames. */
-
-    printf("PCAP_FRAMES -> %d * %d / %d = %d (%d)\n", frames, block_size, frames_per_block, frames * block_size / frames_per_block, frame_size);
-    return frames * block_size / frames_per_block;
-# else
-    return 0;
-# endif
-}
 
 static int pcap_daq_open(Pcap_Context_t *context)
 {
@@ -209,9 +175,6 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
         else if (!strcmp(entry->key,  "immediate"))
             context->immediate_flag = strtol(entry->value, NULL, 10);
     }
-    /* Try to account for legacy PCAP_FRAMES environment variable if we weren't passed a buffer size. */
-    if (context->buffer_size == 0)
-        context->buffer_size = translate_PCAP_FRAMES(context->snaplen);
 
     if (config->mode == DAQ_MODE_READ_FILE)
     {
