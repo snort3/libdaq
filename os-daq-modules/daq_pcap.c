@@ -31,12 +31,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <pcap.h>
-#ifndef PCAP_OLDSTYLE
 # ifdef HAVE_LINUX_IF_PACKET_H
 #include <linux/if_packet.h>
 # endif /* HAVE_LINUX_IF_PACKET_H */
 #include <unistd.h>
-#endif /* PCAP_OLDSTYLE */
 
 #include "daq_api.h"
 
@@ -73,7 +71,6 @@ typedef struct _pcap_context
 
 static void pcap_daq_reset_stats(void *handle);
 
-#ifndef PCAP_OLDSTYLE
 /* Attempt to convert from the PCAP_FRAMES environment variable used by Phil Wood's PCAP-Ring
     to a buffer size I can pass to PCAP 1.0.0's pcap_set_buffer_size(). */
 static int translate_PCAP_FRAMES(int snaplen)
@@ -104,22 +101,18 @@ static int translate_PCAP_FRAMES(int snaplen)
     return 0;
 # endif
 }
-#endif /* PCAP_OLDSTYLE */
 
 static int pcap_daq_open(Pcap_Context_t *context)
 {
     uint32_t localnet, netmask;
     uint32_t defaultnet = 0xFFFFFF00;
-#ifndef PCAP_OLDSTYLE
     int status;
-#endif /* PCAP_OLDSTYLE */
 
     if (context->handle)
         return DAQ_SUCCESS;
 
     if (context->device)
     {
-#ifndef PCAP_OLDSTYLE
         context->handle = pcap_create(context->device, context->errbuf);
         if (!context->handle)
             return DAQ_ERROR;
@@ -135,12 +128,6 @@ static int pcap_daq_open(Pcap_Context_t *context)
             goto fail;
         if ((status = pcap_activate(context->handle)) < 0)
             goto fail;
-#else
-        context->handle = pcap_open_live(context->device, context->snaplen,
-                                         context->promisc_flag ? 1 : 0, context->timeout, context->errbuf);
-        if (!context->handle)
-            return DAQ_ERROR;
-#endif /* PCAP_OLDSTYLE */
         if (pcap_lookupnet(context->device, &localnet, &netmask, context->errbuf) < 0)
             netmask = htonl(defaultnet);
     }
@@ -156,7 +143,6 @@ static int pcap_daq_open(Pcap_Context_t *context)
 
     return DAQ_SUCCESS;
 
-#ifndef PCAP_OLDSTYLE
 fail:
     if (status == PCAP_ERROR || status == PCAP_ERROR_NO_SUCH_DEVICE || status == PCAP_ERROR_PERM_DENIED)
         DPE(context->errbuf, "%s", pcap_geterr(context->handle));
@@ -165,7 +151,6 @@ fail:
     pcap_close(context->handle);
     context->handle = NULL;
     return DAQ_ERROR;
-#endif /* PCAP_OLDSTYLE */
 }
 
 static int update_hw_stats(Pcap_Context_t *context)
@@ -203,9 +188,7 @@ static int update_hw_stats(Pcap_Context_t *context)
 static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char *errbuf, size_t len)
 {
     Pcap_Context_t *context;
-#ifndef PCAP_OLDSTYLE
     DAQ_Dict *entry;
-#endif
 
     context = calloc(1, sizeof(Pcap_Context_t));
     if (!context)
@@ -218,7 +201,6 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
     context->promisc_flag = (config->flags & DAQ_CFG_PROMISC);
     context->timeout = config->timeout;
 
-#ifndef PCAP_OLDSTYLE
     /* Retrieve the requested buffer size (default = 0) */
     for (entry = config->values; entry; entry = entry->next)
     {
@@ -230,7 +212,6 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
     /* Try to account for legacy PCAP_FRAMES environment variable if we weren't passed a buffer size. */
     if (context->buffer_size == 0)
         context->buffer_size = translate_PCAP_FRAMES(context->snaplen);
-#endif
 
     if (config->mode == DAQ_MODE_READ_FILE)
     {
