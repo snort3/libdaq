@@ -51,7 +51,6 @@ typedef struct _pcap_context
     int timeout;
     int buffer_size;
     int packets;
-    int delayed_open;
     DAQ_Analysis_Func_t analysis_func;
     u_char *user_data;
     uint32_t netmask;
@@ -185,7 +184,14 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
             free(context);
             return DAQ_ERROR_NOMEM;
         }
-        context->delayed_open = 0;
+
+        if (pcap_daq_open(context) != DAQ_SUCCESS)
+        {
+            snprintf(errbuf, len, "%s", context->errbuf);
+            free(context->file);
+            free(context);
+            return DAQ_ERROR;
+        }
     }
     else
     {
@@ -195,18 +201,6 @@ static int pcap_daq_initialize(const DAQ_Config_t *config, void **ctxt_ptr, char
             snprintf(errbuf, len, "%s: Couldn't allocate memory for the device string!", __func__);
             free(context);
             return DAQ_ERROR_NOMEM;
-        }
-        context->delayed_open = 1;
-    }
-
-    if (!context->delayed_open)
-    {
-        if (pcap_daq_open(context) != DAQ_SUCCESS)
-        {
-            snprintf(errbuf, len, "%s", context->errbuf);
-            free(context->file);
-            free(context);
-            return DAQ_ERROR;
         }
     }
 
@@ -461,14 +455,11 @@ static int pcap_daq_get_snaplen(void *handle)
 static uint32_t pcap_daq_get_capabilities(void *handle)
 {
     Pcap_Context_t *context = (Pcap_Context_t *) handle;
-    uint32_t capabilities = DAQ_CAPA_BPF;
+    uint32_t capabilities = DAQ_CAPA_BPF | DAQ_CAPA_BREAKLOOP;
 
     if (context->device)
         capabilities |= DAQ_CAPA_INJECT;
-
-    capabilities |= DAQ_CAPA_BREAKLOOP;
-
-    if (!context->delayed_open)
+    else
         capabilities |= DAQ_CAPA_UNPRIV_START;
 
     return capabilities;
