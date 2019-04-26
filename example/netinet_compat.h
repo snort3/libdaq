@@ -21,6 +21,10 @@
 #ifndef _NETINET_COMPAT_H
 #define _NETINET_COMPAT_H
 
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
+#include <sys/socket.h>     // Needed for struct sockaddr and int types
+#endif
+
 #include <netinet/if_ether.h>
 
 typedef struct arphdr EthArpHdr;
@@ -56,10 +60,6 @@ typedef struct ip6_frag Ip6Frag;
 typedef struct icmp6_hdr Icmp6Hdr;
 
 #else
-
-#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
-#include <inttypes.h>
-#endif
 
 #define       IP_MAXPACKET    65535           /* maximum packet size */
 typedef struct _ip_hdr
