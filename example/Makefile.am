@@ -32,6 +32,10 @@ if BUILD_IPFW_MODULE
 daqtest_static_CFLAGS += -DBUILD_IPFW_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/ipfw/libdaq_static_ipfw.la
 endif
+if BUILD_NETMAP_MODULE
+daqtest_static_CFLAGS += -DBUILD_NETMAP_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/netmap/libdaq_static_netmap.la
+endif
 if BUILD_NFQ_MODULE
 daqtest_static_CFLAGS += -DBUILD_NFQ_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/nfq/libdaq_static_nfq.la $(DAQ_NFQ_LIBS)

@@ -129,6 +129,9 @@ extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
 #ifdef BUILD_NFQ_MODULE
 extern const DAQ_ModuleAPI_t nfq_daq_module_data;
 #endif
+#ifdef BUILD_NETMAP_MODULE
+extern const DAQ_ModuleAPI_t netmap_daq_module_data;
+#endif
 #ifdef BUILD_PCAP_MODULE
 extern const DAQ_ModuleAPI_t pcap_daq_module_data;
 #endif

@@ -93,6 +93,7 @@ endif
 if BUILD_NETMAP_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += netmap/daq_netmap.la
+    pkgconfig_DATA += netmap/libdaq_static_netmap.pc
     netmap_daq_netmap_la_SOURCES = netmap/daq_netmap.c
     netmap_daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
     netmap_daq_netmap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared

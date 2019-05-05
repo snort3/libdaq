@@ -226,6 +226,22 @@ fi
 AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
 AM_COND_IF([BUILD_IPFW_MODULE], [AC_CONFIG_FILES([modules/ipfw/libdaq_static_ipfw.pc])])
 
+# Netmap Module
+AC_ARG_ENABLE(netmap-module,
+              AS_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
+              [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
+if test "$enable_netmap_module" = yes; then
+    AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
+                      #include <net/if.h>
+                      ])
+    AC_CHECK_DECL([NETMAP_API], [], [enable_netmap_module=no], [
+                   #include <net/if.h>
+                   #include <net/netmap.h>
+                   ])
+fi
+AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
+AM_COND_IF([BUILD_NETMAP_MODULE], [AC_CONFIG_FILES([modules/netmap/libdaq_static_netmap.pc])])
+
 # NFQ Module
 AC_ARG_ENABLE(nfq-module,
               AS_HELP_STRING([--disable-nfq-module],[do not build the bundled NFQ module]),
@@ -254,25 +270,6 @@ if test "$enable_pcap_module" = yes; then
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/pcap/libdaq_static_pcap.pc])])
-
-# netmap Module
-#AC_ARG_ENABLE(netmap-module,
-#              AS_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
-#              [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
-#if test "$enable_netmap_module" = yes; then
-#    AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
-#                      #include <stdint.h>
-#                      #include <sys/socket.h>
-#                      #include <net/if.h>
-#                      ])
-#    AC_CHECK_DECL([NETMAP_API], [], [enable_netmap_module=no], [
-#                   #include <stdint.h>
-#                   #include <sys/socket.h>
-#                   #include <net/if.h>
-#                   #include <net/netmap.h>
-#                   ])
-#fi
-AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 
 #if test "$enable_nfq_module" = yes ; then
 #    AC_CHECK_HEADERS(dnet.h,,DNET_H="no")
