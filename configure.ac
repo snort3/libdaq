@@ -65,23 +65,6 @@ AX_CODE_COVERAGE
 # Check for cmocka
 AM_CHECK_CMOCKA
 
-# IPv6 configuration
-AC_ARG_ENABLE(ipv6, 
-AS_HELP_STRING([--enable-ipv6],[build IPv6-capable version @<:@default=yes, if getaddrinfo available@:>@]),
-    [],
-    [enable_ipv6=ifavailable])
-if test "$enable_ipv6" != "no"; then
-    AC_CHECK_FUNC(getaddrinfo,
-        [
-            AC_DEFINE(INET6,1,[System IPv6 support])
-        ],
-        [
-            if test "$enable_ipv6" != "ifavailable"; then
-                AC_MSG_FAILURE([--enable-ipv6 was given, but getaddrinfo is not available])
-            fi
-        ])
-fi
-
 save_LIBS=${LIBS}
 
 # Checks for libraries.
@@ -115,26 +98,6 @@ if test "x$HAVE_PCAP_HEADERS" = "xyes" -a "x$HAVE_PCAP_LIBRARY" = "xyes" ; then
     AC_DEFINE(LIBPCAP_AVAILABLE,1,[Define to 1 if libPCAP is available for use.])
 fi
 AM_CONDITIONAL([LIBPCAP_AVAILABLE], [test "$LIBPCAP_AVAILABLE" = yes])
-
-#AC_ARG_WITH(dnet_includes,
-#            [  --with-dnet-includes=DIR    dnet include directory],
-#            [with_dnet_includes="$withval"], [with_dnet_includes="no"])
-#
-#AC_ARG_WITH(dnet_libraries,
-#            [  --with-dnet-libraries=DIR   dnet library directory],
-#            [with_dnet_libraries="$withval"], [with_dnet_libraries="no"])
-#
-#if test "x$with_dnet_includes" != "xno"; then
-#    DNET_CPPFLAGS="-I${with_dnet_includes}"
-#else
-#    DNET_CPPFLAGS="`dnet-config --cflags 2>/dev/null`"
-#fi
-#
-#if test "x$with_dnet_libraries" != "xno"; then
-#    DNET_LDFLAGS="-L${with_dnet_libraries}"
-#else
-#    DNET_LDFLAGS="`dnet-config --libs 2>/dev/null`"
-#fi
 
 AC_ARG_WITH(netmap_includes,
             [  --with-netmap-includes=DIR    netmap include directory],
@@ -270,42 +233,6 @@ if test "$enable_pcap_module" = yes; then
 fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/pcap/libdaq_static_pcap.pc])])
-
-#if test "$enable_nfq_module" = yes ; then
-#    AC_CHECK_HEADERS(dnet.h,,DNET_H="no")
-#    AC_CHECK_HEADERS(dumbnet.h,,DUMBNET_H="no")
-#
-#    if test "x$DNET_H" = "xno" -a "x$DUMBNET_H" = "xno"; then
-#        echo
-#        echo "   ERROR!  dnet header not found, go get it from"
-#        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
-#        echo "   options, if you have it installed in an unusual place"
-#        exit
-#    fi
-#
-#    DNET_FOO="${DNET_LDFLAGS}"
-#
-#    AC_CHECK_LIB(dnet, eth_set, ,[DNET="no"], [${DNET_FOO}])
-#    AC_CHECK_LIB(dumbnet, eth_set, ,[DUMBNET="no"], [${DNET_FOO}])
-#
-#    if test "x$DNET" = "xno" -a "x$DUMBNET" = "xno"; then
-#        echo
-#        echo "   ERROR!  dnet library not found, go get it from"
-#        echo "   http://code.google.com/p/libdnet/ or use the --with-dnet-*"
-#        echo "   options, if you have it installed in an unusual place"
-#        exit
-#    fi
-#
-#    if test "x$DNET_LDFLAGS" = "x" ; then
-#        if test "x$DNET" = "xno"; then
-#            DNET_LDFLAGS="${DNET_LDPATH} -ldumbnet"
-#        else
-#            DNET_LDFLAGS="${DNET_LDPATH} -ldnet"
-#        fi
-#    fi
-#    #echo "DNET_LDFLAGS=${DNET_LDFLAGS}"
-#    STATIC_LIBS="${STATIC_LIBS} ${DNET_LDFLAGS}"
-#fi
 
 # Trace Module
 AC_ARG_ENABLE(trace-module,
