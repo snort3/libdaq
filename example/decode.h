@@ -285,7 +285,7 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
     if (dlen < hlen || dlen != len)
         return false;
 
-    struct cksum_vec vec = { (const uint16_t *) ip, len };
+    struct cksum_vec vec = { (const uint16_t *) ip, hlen };
     if (in_cksum_vec(&vec, 1) != 0)
         return false;
 
