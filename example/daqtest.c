@@ -63,7 +63,7 @@ typedef struct _DAQTestModuleConfig
     struct _DAQTestModuleConfig *next;
     char *module_name;
     char **variables;
-    unsigned int num_variables;
+    unsigned num_variables;
     DAQ_Mode mode;
 } DAQTestModuleConfig;
 
@@ -71,12 +71,13 @@ typedef struct _DAQTestConfig
 {
     int verbosity;
     const char **module_paths;
-    unsigned int num_module_paths;
+    unsigned num_module_paths;
     DAQTestModuleConfig *module_configs;
     char *input;
     unsigned timeout;
     int snaplen;
     char *filter;
+    unsigned batch_size;
     unsigned long packet_limit;
     unsigned long timeout_limit;
     unsigned long delay;
@@ -94,6 +95,7 @@ typedef struct _DAQTestThreadContext
 {
     const DAQTestConfig *cfg;
     DAQ_Instance_h instance;
+    DAQ_Msg_h *msgs;
     pthread_t tid;
     unsigned long packet_count;
     void *newconfig;
@@ -197,6 +199,7 @@ static void usage(void)
 {
     printf("Usage: daqtest -d <daq_module> -i <input> [OPTION]...\n");
     printf("  -A <ip>           Specify an IP to respond to ARPs on (may be specified multiple times)\n");
+    printf("  -b <num>          Specify the number of messages to request per receive call (default = 16)\n");
     printf("  -c <num>          Maximum number of packets to acquire (default = 0, <= 0 is unlimited)\n");
     printf("  -C <key[=value]>  Set a DAQ configuration variable key/value pair\n");
     printf("  -D <delay>        Specify a millisecond delay to be added to each packet processed\n");
@@ -222,9 +225,9 @@ static void print_mac(const uint8_t *addr)
     printf("%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 }
 
-static void print_hex_dump(const uint8_t *data, unsigned int len)
+static void print_hex_dump(const uint8_t *data, unsigned len)
 {
-    unsigned int i;
+    unsigned i;
 
     for (i = 0; i < len; i++)
     {
@@ -463,7 +466,7 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
 {
-    unsigned int dlen;
+    unsigned dlen;
 
     dlen = ntohs(dtp->dd.ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
@@ -480,7 +483,7 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
 {
-    unsigned int dlen;
+    unsigned dlen;
 
     dlen = ntohs(dtp->dd.ip6->ip6_plen) - sizeof(Ip6Hdr) - sizeof(Icmp6Hdr);
     printf("  ICMPv6: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
@@ -505,7 +508,7 @@ static DAQ_Verdict process_udp(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_tcp(DAQTestPacket *dtp)
 {
-    unsigned int dlen;
+    unsigned dlen;
 
     if (dtp->dd.ip)
         dlen = ntohs(dtp->dd.ip->tot_len) - (dtp->dd.ip->ihl * 4) - (dtp->dd.tcp->th_off * 4);
@@ -947,7 +950,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
-    const char *options = "A:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:xz:";
+    const char *options = "A:b:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:xz:";
     char *endptr;
     int ch;
 
@@ -956,6 +959,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
     cfg->snaplen = 1518;
     cfg->default_verdict = DAQ_VERDICT_PASS;
     cfg->ping_action = PING_ACTION_PASS;
+    cfg->batch_size = 16;
     cfg->thread_count = 1;
     cfg->module_configs = daqtest_module_config_new();
     if (!cfg->module_configs)
@@ -982,6 +986,16 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 }
                 ip->next = cfg->ip_addrs;
                 cfg->ip_addrs = ip;
+                break;
+
+            case 'b':
+                errno = 0;
+                cfg->batch_size = strtoul(optarg, &endptr, 10);
+                if (*endptr != '\0' || errno != 0)
+                {
+                    fprintf(stderr, "Invalid batch size specified: %s\n\n", optarg);
+                    return -1;
+                }
                 break;
 
             case 'c':
@@ -1174,7 +1188,7 @@ static void print_config(DAQTestConfig *cfg)
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
     char addr_str[INET_ADDRSTRLEN];
-    unsigned int i;
+    unsigned i;
 
     printf("[Config]\n");
     printf("  Input: %s\n", cfg->input);
@@ -1201,6 +1215,7 @@ static void print_config(DAQTestConfig *cfg)
         printf("%lu\n", cfg->packet_limit);
     else
         printf("Unlimited\n");
+    printf("  Batch Size: %u\n", cfg->batch_size);
     printf("  Default Verdict: %s\n", daq_verdict_string(cfg->default_verdict));
     printf("  Ping Action: %s\n", ping_action_strings[cfg->ping_action]);
     if (cfg->ip_addrs)
@@ -1226,7 +1241,7 @@ static void *processing_thread(void *arg)
     const DAQTestConfig *cfg = ctxt->cfg;
     DAQ_Stats_t stats;
     uint64_t recv_counters[MAX_DAQ_RSTAT];
-    unsigned int i, max_recv, recv_cnt, timeout_count;
+    unsigned i, max_recv, recv_cnt, timeout_count;
     int rval;
 
     if (cfg->filter && (rval = daq_instance_set_filter(ctxt->instance, cfg->filter)) != 0)
@@ -1269,11 +1284,10 @@ static void *processing_thread(void *arg)
             ctxt->oldconfig = oldconfig;
         }
 
-        DAQ_Msg_h msgs[16];
         DAQ_RecvStatus rstat;
         unsigned num_recv;
 
-        num_recv = daq_instance_msg_receive(ctxt->instance, 16, msgs, &rstat);
+        num_recv = daq_instance_msg_receive(ctxt->instance, cfg->batch_size, ctxt->msgs, &rstat);
         recv_counters[rstat]++;
         if (num_recv > max_recv)
             max_recv = num_recv;
@@ -1283,7 +1297,7 @@ static void *processing_thread(void *arg)
 
         for (unsigned idx = 0; idx < num_recv; idx++)
         {
-            DAQ_Msg_h msg = msgs[idx];
+            DAQ_Msg_h msg = ctxt->msgs[idx];
             DAQ_Verdict verdict = DAQ_VERDICT_PASS;
             switch (msg->type)
             {
@@ -1488,6 +1502,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
+        dttc->msgs = calloc(cfg.batch_size, sizeof(*dttc->msgs));
         dttc->cfg = &cfg;
     }
 
@@ -1593,6 +1608,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         daq_instance_destroy(dttc->instance);
+        free(dttc->msgs);
     }
 
     /* Clean up remaining memory to make Valgrind-like tools happy. */
