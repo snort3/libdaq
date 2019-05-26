@@ -29,7 +29,7 @@
 #include "daq_module_api.h"
 #include "fst.h"
 
-#define DEBUG_DAQ_FST
+//#define DEBUG_DAQ_FST
 #ifdef DEBUG_DAQ_FST
 #define debugf(...) printf(__VA_ARGS__)
 #else
