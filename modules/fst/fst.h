@@ -64,6 +64,7 @@ struct FstKeyHash
 struct FstEntry
 {
     FstEntry(const DAQ_PktHdr_t *pkthdr, const FstKey &key, uint32_t id, bool swapped);
+    ~FstEntry() { delete[] ha_state; }
     void update_stats(const DAQ_PktHdr_t *pkthdr, bool swapped);
 
     Flow_Stats_t flow_stats = { };

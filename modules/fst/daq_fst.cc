@@ -73,6 +73,7 @@ struct FstMsgPool
 struct FstContext
 {
     /* Configuration */
+    bool binding_verdicts = true;
     /* State */
     DAQ_ModuleInstance_h modinst;
     DAQ_InstanceAPI_t subapi;
@@ -84,6 +85,10 @@ struct FstContext
     std::deque<DAQ_Msg_h> limbo;
 };
 
+
+static DAQ_VariableDesc_t fst_variable_descriptions[] = {
+    { "no_binding_verdicts", "Disables enforcement of binding verdicts", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+};
 
 static DAQ_BaseAPI_t daq_base_api;
 
@@ -143,6 +148,13 @@ static int fst_daq_module_unload(void)
     return DAQ_SUCCESS;
 }
 
+static int fst_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table)
+{
+    *var_desc_table = fst_variable_descriptions;
+
+    return sizeof(fst_variable_descriptions) / sizeof(DAQ_VariableDesc_t);
+}
+
 static int fst_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
     FstContext *fc;
@@ -155,6 +167,15 @@ static int fst_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         SET_ERROR(modinst, "%s: Couldn't resolve subapi. No submodule configured?", __func__);
         delete fc;
         return DAQ_ERROR_INVAL;
+    }
+
+    const char *varKey, *varValue;
+    daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
+    while (varKey)
+    {
+        if (!strcmp(varKey, "no_binding_verdicts"))
+            fc->binding_verdicts = false;
+        daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
 
     DAQ_MsgPoolInfo_t mpool_info;
@@ -409,6 +430,8 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
                 std::shared_ptr<FstEntry> entry = desc->entry;
                 if (fhs->length > 0)
                 {
+                    if (entry->ha_state)
+                        delete[] entry->ha_state;
                     entry->ha_state = new uint8_t[fhs->length];
                     entry->ha_state_len = fhs->length;
                     memcpy(entry->ha_state, fhs->data, entry->ha_state_len);
@@ -531,10 +554,13 @@ static int fst_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
         FstMsgDesc *desc = (FstMsgDesc *) msg->priv;
         std::shared_ptr<FstEntry> entry = desc->entry;
 
-        if (verdict == DAQ_VERDICT_WHITELIST)
-            entry->flags |= FST_ENTRY_FLAG_WHITELISTED;
-        else if (verdict == DAQ_VERDICT_BLACKLIST)
-            entry->flags |= FST_ENTRY_FLAG_BLACKLISTED;
+        if (fc->binding_verdicts)
+        {
+            if (verdict == DAQ_VERDICT_WHITELIST)
+                entry->flags |= FST_ENTRY_FLAG_WHITELISTED;
+            else if (verdict == DAQ_VERDICT_BLACKLIST)
+                entry->flags |= FST_ENTRY_FLAG_BLACKLISTED;
+        }
         msg = desc->wrapped_msg;
         /* Toss the descriptor back on the free list for reuse. */
         desc->entry = nullptr;
@@ -561,7 +587,7 @@ DAQ_ModuleAPI_t fst_daq_module_data =
     /* .type = */ DAQ_TYPE_WRAPPER,
     /* .load = */ fst_daq_module_load,
     /* .unload = */ fst_daq_module_unload,
-    /* .get_variable_descs = */ NULL,
+    /* .get_variable_descs = */ fst_daq_get_variable_descs,
     /* .instantiate = */ fst_daq_instantiate,
     /* .destroy = */ fst_daq_destroy,
     /* .set_filter = */ NULL,
