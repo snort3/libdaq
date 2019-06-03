@@ -37,7 +37,7 @@ if BUILD_SHARED_MODULES
 endif
     lib_LTLIBRARIES += bpf/libdaq_static_bpf.la
     bpf_libdaq_static_bpf_la_SOURCES = bpf/daq_bpf.c
-    bpf_libdaq_static_bpf_la_CPPFLAGS = $(AM_CPPFLAGS)
+    bpf_libdaq_static_bpf_la_CPPFLAGS = $(AM_CPPFLAGS) $(PCAP_CPPFLAGS)
     bpf_libdaq_static_bpf_la_LDFLAGS = -static -avoid-version
 endif
 
