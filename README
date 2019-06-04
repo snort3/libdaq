@@ -284,10 +284,17 @@ So this device string:
 
     em1^:em1
 
-creates a netmap pipe between the NIC driver and the host stack.  To configure
-Snort with DAQ to operate in inline IPS mode with netmap, start it as follows:
+creates a netmap pipe between the NIC driver and the host stack.
+
+To configure Snort with DAQ to operate in inline IPS mode with netmap using 
+the host OS stack as one endpoint, start it as follows:
 
     ./snort --daq netmap --daq-mode inline -i em1^:em1
+
+To configure Snort with DAQ to forward between two different interfaces, 
+start it as follows:
+
+    ./snort --daq netmap --daq-mode inline -i em0:em1
 
 Inline operation performs Layer 2 forwarding with no MAC filtering, akin to the
 AFPacket module's behavior.  All packets received on one interface in an inline
@@ -300,12 +307,7 @@ either of these configuration steps for itself.
 
 FreeBSD
 -------
-In FreeBSD 11.0 and higher, netmap has been integrated into the core OS.  In
-order to use it, you must recompile your kernel with the line
-
-    device netmap
-
-added to your kernel config.
+In FreeBSD 11.0 and higher, netmap has been integrated into the core OS.
 
 Linux
 -----

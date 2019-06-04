@@ -1,13 +1,12 @@
-Changes in 2.2.3 Release on 2019-05-31:
+Changes in 2.2.3 Release on 20XX-XX-XX:
 ---------------------------------------
 bmeeks (Bill Meeks)
 	* daq_netmap: Use netmap user library functions for opening
-			and closing netmap connections.  This allows
-			specifying the host OS stack as a netmap
-			endpoint in an interface device string.
-
-			Remove compiler directives for FreeBSD 10.0
-			support as that OS is now obsolete. 
+		and closing netmap connections.  This allows
+		specifying the host OS stack as a netmap
+		endpoint in an interface device string.
+	* daq_netmap: Remove compiler directives for FreeBSD 10.0
+		support as that OS is now obsolete. 
 
 
 Changes in 2.2.2 Release on 2017-07-05:
