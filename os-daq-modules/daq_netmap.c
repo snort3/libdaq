@@ -46,6 +46,10 @@
 /* Hi! I'm completely arbitrary! */
 #define NETMAP_MAX_INTERFACES       32
 
+#ifndef NETMAP_REQ_IFNAMSIZ // Not available until FreeBSD 12
+#define NETMAP_REQ_IFNAMSIZ 64
+#endif
+
 typedef struct _netmap_instance
 {
     struct _netmap_instance *next;
