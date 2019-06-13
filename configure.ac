@@ -172,6 +172,12 @@ AM_CONDITIONAL([BUILD_FST_MODULE], [test "$enable_fst_module" = yes])
 if test "$enable_fst_module" = yes; then
     if test "$HAVE_CXX11" = 1 ; then
         DAQ_FST_LIBS="-lstdc++"
+        case "${host_os}" in
+            freebsd*)
+                # Clang on FreeBSD isn't smart enough to link us with libm when we use ceilf in STL
+                DAQ_FST_LIBS="$DAQ_FST_LIBS -lm"
+                ;;
+        esac
     else
         AC_MSG_WARN([A compiler with C++11 support is not available, disabling the FST DAQ module])
         enable_fst_module=no
