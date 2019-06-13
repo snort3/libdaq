@@ -1,59 +1,79 @@
-**NOTE: This document is entirely out-of-date and potentially very inaccurate.**
-
 NFQ Module
 ==========
 
-NFQ is the new and improved way to process iptables packets:
+A DAQ module built on top of the Linux netfilter packet filtering framework.
+Specifically, the module operates on packets queued by the kernel packet filter
+for userspace consumption via the NFQUEUE mechanism, usually controlled by
+iptables rules.  The input specification given to the DAQ module should be the
+integer value of the queue number to receive and process packets on.
 
-    ./snort --daq nfq \
-        [--daq-var device=<dev>] \
-        [--daq-var proto=<proto>] \
-        [--daq-var queue=<qid>]
+Packets will come up to the application with a datalink type of "RAW", which
+means the packet data begins with the IP header.
 
-    <dev> ::= ip | eth0, etc; default is IP injection
-    <proto> ::= ip4 | ip6 |; default is ip4
-    <qid> ::= 0..65535; default is 0
+The maximum netfilter queue length defaults to 1024 and can be overridden with
+the 'queue_maxlen' variable.
 
-This module can not run unprivileged so ./snort -u -g will produce a warning
-and won't change user or group.
+The normal behavior for netfilter queues is to drop any packets that cannot fit
+in the target queue, usually due to the userspace application being overwhelmed.
+This behavior can be modified to instead bypass the queue if the 'fail_open'
+variable is given to the DAQ module.
 
-Notes on iptables are given below.
+The NFQ module uses the modern minimalistic abstraction layer library for
+netfilter called libmnl.  It is available in the package repositories of most
+modern Linux distributions.
 
+Note: Packets will come up from the kernel defragmented, so a snaplen
+approaching 64k is suggested.
 
-Notes on iptables
-=================
+Example Setup
+-------------
 
-These notes are just a quick reminder that you need to set up iptables to use
-the NFQ DAQs.  Doing so may cause problems with your network so tread
-carefully.  The examples below are intentionally incomplete so please read the
-related documentation first.
+The following steps set up a Linux system with two data interfaces (eth1 and
+eth2) and configure them as two forwarding (routing) interfaces with both IPv4
+and IPv6 addresses.  All traffic will be queued for inspection on queue number
+42 prior to being forwarded by the routing subsystem.
 
-Here is a blog post by Marty for historical reference:
+1. Give the interfaces both an IPv4 and IPv6 address.
 
-    http://archives.neohapsis.com/archives/snort/2000-11/0394.html
+        ip addr add 172.16.1.1/24 dev eth1
+        ip -6 addr add 2011:11:11:11::1/64 dev eth1
+        ip addr add 172.16.2.1/24 dev eth2
+        ip -6 addr add 2011:22:22:22::1/64 dev eth2
 
-You can check this out for queue sizing tips:
+2. Enable forwarding for the interfaces in the kernel.
 
-    http://www.inliniac.net/blog/2008/01/23/improving-snort_inlines-nfq-performance.html
+        sysctl -w net.ipv4.conf.eth1.forwarding=1
+        sysctl -w net.ipv4.conf.eth2.forwarding=1
+        sysctl -w net.ipv6.conf.all.forwarding=1
 
-Use this to examine your iptables:
+3. Add iptables/ip6tables rules to queue all packets that would be forwarded by
+the kernel for inspection on queue number 42.  The --queue-bypass option will
+allow all packets to bypass the queue while there is no userspace process
+attached to the queue.  The default behavior is to drop packets in such cases.
+(This is useful for those that value connectivity over security.)
 
-    sudo /sbin/iptables -L
+        iptables -A FORWARD -j NFQUEUE --queue-num 42 --queue-bypass
+        ip6tables -A FORWARD -j NFQUEUE --queue-num 42 --queue-bypass
 
-Use something like this to set up NFQ:
+At this point, queue 42 is available to attach the DAQ module to and will the
+kernel will start queueing packets for it once it has registered.
 
-    sudo /sbin/iptables
-        -I <table> [<protocol stuff>] [<state stuff>]
-        -j NFQUEUE --queue-num 1
+Limitations
+-----------
 
-Use something like this to "disconnect" snort:
+* Multiple instantiation is technically supported, but there is currently no
+way to handle the same queue in multiple instances.  For now, the best way to
+use multiple instances is to have each listen on its own queue.
 
-    sudo /sbin/iptables -D <table> <rule pos>
+* Last I checked, the process cannot operate in unprivileged mode.  This needs
+to be revalidated, but the module is marked as such in the meantime.
 
-Be sure to start Snort prior to routing packets through NFQ with iptables.
-Such packets will be dropped until Snort is started.
+Requirements
+------------
+* libmnl
 
-The queue-num is the number you must give Snort.
+Additional Resources
+--------------------
 
-These DAQs should be run with a snaplen of 65535 since the kernel defrags the
-packets before queuing.  Also, no need to configure frag3.
+* The netfilter project homepage: <https://www.netfilter.org/>
+* The libmnl project homepage: <https://www.netfilter.org/projects/libmnl/index.html>
