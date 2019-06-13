@@ -1,14 +1,10 @@
-**NOTE: This document is entirely out-of-date and potentially very inaccurate.**
-
 Netmap Module
 =============
 
-The netmap project is a framework for very high speed packet I/O.  It is
-available on both FreeBSD and Linux with varying amounts of preparatory
-setup required.  Specific notes for each follow.
-
-    ./snort --daq netmap -i <device>
-            [--daq-var debug]
+A DAQ module built on top of the netmap project.  The netmap project is a
+framework for very high speed packet I/O.  It is available on both FreeBSD and
+Linux with varying amounts of preparatory setup required.  Specific notes for
+each are given in following sections.
 
 If you want to run netmap in inline mode, you must craft the device string as
 one or more interface pairs, where each member of a pair is separated by a
@@ -25,21 +21,24 @@ AFPacket module's behavior.  All packets received on one interface in an inline
 pair will be forwarded out the other interface unless dropped by the reader and
 vice versa.
 
+For passive operation, simply give a colon-separated list of interfaces to
+listen on.  It will end up look the same as the inline specification except
+without the double colon delimited pair concept.
+
 IMPORTANT: The interfaces will need to be up and in promiscuous mode in order to
 function ('ifconfig em1 up promisc').  The DAQ module does not currently do
 either of these configuration steps for itself.
 
 FreeBSD
 -------
-In FreeBSD 10.0, netmap has been integrated into the core OS.  In order to use
-it, you must recompile your kernel with the line
-
-    device netmap
-
-added to your kernel config.
+In FreeBSD 11.0, netmap has been integrated into the core OS and compiled into
+the kernel by default.  You no longer need to recompile your kernel to add
+netmap support.
 
 Linux
 -----
+**NOTE: This section is entirely out-of-date and potentially very inaccurate.**
+
 You will need to download the netmap source code from the project's repository:
 
     https://code.google.com/p/netmap/
@@ -61,6 +60,7 @@ drivers are supported under Linux at the time of writing (June 2014):
     r8169
     virtio
 
-TODO:
+TODO
+----
 - Support for attaching to only a single ring (queue) on a network adapter.
 - Support for VALE and netmap pipes.
