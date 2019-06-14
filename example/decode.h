@@ -282,7 +282,9 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
         return false;
 
     uint32_t dlen = ntohs(ip->tot_len);
-    if (dlen < hlen || dlen != len)
+    /* Allow the buffer length to exceed the total length from the IP header to account for
+        Ethernet frame trailers/padding. */
+    if (dlen > len || dlen < hlen)
         return false;
 
     struct cksum_vec vec = { (const uint16_t *) ip, hlen };
