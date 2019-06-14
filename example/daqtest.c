@@ -89,6 +89,7 @@ typedef struct _DAQTestConfig
     bool modify_opaque_value;
     bool performance_mode;
     bool dump_packets;
+    bool ignore_checksum_errors;
 } DAQTestConfig;
 
 typedef struct _DAQTestThreadContext
@@ -205,6 +206,7 @@ static void usage(void)
     printf("  -D <delay>        Specify a millisecond delay to be added to each packet processed\n");
     printf("  -f <bpf>          Specify the Berkley Packet Filter string to use for filtering\n");
     printf("  -h                Display this usage text and exit\n");
+    printf("  -k                Ignore checksum errors during protocol decoding\n");
     printf("  -l                Print a list of modules found and exit\n");
     printf("  -m <path>         Specify a direcotyr path to search for modules (may be specified multiple times)\n");
     printf("  -M <mode>         Specify the mode (passive (default), inline, read-file)\n");
@@ -469,8 +471,9 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
     unsigned dlen;
 
     dlen = ntohs(dtp->dd.ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
-    printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
-           dtp->dd.icmp->type, dtp->dd.icmp->code, dtp->dd.icmp->checksum, dlen);
+    printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu%s  (%u bytes of data)\n",
+           dtp->dd.icmp->type, dtp->dd.icmp->code, dtp->dd.icmp->checksum,
+           dtp->dd.icmp_bad_checksums ? " (incorrect)" : "", dlen);
     if (dtp->dd.icmp->type == ICMP_ECHO || dtp->dd.icmp->type == ICMP_ECHOREPLY)
     {
         printf("   Echo: ID %hu  Sequence %hu\n",
@@ -486,8 +489,9 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
     unsigned dlen;
 
     dlen = ntohs(dtp->dd.ip6->ip6_plen) - sizeof(Ip6Hdr) - sizeof(Icmp6Hdr);
-    printf("  ICMPv6: Type %hhu  Code %hhu  Checksum %hu  (%u bytes of data)\n",
-           dtp->dd.icmp6->icmp6_type, dtp->dd.icmp6->icmp6_code, dtp->dd.icmp6->icmp6_cksum, dlen);
+    printf("  ICMPv6: Type %hhu  Code %hhu  Checksum %hu%s  (%u bytes of data)\n",
+           dtp->dd.icmp6->icmp6_type, dtp->dd.icmp6->icmp6_code, dtp->dd.icmp6->icmp6_cksum,
+           dtp->dd.icmp6_bad_checksums ? " (incorrect)" : "", dlen);
     if (dtp->dd.icmp6->icmp6_type == ICMP6_ECHO_REQUEST || dtp->dd.icmp6->icmp6_type == ICMP6_ECHO_REPLY)
     {
         printf("   Echo: ID %hu  Sequence %hu\n",
@@ -500,8 +504,9 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
 
 static DAQ_Verdict process_udp(DAQTestPacket *dtp)
 {
-    printf("  UDP: %hu -> %hu  Checksum %hu  (%hu bytes of data)\n",
-           ntohs(dtp->dd.udp->uh_sport), ntohs(dtp->dd.udp->uh_dport), ntohs(dtp->dd.udp->uh_sum), ntohs(dtp->dd.udp->uh_ulen));
+    printf("  UDP: %hu -> %hu  Checksum %hu%s  (%hu bytes of data)\n",
+           ntohs(dtp->dd.udp->uh_sport), ntohs(dtp->dd.udp->uh_dport), ntohs(dtp->dd.udp->uh_sum),
+           dtp->dd.udp_bad_checksums ? " (incorrect)" : "", ntohs(dtp->dd.udp->uh_ulen));
 
     return dtp->ctxt->cfg->default_verdict;
 }
@@ -514,8 +519,9 @@ static DAQ_Verdict process_tcp(DAQTestPacket *dtp)
         dlen = ntohs(dtp->dd.ip->tot_len) - (dtp->dd.ip->ihl * 4) - (dtp->dd.tcp->th_off * 4);
     else
         dlen = ntohs(dtp->dd.ip6->ip6_plen) - (dtp->dd.tcp->th_off * 4);
-    printf("  TCP: %hu -> %hu  Checksum %hu  (%u bytes of data)\n",
-           ntohs(dtp->dd.tcp->th_sport), ntohs(dtp->dd.tcp->th_dport), ntohs(dtp->dd.tcp->th_sum), dlen);
+    printf("  TCP: %hu -> %hu  Checksum %hu%s  (%u bytes of data)\n",
+           ntohs(dtp->dd.tcp->th_sport), ntohs(dtp->dd.tcp->th_dport), ntohs(dtp->dd.tcp->th_sum),
+           dtp->dd.tcp_bad_checksums ? " (incorrect)" : "", dlen);
 
     return dtp->ctxt->cfg->default_verdict;
 }
@@ -610,8 +616,9 @@ static DAQ_Verdict process_ip(DAQTestPacket *dtp)
     inet_ntop(AF_INET, &addr, src_addr_str, sizeof(src_addr_str));
     addr.s_addr = dtp->dd.ip->daddr;
     inet_ntop(AF_INET, &addr, dst_addr_str, sizeof(dst_addr_str));
-    printf(" IP: %s -> %s (%hu bytes) (checksum: %hu) (protocol: %hhu)\n",
-            src_addr_str, dst_addr_str, ntohs(dtp->dd.ip->tot_len), dtp->dd.ip->check, dtp->dd.ip->protocol);
+    printf(" IP: %s -> %s (%hu bytes) (checksum: %hu%s) (protocol: %hhu)\n",
+            src_addr_str, dst_addr_str, ntohs(dtp->dd.ip->tot_len), dtp->dd.ip->check,
+            dtp->dd.ip_bad_checksums ? " (incorrect)" : "", dtp->dd.ip->protocol);
 
     switch (dtp->dd.ip->protocol)
     {
@@ -802,6 +809,7 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     memset(&dtp, 0, sizeof(dtp));
     dtp.msg = msg;
     dtp.ctxt = ctxt;
+    dtp.dd.ignore_checksums = cfg->ignore_checksum_errors;
     if (!decode_packet(data, data_len, &dtp.dd))
         return ctxt->cfg->default_verdict;
 
@@ -950,7 +958,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
-    const char *options = "A:b:c:C:d:D:f:hi:lm:M:OpP:s:t:T:vV:xz:";
+    const char *options = "A:b:c:C:d:D:f:hi:klm:M:OpP:s:t:T:vV:xz:";
     char *endptr;
     int ch;
 
@@ -1051,6 +1059,10 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 'i':
                 cfg->input = optarg;
+                break;
+
+            case 'k':
+                cfg->ignore_checksum_errors = true;
                 break;
 
             case 'l':
@@ -1227,6 +1239,8 @@ static void print_config(DAQTestConfig *cfg)
             printf("  %s\n", addr_str);
         }
     }
+    if (cfg->ignore_checksum_errors)
+        printf("  Ignoring checksum errors during decode.\n");
     if (cfg->delay > 0)
         printf("  Delaying packets by %lu milliseconds.\n", cfg->delay);
     if (cfg->modify_opaque_value)

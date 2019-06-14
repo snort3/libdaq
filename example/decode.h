@@ -50,6 +50,12 @@ typedef struct
     const TcpHdr *tcp;
     const UdpHdr *udp;
     uint16_t vlan_tags;
+    uint8_t ip_bad_checksums;
+    uint8_t icmp_bad_checksums;
+    uint8_t icmp6_bad_checksums;
+    uint8_t tcp_bad_checksums;
+    uint8_t udp_bad_checksums;
+    bool ignore_checksums;
 } DecodeData;
 
 /*
@@ -147,7 +153,11 @@ static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *
 
     struct cksum_vec vec = { (const uint16_t *) icmp, len };
     if (in_cksum_vec(&vec, 1) != 0)
-        return false;
+    {
+        if (!dd->ignore_checksums)
+            return false;
+        dd->icmp_bad_checksums++;
+    }
 
     dd->icmp = icmp;
     return true;
@@ -160,7 +170,11 @@ static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData 
     const Icmp6Hdr *icmp6 = (const Icmp6Hdr *) cursor;
 
     if (in_cksum_v6(dd->ip6, (const uint16_t *) icmp6, len, IPPROTO_ICMPV6) != 0)
-        return false;
+    {
+        if (!dd->ignore_checksums)
+            return false;
+        dd->icmp6_bad_checksums++;
+    }
 
     dd->icmp6 = icmp6;
     return true;
@@ -178,12 +192,20 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     if (dd->ip)
     {
         if (in_cksum_v4(dd->ip, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
-            return false;
+        {
+            if (!dd->ignore_checksums)
+                return false;
+            dd->tcp_bad_checksums++;
+        }
     }
     else
     {
         if (in_cksum_v6(dd->ip6, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
-            return false;
+        {
+            if (!dd->ignore_checksums)
+                return false;
+            dd->tcp_bad_checksums++;
+        }
     }
 
     dd->tcp = tcp;
@@ -202,12 +224,20 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
     if (dd->ip)
     {
         if (in_cksum_v4(dd->ip, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
-            return false;
+        {
+            if (!dd->ignore_checksums)
+                return false;
+            dd->udp_bad_checksums++;
+        }
     }
     else
     {
         if (in_cksum_v6(dd->ip6, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
-            return false;
+        {
+            if (!dd->ignore_checksums)
+                return false;
+            dd->udp_bad_checksums++;
+        }
     }
 
     dd->udp = udp;
@@ -289,7 +319,11 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
 
     struct cksum_vec vec = { (const uint16_t *) ip, hlen };
     if (in_cksum_vec(&vec, 1) != 0)
-        return false;
+    {
+        if (!dd->ignore_checksums)
+            return false;
+        dd->ip_bad_checksums++;
+    }
 
     uint16_t offset = hlen;
     dd->ip = ip;
