@@ -21,8 +21,12 @@
 #ifndef _NETINET_COMPAT_H
 #define _NETINET_COMPAT_H
 
-#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__) || defined(__OpenBSD__)
 #include <sys/socket.h>     // Needed for struct sockaddr and int types
+#endif
+
+#if defined(__OpenBSD__)
+#include <net/if_arp.h>     // Needed for struct arphdr
 #endif
 
 #include <netinet/if_ether.h>
@@ -163,7 +167,7 @@ typedef struct _icmp6_hdr
 #define icmp6_id        icmp6_data16[0]  /* echo request/reply */
 #define icmp6_seq       icmp6_data16[1]  /* echo request/reply */
 
-#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__)
+#if defined(__FreeBSD__) || defined(__APPLE__) || defined(__darwin__) || defined(__OpenBSD__)
 #define s6_addr16 __u6_addr.__u6_addr16
 #define s6_addr32 __u6_addr.__u6_addr32
 #endif

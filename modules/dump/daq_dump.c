@@ -199,7 +199,8 @@ static int dump_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, cons
         const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) hdr;
         struct pcap_pkthdr phdr;
 
-        phdr.ts = pkthdr->ts;
+        phdr.ts.tv_sec = pkthdr->ts.tv_sec;
+        phdr.ts.tv_usec = pkthdr->ts.tv_usec;
         phdr.caplen = data_len;
         phdr.len = data_len;
 
@@ -227,7 +228,8 @@ static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const ui
         struct pcap_pkthdr phdr;
 
         // Reuse the timestamp from the original packet for the injected packet
-        phdr.ts = hdr->ts;
+        phdr.ts.tv_sec = hdr->ts.tv_sec;
+        phdr.ts.tv_usec = hdr->ts.tv_usec;
         phdr.caplen = data_len;
         phdr.len = data_len;
 
@@ -312,7 +314,8 @@ static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
         {
             struct pcap_pkthdr pcap_hdr;
 
-            pcap_hdr.ts = hdr->ts;
+            pcap_hdr.ts.tv_sec = hdr->ts.tv_sec;
+            pcap_hdr.ts.tv_usec = hdr->ts.tv_usec;
             pcap_hdr.caplen = msg->data_len;
             pcap_hdr.len = hdr->pktlen;
             pcap_dump((u_char *) dc->dumper, &pcap_hdr, data);

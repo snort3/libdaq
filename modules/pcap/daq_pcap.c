@@ -668,7 +668,8 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
         /* Then, set up the DAQ packet header. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
         pkthdr->pktlen = pcaphdr->len;
-        pkthdr->ts = pcaphdr->ts;
+        pkthdr->ts.tv_sec = pcaphdr->ts.tv_sec;
+        pkthdr->ts.tv_usec = pcaphdr->ts.tv_usec;
 
         /* Last, but not least, extract this descriptor from the free list and 
             place the message in the return vector. */

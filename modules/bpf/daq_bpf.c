@@ -32,6 +32,10 @@
 
 #define DAQ_BPF_VERSION 1
 
+#ifndef PCAP_NETMASK_UNKNOWN // For OpenBSD
+#define PCAP_NETMASK_UNKNOWN    0xffffffff
+#endif
+
 #define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
 #define CALL_SUBAPI_NOARGS(ctxt, fname) \

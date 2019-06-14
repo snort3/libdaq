@@ -349,7 +349,7 @@ static inline int ip6_cmp(const struct in6_addr *ip1, const struct in6_addr *ip2
     if (ip1->s6_addr32[3] < ip2->s6_addr32[3])
         return -1;
 
-    if (ip1->s6_addr32[3] > ip2->s6_addr32[4])
+    if (ip1->s6_addr32[3] > ip2->s6_addr32[3])
         return 1;
 
     return 0;

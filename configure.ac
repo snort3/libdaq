@@ -173,8 +173,8 @@ if test "$enable_fst_module" = yes; then
     if test "$HAVE_CXX11" = 1 ; then
         DAQ_FST_LIBS="-lstdc++"
         case "${host_os}" in
-            freebsd*)
-                # Clang on FreeBSD isn't smart enough to link us with libm when we use ceilf in STL
+            # Clang on *BSD isn't smart enough to link us with libm when we use ceilf in STL
+            freebsd*|openbsd*)
                 DAQ_FST_LIBS="$DAQ_FST_LIBS -lm"
                 ;;
         esac

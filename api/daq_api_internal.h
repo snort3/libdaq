@@ -21,6 +21,7 @@
 #ifndef _DAQ_API_INTERNAL_H
 #define _DAQ_API_INTERNAL_H
 
+#include <stdarg.h>
 #include <stdio.h>
 
 #include "daq_module_api.h"
