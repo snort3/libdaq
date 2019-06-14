@@ -358,7 +358,7 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
                     sin_family  = 2     AKA AF_INET
                     sin_port    = <ipfw rule ID>
                     sin_addr    = incoming ? first IP of ingress interface : 0.0.0.0
-                    sin_zero[8] = name of interface (up to 8 characters
+                    sin_zero[8] = name of interface (up to 8 characters)
             */
 
             /* Next, set up the DAQ message.  Most fields are prepopulated and unchanging. */

@@ -1,119 +1,72 @@
-**NOTE: This document is entirely out-of-date and potentially very inaccurate.**
-
 IPFW Module
 ===========
 
-IPFW is available for BSD systems.  It replaces the inline version available in
-pre-2.9 versions built with this:
+A DAQ module for listening on BSD divert sockets.  The input specification given
+to the DAQ module should be the integer value of the divert port number to
+receive and process packets on.  The module is intrinsically operating in an
+inline mode as any packets that it does not return to the kernel will be
+dropped.
 
-    ./configure --enable-ipfw
+Packets will come up to the application with a datalink type of "RAW", which
+means the packet data begins with the IP header.
 
-This command line argument is no longer supported:
+Note: If nothing is listening on the specified divert socket port, the traffic
+that was supposed to be diverted to it will be dropped.
 
-    ./snort -J <port#>
+Example Setup (FreeBSD)
+-----------------------
 
-Instead, start Snort like this:
+The following steps set up a FreeBSD system with two data interfaces (em0 and
+em1) and configure them as two routing interfaces with IPv4 addresses.  All
+traffic that is received on either interface is sent to the divert socket on
+port 8000 and forwarded when it is received back from the userspace
+application.
 
-    ./snort --daq ipfw [--daq-var port=<port>]
+1. Enable the firewall and configure it with the "open" template.
 
-    <port> ::= 1..65535; default is 8000
+        sysrc firewall_enable="YES"
+        sysrc firewall_type="open"
+        service ipfw restart
 
-* IPFW only supports ip4 traffic.
+2. Give the interfaces IPv4 addresses.
 
-FreeBSD
--------
-Check the online manual at:
+        ifconfig em0 172.16.1.1/24
+        ifconfig em1 172.16.2.1/24
 
-    http://www.freebsd.org/doc/handbook/firewalls-ipfw.html.
+3. Enable gateway (routing) functionality.
 
-Here is a brief example to divert icmp packets to Snort at port 8000:
+        sysrc gateway_enable="yes"
+        service routing restart
 
-To enable support for divert sockets, place the following lines in the
-kernel configuration file:
+4. Load the ipdivert kernel module if it's not compiled in (default).
 
-    options IPFIREWALL
-    options IPDIVERT
+        kldload ipdivert
+        To make this permanent, add ipdivert_load="YES" to /boot/loader.conf.
 
-(The file in this case was: /usr/src/sys/i386/conf/GENERIC; which is platform
-dependent.)
+5. Define an ipfw rule with an arbitrary (but low) rule ID (75) that diverts all
+traffic received on em0 and em1 to an arbitrary divert socket port (8000).
 
-You may need to also set these to use the loadable kernel modules:
+        ipfw add 75 divert 8000 all from any to any in recv em0
+        ipfw add 75 divert 8000 all from any to any in recv em1
 
-/etc/rc.conf:
-firewall_enable="YES"
+Note: If you are operating in a slightly more complicated setup with NAT via a
+natd divert, you will want to add the two rules before and after the natd divert
+rule.  For example, if em0 is the public interface and em1 is the internal
+interface, the snippet of the final rule set around the nat divert rule should
+look something like this:
 
-/boot/loader.conf:
-ipfw_load="YES"
-ipdivert_load="YES"
+    ipfw add 45 divert 8000 all from any to any in recv em1
+    ipfw add 50 divert natd ip4 from any to any via em0
+    ipfw add 55 divert 8000 all from any to any in recv em0
 
-$ dmesg | grep ipfw
-ipfw2 (+ipv6) initialized, divert loadable, nat loadable, rule-based
-forwarding disabled, default to deny, logging disabled
-
-$ kldload -v ipdivert
-Loaded ipdivert, id=4
-
-$ ipfw add 75 divert 8000 icmp from any to any
-00075 divert 8000 icmp from any to any
-
-$ ipfw list
-...
-00075 divert 8000 icmp from any to any
-00080 allow icmp from any to any
-...
-
-* Note that on FreeBSD, divert sockets don't work with bridges!
-
-Please refer to the following articles for more information:
-
-https://forums.snort.org/forums/support/topics/snort-inline-on-freebsd-ipfw
-http://freebsd.rogness.net/snort_inline/
-
-NAT gateway can be used with divert sockets if the network environment is
-conducive to using NAT.
-
-The steps to set up NAT with ipfw are as follows:
-
-1. Set up NAT with two interface em0 and em1 by adding
-the following to /etc/rc.conf
-
-gateway_enable="YES"
-natd_program="/sbin/natd"   # path to natd
-natd_enable="YES"           # Enable natd (if firewall_enable == YES)
-natd_interface="em0"       # Public interface or IP Address
-natd_flags="-dynamic"       # Additional flags
-defaultrouter=""
-ifconfig_em0="DHCP"
-ifconfig_em1="inet 192.168.1.2 netmask 255.255.255.0"
-firewall_enable="YES"
-firewall_script="/etc/rc.firewall"
-firewall_type="simple"
-
-Here em0 is connected to external network and em1 to host-only LAN.
-
-2. Add the following divert rules to divert packets to Snort above and
-below the NAT rule in the "Simple" section of /etc/rc.firewall.
-
-   ...
-   # Inspect outbound packets (those arriving on "inside" interface)
-   # before NAT translation.
-   ${fwcmd} add divert 8000 all from any to any in via ${iif}
-   case ${natd_enable} in
-   [Yy][Ee][Ss])
-       if [ -n "${natd_interface}" ]; then
-           ${fwcmd} add divert natd all from any to any via
-${natd_interface}
-       fi
-       ;;
-   esac
-   ...
-   # Inspect inbound packets (those arriving on "outside" interface)
-   # after NAT translation that aren't blocked for other reasons,
-   # after the TCP "established" rule.
-   ${fwcmd} add divert 8000 all from any to any in via ${oif}
+This will send all traffic coming in on the internal interface pre-NAT and all
+traffic coming in on the public interace post-NAT to the divert socket so that
+all traffic is using private addresses.
 
 OpenBSD
 -------
+**NOTE: This section is entirely out-of-date and potentially very inaccurate.**
+
 OpenBSD supports divert sockets as of 4.7, so we use the ipfw DAQ.
 
 Here is one way to set things up:
@@ -143,3 +96,7 @@ Here is one way to set things up:
 
 * Note that on OpenBSD, divert sockets don't work with bridges!
 
+Additional Resources
+--------------------
+
+* FreeBSD online manual for IFPW: <https://www.freebsd.org/doc/handbook/firewalls-ipfw.html>
