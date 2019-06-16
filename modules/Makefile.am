@@ -41,6 +41,20 @@ endif
     bpf_libdaq_static_bpf_la_LDFLAGS = -static -avoid-version
 endif
 
+if BUILD_DIVERT_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += divert/daq_divert.la
+    pkgconfig_DATA += divert/libdaq_static_divert.pc
+    divert_daq_divert_la_SOURCES = divert/daq_divert.c
+    divert_daq_divert_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    divert_daq_divert_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+endif
+    lib_LTLIBRARIES += divert/libdaq_static_divert.la
+    divert_libdaq_static_divert_la_SOURCES = divert/daq_divert.c
+    divert_libdaq_static_divert_la_CPPFLAGS = $(AM_CPPFLAGS)
+    divert_libdaq_static_divert_la_LDFLAGS = -static -avoid-version
+endif
+
 if BUILD_DUMP_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += dump/daq_dump.la
@@ -74,20 +88,6 @@ endif
 						 fst/PMurHash.h
     fst_libdaq_static_fst_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/example
     fst_libdaq_static_fst_la_LDFLAGS = -static -avoid-version
-endif
-
-if BUILD_IPFW_MODULE
-if BUILD_SHARED_MODULES
-    pkglib_LTLIBRARIES += ipfw/daq_ipfw.la
-    pkgconfig_DATA += ipfw/libdaq_static_ipfw.pc
-    ipfw_daq_ipfw_la_SOURCES = ipfw/daq_ipfw.c
-    ipfw_daq_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
-    ipfw_daq_ipfw_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
-endif
-    lib_LTLIBRARIES += ipfw/libdaq_static_ipfw.la
-    ipfw_libdaq_static_ipfw_la_SOURCES = ipfw/daq_ipfw.c
-    ipfw_libdaq_static_ipfw_la_CPPFLAGS = $(AM_CPPFLAGS)
-    ipfw_libdaq_static_ipfw_la_LDFLAGS = -static -avoid-version
 endif
 
 if BUILD_NETMAP_MODULE

@@ -1,5 +1,5 @@
-IPFW Module
-===========
+Divert Module
+=============
 
 A DAQ module for listening on BSD divert sockets.  The input specification given
 to the DAQ module should be the integer value of the divert port number to

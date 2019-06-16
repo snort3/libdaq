@@ -120,14 +120,14 @@ extern const DAQ_ModuleAPI_t afpacket_daq_module_data;
 #ifdef BUILD_BPF_MODULE
 extern const DAQ_ModuleAPI_t bpf_daq_module_data;
 #endif
+#ifdef BUILD_DIVERT_MODULE
+extern const DAQ_ModuleAPI_t divert_daq_module_data;
+#endif
 #ifdef BUILD_DUMP_MODULE
 extern const DAQ_ModuleAPI_t dump_daq_module_data;
 #endif
 #ifdef BUILD_FST_MODULE
 extern const DAQ_ModuleAPI_t fst_daq_module_data;
-#endif
-#ifdef BUILD_IPFW_MODULE
-extern const DAQ_ModuleAPI_t ipfw_daq_module_data;
 #endif
 #ifdef BUILD_NFQ_MODULE
 extern const DAQ_ModuleAPI_t nfq_daq_module_data;
@@ -153,14 +153,14 @@ static DAQ_Module_h static_modules[] =
 #ifdef BUILD_BPF_MODULE
     &bpf_daq_module_data,
 #endif
+#ifdef BUILD_DIVERT_MODULE
+    &divert_daq_module_data,
+#endif
 #ifdef BUILD_DUMP_MODULE
     &dump_daq_module_data,
 #endif
 #ifdef BUILD_FST_MODULE
     &fst_daq_module_data,
-#endif
-#ifdef BUILD_IPFW_MODULE
-    &ipfw_daq_module_data,
 #endif
 #ifdef BUILD_NFQ_MODULE
     &nfq_daq_module_data,

@@ -20,6 +20,10 @@ if BUILD_BPF_MODULE
 daqtest_static_CFLAGS += -DBUILD_BPF_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/bpf/libdaq_static_bpf.la $(DAQ_BPF_LIBS)
 endif
+if BUILD_DIVERT_MODULE
+daqtest_static_CFLAGS += -DBUILD_DIVERT_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/divert/libdaq_static_divert.la
+endif
 if BUILD_DUMP_MODULE
 daqtest_static_CFLAGS += -DBUILD_DUMP_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/dump/libdaq_static_dump.la $(DAQ_DUMP_LIBS)
@@ -27,10 +31,6 @@ endif
 if BUILD_FST_MODULE
 daqtest_static_CFLAGS += -DBUILD_FST_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/fst/libdaq_static_fst.la $(DAQ_FST_LIBS)
-endif
-if BUILD_IPFW_MODULE
-daqtest_static_CFLAGS += -DBUILD_IPFW_MODULE
-daqtest_static_LDADD += ${top_builddir}/modules/ipfw/libdaq_static_ipfw.la
 endif
 if BUILD_NETMAP_MODULE
 daqtest_static_CFLAGS += -DBUILD_NETMAP_MODULE

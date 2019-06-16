@@ -6,6 +6,11 @@ m4_define([daq_minor_version], [0])
 m4_define([daq_patch_version], [0])
 m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version])
 
+# Kill the 'divert' macro with extreme prejudice so it stops clashing with references
+# to the module directory of the same name.
+# TODO: Find the "right" way to escape this macro in arguments to m4 functions.
+m4_undefine([divert])
+
 AC_PREREQ([2.69])
 AC_INIT([daq],[daq_version_str],[snort-team@sourcefire.com])
 AC_CONFIG_MACRO_DIR([m4])
@@ -149,6 +154,16 @@ fi
 AM_CONDITIONAL([BUILD_BPF_MODULE], [test "$enable_bpf_module" = yes])
 AM_COND_IF([BUILD_BPF_MODULE], [AC_CONFIG_FILES([modules/bpf/libdaq_static_bpf.pc])])
 
+# Divert Module
+AC_ARG_ENABLE(divert-module,
+              AS_HELP_STRING([--disable-divert-module],[do not build the bundled Divert module]),
+              [enable_divert_module="$enableval"], [enable_divert_module="$DEFAULT_ENABLE"])
+if test "$enable_divert_module" = yes; then
+    AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_divert_module=no], [[#include <netinet/in.h>]])
+fi
+AM_CONDITIONAL([BUILD_DIVERT_MODULE], [test "$enable_divert_module" = yes])
+AM_COND_IF([BUILD_DIVERT_MODULE], [AC_CONFIG_FILES([modules/divert/libdaq_static_divert.pc])])
+
 # Dump Module
 AC_ARG_ENABLE(dump-module,
               AS_HELP_STRING([--disable-dump-module],[do not build the bundled Dump module]),
@@ -184,16 +199,6 @@ if test "$enable_fst_module" = yes; then
     fi
 fi
 AM_COND_IF([BUILD_FST_MODULE], [AC_CONFIG_FILES([modules/fst/libdaq_static_fst.pc])])
-
-# IPFW Module
-AC_ARG_ENABLE(ipfw-module,
-              AS_HELP_STRING([--disable-ipfw-module],[do not build the bundled IPFW module]),
-              [enable_ipfw_module="$enableval"], [enable_ipfw_module="$DEFAULT_ENABLE"])
-if test "$enable_ipfw_module" = yes; then
-    AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_ipfw_module=no], [[#include <netinet/in.h>]])
-fi
-AM_CONDITIONAL([BUILD_IPFW_MODULE], [test "$enable_ipfw_module" = yes])
-AM_COND_IF([BUILD_IPFW_MODULE], [AC_CONFIG_FILES([modules/ipfw/libdaq_static_ipfw.pc])])
 
 # Netmap Module
 AC_ARG_ENABLE(netmap-module,
@@ -251,9 +256,9 @@ AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/trace/libdaq_static_t
 
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_bpf_module" = yes -o \
+                                      "$enable_divert_module" = yes -o \
                                       "$enable_dump_module" = yes -o \
                                       "$enable_fst_module" = yes -o \
-                                      "$enable_ipfw_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
                                       "$enable_pcap_module" = yes -o \
                                       "$enable_trace_module" = yes])
@@ -337,9 +342,9 @@ AC_MSG_RESULT([
 
     Build AFPacket DAQ module.. : $enable_afpacket_module
     Build BPF DAQ module....... : $enable_bpf_module
+    Build Divert DAQ module.... : $enable_divert_module
     Build Dump DAQ module...... : $enable_dump_module
     Build FST DAQ module....... : $enable_fst_module
-    Build IPFW DAQ module...... : $enable_ipfw_module
     Build NFQ DAQ module....... : $enable_nfq_module
     Build PCAP DAQ module...... : $enable_pcap_module
     Build netmap DAQ module.... : $enable_netmap_module

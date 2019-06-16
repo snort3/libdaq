@@ -31,29 +31,29 @@
 #include "daq_dlt.h"
 #include "daq_module_api.h"
 
-#define DAQ_IPFW_VERSION 4
+#define DAQ_DIVERT_VERSION 1
 
-#define IPFW_DEFAULT_POOL_SIZE  64
+#define DIVERT_DEFAULT_POOL_SIZE    64
 
 #define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
-typedef struct _ipfw_pkt_desc
+typedef struct _divert_pkt_desc
 {
     DAQ_Msg_t msg;
     DAQ_PktHdr_t pkthdr;
     uint8_t *data;
     struct sockaddr_in addr;
-    struct _ipfw_pkt_desc *next;
-} IpfwPktDesc;
+    struct _divert_pkt_desc *next;
+} DivertPktDesc;
 
-typedef struct _ipfw_msg_pool
+typedef struct _divert_msg_pool
 {
-    IpfwPktDesc *pool;
-    IpfwPktDesc *freelist;
+    DivertPktDesc *pool;
+    DivertPktDesc *freelist;
     DAQ_MsgPoolInfo_t info;
-} IpfwMsgPool;
+} DivertMsgPool;
 
-typedef struct _ipfw_context {
+typedef struct _divert_context {
     /* Configuration */
     int port;
     bool passive;
@@ -62,19 +62,19 @@ typedef struct _ipfw_context {
     /* State */
     int sock;
     DAQ_ModuleInstance_h modinst;
-    IpfwMsgPool pool;
+    DivertMsgPool pool;
     volatile bool interrupted;
     DAQ_Stats_t stats;
-} Ipfw_Context_t;
+} Divert_Context_t;
 
-static void ipfw_daq_destroy(void *);
+static void divert_daq_destroy(void *);
 
 static DAQ_BaseAPI_t daq_base_api;
 
 
-static void destroy_packet_pool(Ipfw_Context_t *ipfwc)
+static void destroy_packet_pool(Divert_Context_t *dc)
 {
-    IpfwMsgPool *pool = &ipfwc->pool;
+    DivertMsgPool *pool = &dc->pool;
     if (pool->pool)
     {
         while (pool->info.size > 0)
@@ -87,29 +87,29 @@ static void destroy_packet_pool(Ipfw_Context_t *ipfwc)
     pool->info.mem_size = 0;
 }
 
-static int create_packet_pool(Ipfw_Context_t *ipfwc, unsigned size)
+static int create_packet_pool(Divert_Context_t *dc, unsigned size)
 {
-    IpfwMsgPool *pool = &ipfwc->pool;
-    pool->pool = calloc(sizeof(IpfwPktDesc), size);
+    DivertMsgPool *pool = &dc->pool;
+    pool->pool = calloc(sizeof(DivertPktDesc), size);
     if (!pool->pool)
     {
-        SET_ERROR(ipfwc->modinst, "%s: Couldn't allocate %zu bytes for a packet descriptor pool!",
-                __func__, sizeof(IpfwPktDesc) * size);
+        SET_ERROR(dc->modinst, "%s: Couldn't allocate %zu bytes for a packet descriptor pool!",
+                __func__, sizeof(DivertPktDesc) * size);
         return DAQ_ERROR_NOMEM;
     }
-    pool->info.mem_size = sizeof(IpfwPktDesc) * size;
+    pool->info.mem_size = sizeof(DivertPktDesc) * size;
     while (pool->info.size < size)
     {
         /* Allocate packet data and set up descriptor */
-        IpfwPktDesc *desc = &pool->pool[pool->info.size];
-        desc->data = malloc(ipfwc->snaplen);
+        DivertPktDesc *desc = &pool->pool[pool->info.size];
+        desc->data = malloc(dc->snaplen);
         if (!desc->data)
         {
-            SET_ERROR(ipfwc->modinst, "%s: Couldn't allocate %d bytes for a packet descriptor message buffer!",
-                    __func__, ipfwc->snaplen);
+            SET_ERROR(dc->modinst, "%s: Couldn't allocate %d bytes for a packet descriptor message buffer!",
+                    __func__, dc->snaplen);
             return DAQ_ERROR_NOMEM;
         }
-        pool->info.mem_size += ipfwc->snaplen;
+        pool->info.mem_size += dc->snaplen;
 
         /* Initialize non-zero invariant packet header fields. */
         DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
@@ -124,7 +124,7 @@ static int create_packet_pool(Ipfw_Context_t *ipfwc, unsigned size)
         msg->hdr_len = sizeof(desc->pkthdr);
         msg->hdr = &desc->pkthdr;
         msg->data = desc->data;
-        msg->owner = ipfwc->modinst;
+        msg->owner = dc->modinst;
         msg->priv = desc;
 
         /* Place it on the free list */
@@ -137,7 +137,7 @@ static int create_packet_pool(Ipfw_Context_t *ipfwc, unsigned size)
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_module_load(const DAQ_BaseAPI_t *base_api)
+static int divert_daq_module_load(const DAQ_BaseAPI_t *base_api)
 {
     if (base_api->api_version != DAQ_BASE_API_VERSION || base_api->api_size != sizeof(DAQ_BaseAPI_t))
         return DAQ_ERROR;
@@ -147,122 +147,122 @@ static int ipfw_daq_module_load(const DAQ_BaseAPI_t *base_api)
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_module_unload(void)
+static int divert_daq_module_unload(void)
 {
     memset(&daq_base_api, 0, sizeof(daq_base_api));
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
+static int divert_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
-    Ipfw_Context_t *ipfwc = calloc(1, sizeof(*ipfwc));
+    Divert_Context_t *dc = calloc(1, sizeof(*dc));
 
-    if (!ipfwc)
+    if (!dc)
     {
-        SET_ERROR(modinst, "%s: Couldn't allocate memory for the new IPFW context!", __func__);
+        SET_ERROR(modinst, "%s: Couldn't allocate memory for the new Divert context!", __func__);
         return DAQ_ERROR_NOMEM;
     }
-    ipfwc->sock = -1;
-    ipfwc->modinst = modinst;
+    dc->sock = -1;
+    dc->modinst = modinst;
 
     char *endptr;
     errno = 0;
-    ipfwc->port = strtoul(daq_base_api.config_get_input(modcfg), &endptr, 10);
-    if (*endptr != '\0' || errno != 0 || ipfwc->port > 65535)
+    dc->port = strtoul(daq_base_api.config_get_input(modcfg), &endptr, 10);
+    if (*endptr != '\0' || errno != 0 || dc->port > 65535)
     {
         SET_ERROR(modinst, "%s: Invalid divert port number specified: '%s'",
                 __func__, daq_base_api.config_get_input(modcfg));
-        ipfw_daq_destroy(ipfwc);
+        divert_daq_destroy(dc);
         return DAQ_ERROR_INVAL;
     }
 
-    ipfwc->snaplen = daq_base_api.config_get_snaplen(modcfg);
-    ipfwc->timeout = daq_base_api.config_get_timeout(modcfg);
-    if (ipfwc->timeout == 0)
-        ipfwc->timeout = -1;
-    ipfwc->passive = (daq_base_api.config_get_mode(modcfg) == DAQ_MODE_PASSIVE);
+    dc->snaplen = daq_base_api.config_get_snaplen(modcfg);
+    dc->timeout = daq_base_api.config_get_timeout(modcfg);
+    if (dc->timeout == 0)
+        dc->timeout = -1;
+    dc->passive = (daq_base_api.config_get_mode(modcfg) == DAQ_MODE_PASSIVE);
 
     /* Open the divert socket.  Traffic will not start going to it until we bind it in start(). */
-    if ((ipfwc->sock = socket(PF_INET, SOCK_RAW, IPPROTO_DIVERT)) == -1)
+    if ((dc->sock = socket(PF_INET, SOCK_RAW, IPPROTO_DIVERT)) == -1)
     {
         SET_ERROR(modinst, "%s: Couldn't open the DIVERT socket: %s", __func__, strerror(errno));
-        ipfw_daq_destroy(ipfwc);
+        divert_daq_destroy(dc);
         return DAQ_ERROR;
     }
 
     /* Finally, create the message buffer pool. */
     uint32_t pool_size = daq_base_api.config_get_msg_pool_size(modcfg);
     int rval;
-    if ((rval = create_packet_pool(ipfwc, pool_size ? pool_size : IPFW_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
+    if ((rval = create_packet_pool(dc, pool_size ? pool_size : DIVERT_DEFAULT_POOL_SIZE)) != DAQ_SUCCESS)
     {
-        ipfw_daq_destroy(ipfwc);
+        divert_daq_destroy(dc);
         return rval;
     }
 
-    *ctxt_ptr = ipfwc;
+    *ctxt_ptr = dc;
 
     return DAQ_SUCCESS;
 }
 
-static void ipfw_daq_destroy(void* handle)
+static void divert_daq_destroy(void* handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
 
-    if (ipfwc->sock != -1)
-        close(ipfwc->sock);
-    destroy_packet_pool(ipfwc);
-    free(ipfwc);
+    if (dc->sock != -1)
+        close(dc->sock);
+    destroy_packet_pool(dc);
+    free(dc);
 }
 
-static int ipfw_daq_start(void *handle)
+static int divert_daq_start(void *handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
 
     struct sockaddr_in sin;
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = PF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(ipfwc->port);
+    sin.sin_port = htons(dc->port);
 
-    if (bind(ipfwc->sock, (struct sockaddr *) &sin, sizeof(sin)) == -1)
+    if (bind(dc->sock, (struct sockaddr *) &sin, sizeof(sin)) == -1)
     {
-        SET_ERROR(ipfwc->modinst, "%s: Couldn't bind to port %d on the DIVERT socket: %s",
-            __func__, ipfwc->port, strerror(errno));
+        SET_ERROR(dc->modinst, "%s: Couldn't bind to port %d on the DIVERT socket: %s",
+            __func__, dc->port, strerror(errno));
         return DAQ_ERROR;
     }
 
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_stop(void *handle)
+static int divert_daq_stop(void *handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
-    close(ipfwc->sock);
-    ipfwc->sock = -1;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
+    close(dc->sock);
+    dc->sock = -1;
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
+static int divert_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
-    IpfwPktDesc *desc = (IpfwPktDesc *) msg->priv;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
+    DivertPktDesc *desc = (DivertPktDesc *) msg->priv;
 
     /* We don't appear to need to respect the reverse aspect as long as the packet is well-formed enough to be
         routed successfully. */
-    ssize_t wrote = sendto(ipfwc->sock, data, data_len, 0, (struct sockaddr*) &desc->addr, sizeof(desc->addr));
+    ssize_t wrote = sendto(dc->sock, data, data_len, 0, (struct sockaddr*) &desc->addr, sizeof(desc->addr));
     if (wrote < 0 || (unsigned) wrote != data_len)
     {
-        SET_ERROR(ipfwc->modinst, "%s: Couldn't send to the DIVERT socket: %s", __func__, strerror(errno));
+        SET_ERROR(dc->modinst, "%s: Couldn't send to the DIVERT socket: %s", __func__, strerror(errno));
         return DAQ_ERROR;
     }
-    ipfwc->stats.packets_injected++;
+    dc->stats.packets_injected++;
 
     return DAQ_SUCCESS;
 }
 
-static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
+static unsigned divert_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
     DAQ_RecvStatus status = DAQ_RSTAT_OK;
     struct timeval tv;
     unsigned idx = 0;
@@ -270,7 +270,7 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
     while (idx < max_recv)
     {
         /* Make sure that we have a packet descriptor available to populate. */
-        IpfwPktDesc *desc = ipfwc->pool.freelist;
+        DivertPktDesc *desc = dc->pool.freelist;
         if (!desc)
         {
             status = DAQ_RSTAT_NOBUF;
@@ -282,13 +282,13 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
         int rval;
         if (idx == 0)
         {
-            int timeout = ipfwc->timeout;
+            int timeout = dc->timeout;
             rval = 0;
             while (timeout != 0 && rval == 0)
             {
-                if (ipfwc->interrupted)
+                if (dc->interrupted)
                 {
-                    ipfwc->interrupted = false;
+                    dc->interrupted = false;
                     *rstat = DAQ_RSTAT_INTERRUPTED;
                     return 0;
                 }
@@ -310,8 +310,8 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
                     tv.tv_usec = 0;
                 }
                 FD_ZERO(&fdset);
-                FD_SET(ipfwc->sock, &fdset);
-                rval = select(ipfwc->sock + 1, &fdset, NULL, NULL, &tv);
+                FD_SET(dc->sock, &fdset);
+                rval = select(dc->sock + 1, &fdset, NULL, NULL, &tv);
             }
         }
         else
@@ -319,13 +319,13 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
             tv.tv_sec = 0;
             tv.tv_usec = 0;
             FD_ZERO(&fdset);
-            FD_SET(ipfwc->sock, &fdset);
-            rval = select(ipfwc->sock + 1, &fdset, NULL, NULL, &tv);
+            FD_SET(dc->sock, &fdset);
+            rval = select(dc->sock + 1, &fdset, NULL, NULL, &tv);
         }
 
         if (rval == -1)
         {
-            SET_ERROR(ipfwc->modinst, "%s: Couldn't select on the DIVERT socket: %s", __func__, strerror(errno));
+            SET_ERROR(dc->modinst, "%s: Couldn't select on the DIVERT socket: %s", __func__, strerror(errno));
             status = DAQ_RSTAT_ERROR;
             break;
         }
@@ -336,17 +336,17 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
             break;
         }
 
-        if (FD_ISSET(ipfwc->sock, &fdset))
+        if (FD_ISSET(dc->sock, &fdset))
         {
             socklen_t addrlen = sizeof(desc->addr);
             ssize_t pktlen;
 
-            if ((pktlen = recvfrom(ipfwc->sock, desc->data, ipfwc->snaplen, 0,
+            if ((pktlen = recvfrom(dc->sock, desc->data, dc->snaplen, 0,
                 (struct sockaddr *) &desc->addr, &addrlen)) == -1)
             {
                 if (errno != EINTR)
                 {
-                    SET_ERROR(ipfwc->modinst, "%s: Couldn't receive from the DIVERT socket: %s", __func__, strerror(errno));
+                    SET_ERROR(dc->modinst, "%s: Couldn't receive from the DIVERT socket: %s", __func__, strerror(errno));
                     status = DAQ_RSTAT_ERROR;
                     break;
                 }
@@ -372,13 +372,13 @@ static unsigned ipfw_daq_msg_receive(void *handle, const unsigned max_recv, cons
 
             /* Last, but not least, extract this descriptor from the free list and
                place the message in the return vector. */
-            ipfwc->pool.freelist = desc->next;
+            dc->pool.freelist = desc->next;
             desc->next = NULL;
-            ipfwc->pool.info.available--;
+            dc->pool.info.available--;
             msgs[idx] = &desc->msg;
 
-            ipfwc->stats.hw_packets_received++;
-            ipfwc->stats.packets_received++;
+            dc->stats.hw_packets_received++;
+            dc->stats.packets_received++;
 
             idx++;
         }
@@ -399,81 +399,81 @@ static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
     DAQ_VERDICT_BLOCK       /* DAQ_VERDICT_RETRY */
 };
 
-static int ipfw_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+static int divert_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
-    IpfwPktDesc *desc = (IpfwPktDesc *) msg->priv;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
+    DivertPktDesc *desc = (DivertPktDesc *) msg->priv;
 
     /* Sanitize and enact the verdict. */
     if (verdict >= MAX_DAQ_VERDICT)
         verdict = DAQ_VERDICT_BLOCK;
-    ipfwc->stats.verdicts[verdict]++;
+    dc->stats.verdicts[verdict]++;
     verdict = verdict_translation_table[verdict];
-    if (ipfwc->passive || verdict == DAQ_VERDICT_PASS)
+    if (dc->passive || verdict == DAQ_VERDICT_PASS)
     {
-        ssize_t wrote = sendto(ipfwc->sock, msg->data, msg->data_len, 0,
+        ssize_t wrote = sendto(dc->sock, msg->data, msg->data_len, 0,
                                 (struct sockaddr*) &desc->addr, sizeof(desc->addr));
         if (wrote < 0 || (unsigned) wrote != msg->data_len)
         {
-            SET_ERROR(ipfwc->modinst, "%s: Couldn't send to the DIVERT socket: %s", __func__, strerror(errno));
+            SET_ERROR(dc->modinst, "%s: Couldn't send to the DIVERT socket: %s", __func__, strerror(errno));
             return DAQ_ERROR;
         }
     }
 
     /* Toss the descriptor back on the free list for reuse. */
-    desc->next = ipfwc->pool.freelist;
-    ipfwc->pool.freelist = desc;
-    ipfwc->pool.info.available++;
+    desc->next = dc->pool.freelist;
+    dc->pool.freelist = desc;
+    dc->pool.info.available++;
 
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_interrupt(void *handle)
+static int divert_daq_interrupt(void *handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
 
-    ipfwc->interrupted = true;
+    dc->interrupted = true;
 
     return DAQ_SUCCESS;
 }
 
-static int ipfw_daq_get_stats(void *handle, DAQ_Stats_t* stats)
+static int divert_daq_get_stats(void *handle, DAQ_Stats_t* stats)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
 
-    *stats = ipfwc->stats;
+    *stats = dc->stats;
 
     return DAQ_SUCCESS;
 }
 
-static void ipfw_daq_reset_stats(void *handle)
+static void divert_daq_reset_stats(void *handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
-    memset(&ipfwc->stats, 0, sizeof(ipfwc->stats));
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
+    memset(&dc->stats, 0, sizeof(dc->stats));
 }
 
-static int ipfw_daq_get_snaplen(void *handle)
+static int divert_daq_get_snaplen(void *handle)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
-    return ipfwc->snaplen;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
+    return dc->snaplen;
 }
 
-static uint32_t ipfw_daq_get_capabilities(void *handle)
+static uint32_t divert_daq_get_capabilities(void *handle)
 {
     return DAQ_CAPA_BLOCK | DAQ_CAPA_REPLACE | DAQ_CAPA_INJECT | DAQ_CAPA_INJECT_RAW
         | DAQ_CAPA_INTERRUPT | DAQ_CAPA_UNPRIV_START;
 }
 
-static int ipfw_daq_get_datalink_type(void *handle)
+static int divert_daq_get_datalink_type(void *handle)
 {
     return DLT_RAW;
 }
 
-static int ipfw_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
+static int divert_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
 {
-    Ipfw_Context_t *ipfwc = (Ipfw_Context_t *) handle;
+    Divert_Context_t *dc = (Divert_Context_t *) handle;
 
-    *info = ipfwc->pool.info;
+    *info = dc->pool.info;
 
     return DAQ_SUCCESS;
 }
@@ -481,35 +481,35 @@ static int ipfw_daq_get_msg_pool_info(void *handle, DAQ_MsgPoolInfo_t *info)
 #ifdef BUILDING_SO
 DAQ_SO_PUBLIC const DAQ_ModuleAPI_t DAQ_MODULE_DATA =
 #else
-const DAQ_ModuleAPI_t ipfw_daq_module_data =
+const DAQ_ModuleAPI_t divert_daq_module_data =
 #endif
 {
     /* .api_version = */ DAQ_MODULE_API_VERSION,
     /* .api_size = */ sizeof(DAQ_ModuleAPI_t),
-    /* .module_version = */ DAQ_IPFW_VERSION,
-    /* .name = */ "ipfw",
+    /* .module_version = */ DAQ_DIVERT_VERSION,
+    /* .name = */ "divert",
     /* .type = */ DAQ_TYPE_INTF_CAPABLE | DAQ_TYPE_INLINE_CAPABLE | DAQ_TYPE_MULTI_INSTANCE,
-    /* .load = */ ipfw_daq_module_load,
-    /* .unload = */ ipfw_daq_module_unload,
+    /* .load = */ divert_daq_module_load,
+    /* .unload = */ divert_daq_module_unload,
     /* .get_variable_descs = */ NULL,
-    /* .instantiate = */ ipfw_daq_instantiate,
-    /* .destroy = */ ipfw_daq_destroy,
+    /* .instantiate = */ divert_daq_instantiate,
+    /* .destroy = */ divert_daq_destroy,
     /* .set_filter = */ NULL,
-    /* .start = */ ipfw_daq_start,
+    /* .start = */ divert_daq_start,
     /* .inject = */ NULL,
-    /* .inject_relative = */ ipfw_daq_inject_relative,
-    /* .interrupt = */ ipfw_daq_interrupt,
-    /* .stop = */ ipfw_daq_stop,
+    /* .inject_relative = */ divert_daq_inject_relative,
+    /* .interrupt = */ divert_daq_interrupt,
+    /* .stop = */ divert_daq_stop,
     /* .ioctl = */ NULL,
-    /* .get_stats = */ ipfw_daq_get_stats,
-    /* .reset_stats = */ ipfw_daq_reset_stats,
-    /* .get_snaplen = */ ipfw_daq_get_snaplen,
-    /* .get_capabilities = */ ipfw_daq_get_capabilities,
-    /* .get_datalink_type = */ ipfw_daq_get_datalink_type,
+    /* .get_stats = */ divert_daq_get_stats,
+    /* .reset_stats = */ divert_daq_reset_stats,
+    /* .get_snaplen = */ divert_daq_get_snaplen,
+    /* .get_capabilities = */ divert_daq_get_capabilities,
+    /* .get_datalink_type = */ divert_daq_get_datalink_type,
     /* .config_load = */ NULL,
     /* .config_swap = */ NULL,
     /* .config_free = */ NULL,
-    /* .msg_receive = */ ipfw_daq_msg_receive,
-    /* .msg_finalize = */ ipfw_daq_msg_finalize,
-    /* .get_msg_pool_info = */ ipfw_daq_get_msg_pool_info,
+    /* .msg_receive = */ divert_daq_msg_receive,
+    /* .msg_finalize = */ divert_daq_msg_finalize,
+    /* .get_msg_pool_info = */ divert_daq_get_msg_pool_info,
 };
