@@ -29,7 +29,7 @@ Example Setup
 -------------
 
 The following steps set up a Linux system with two data interfaces (eth1 and
-eth2) and configure them as two forwarding (routing) interfaces with both IPv4
+eth2) and configures them as two forwarding (routing) interfaces with both IPv4
 and IPv6 addresses.  All traffic will be queued for inspection on queue number
 42 prior to being forwarded by the routing subsystem.
 
