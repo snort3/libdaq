@@ -21,8 +21,10 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <grp.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -85,6 +87,8 @@ typedef struct _DAQTestConfig
     PingAction ping_action;
     IPv4Addr *ip_addrs;
     unsigned thread_count;
+    int group_id;
+    int user_id;
     bool list_and_exit;
     bool modify_opaque_value;
     bool performance_mode;
@@ -205,6 +209,7 @@ static void usage(void)
     printf("  -C <key[=value]>  Set a DAQ configuration variable key/value pair\n");
     printf("  -D <delay>        Specify a millisecond delay to be added to each packet processed\n");
     printf("  -f <bpf>          Specify the Berkley Packet Filter string to use for filtering\n");
+    printf("  -g <groupname>    Run as the specified group after initialization (accepts GID)\n");
     printf("  -h                Display this usage text and exit\n");
     printf("  -k                Ignore checksum errors during protocol decoding\n");
     printf("  -l                Print a list of modules found and exit\n");
@@ -216,6 +221,7 @@ static void usage(void)
     printf("  -s <len>          Specify the capture length in bytes (default = 1518)\n");
     printf("  -t <num>          Specify the receive timeout in milliseconds (default = 0, 0 is unlimited)\n");
     printf("  -T <num>          Maximum number of receive timeouts to encounter before exiting (default = 0, 0 is unlimited)\n");
+    printf("  -u <username>     Run as the specified user after initialization (accepts UID)\n");
     printf("  -v                Increase the verbosity level of the DAQ library (may be specified multiple times)\n");
     printf("  -V <verdict>      Specify a default verdict to render on packets (pass (default), block, blacklist, whitelist)\n");
     printf("  -x                Print a hexdump of each packet received\n");
@@ -954,11 +960,53 @@ static DAQTestModuleConfig *daqtest_module_config_new(void)
     return dtmc;
 }
 
+static int gid_from_groupname(const char *name)
+{
+    struct group *grp;
+    char *endptr;
+    gid_t gid;
+
+    if (!name || *name == '\0')
+        return -1;
+
+    /* Accept a numeric string and assume it's a GID. */
+    gid = strtol(name, &endptr, 10);
+    if (*endptr == '\0')
+        return gid;
+
+    grp = getgrnam(name);
+    if (!grp)
+        return -1;
+
+    return grp->gr_gid;
+}
+
+static int uid_from_username(const char *name)
+{
+    struct passwd *pwd;
+    char *endptr;
+    uid_t uid;
+
+    if (!name || *name == '\0')
+        return -1;
+
+    /* Accept a numeric string and assume it's a UID. */
+    uid = strtol(name, &endptr, 10);
+    if (*endptr == '\0')
+        return uid;
+
+    pwd = getpwnam(name);
+    if (!pwd)
+        return -1;
+
+    return pwd->pw_uid;
+}
+
 static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
-    const char *options = "A:b:c:C:d:D:f:hi:klm:M:OpP:s:t:T:vV:xz:";
+    const char *options = "A:b:c:C:d:D:f:g:hi:klm:M:OpP:s:t:T:u:vV:xz:";
     char *endptr;
     int ch;
 
@@ -969,6 +1017,8 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
     cfg->ping_action = PING_ACTION_PASS;
     cfg->batch_size = 16;
     cfg->thread_count = 1;
+    cfg->group_id = -1;
+    cfg->user_id = -1;
     cfg->module_configs = daqtest_module_config_new();
     if (!cfg->module_configs)
         return -1;
@@ -1051,6 +1101,15 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 
             case 'f':
                 cfg->filter = optarg;
+                break;
+
+            case 'g':
+                cfg->group_id = gid_from_groupname(optarg);
+                if (cfg->group_id == -1)
+                {
+                    fprintf(stderr, "Invalid group specified: %s\n\n", optarg);
+                    return -1;
+                }
                 break;
 
             case 'h':
@@ -1152,6 +1211,15 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 }
                 break;
 
+            case 'u':
+                cfg->user_id = uid_from_username(optarg);
+                if (cfg->user_id == -1)
+                {
+                    fprintf(stderr, "Invalid user specified: %s\n\n", optarg);
+                    return -1;
+                }
+                break;
+
             case 'v':
                 cfg->verbosity++;
                 break;
@@ -1230,6 +1298,10 @@ static void print_config(DAQTestConfig *cfg)
     printf("  Batch Size: %u\n", cfg->batch_size);
     printf("  Default Verdict: %s\n", daq_verdict_string(cfg->default_verdict));
     printf("  Ping Action: %s\n", ping_action_strings[cfg->ping_action]);
+    if (cfg->group_id != -1)
+        printf("  GID: %d\n", cfg->group_id);
+    if (cfg->user_id != -1)
+        printf("  UID: %d\n", cfg->user_id);
     if (cfg->ip_addrs)
     {
         printf("  Handling ARPs for:\n");
@@ -1530,6 +1602,13 @@ int main(int argc, char *argv[])
     sigaction(SIGTERM, &action, NULL);
     sigaction(SIGINT, &action, NULL);
     sigaction(SIGHUP, &action, NULL);
+
+    /* Drop privileges. */
+    if (cfg.group_id != -1 && setgid(cfg.group_id) == -1)
+        fprintf(stderr, "Could not set GID to %d: %s (%d)\n", cfg.group_id, strerror(errno), errno);
+
+    if (cfg.user_id != -1 && setuid(cfg.user_id) == -1)
+        fprintf(stderr, "Could not set UID to %d: %s (%d)\n", cfg.user_id, strerror(errno), errno);
 
     /* Spin off all of the packet threads (blocking the signals we're catching). */
     sigset_t set;
