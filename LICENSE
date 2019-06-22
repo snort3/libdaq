@@ -1,7 +1,61 @@
-GNU GENERAL PUBLIC LICENSE
+*****************************************************************************
+The text that follows is the GNU General Public License, Version 2 (GPL V2)
+and governs your use, modification and/or distribution of LibDAQ.
+
+Section 9 of the GPL V2 acknowledges that the Free Software Foundation may
+publish revised and/or new versions of the GPL V2 from time to time.  Section 9
+further states that a licensee of a program subject to the GPL V2 could be
+free to use any such revised and/or new versions under two different scenarios:
+
+1. "Failure to Specify." Section 9 of the GPL V2 allows a licensee of a
+program governed by an unspecified version of the General Public License to
+choose any version of the General Public License ever published by the Free
+Software Foundation to govern his or her use of such program.
+
+This provision is not applicable to your use of LibDAQ because we have
+expressly stated in a number of instances that any third party's use,
+modification or distribution of LibDAQ is governed by GPL V2.
+
+2. "Any Later Version." At the end of the terms and condition of the GPL V2 is
+a section called "How to Apply these Terms to Your New Program," which
+provides guidance to a developer on how to apply the GPL V2 to a third party's
+use, modification and/or distribution of his/her program. Among other things,
+this guidance suggests that the developer attach certain notices to the
+program. Of particular importance is the following notice:
+
+"This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version."
+
+Thus if a developer follows strictly the guidance provided by the Free
+Software Foundation, Section 9 of the GPL V2 provides the licensee the option
+to either use, modify or distribute the program under GPL V2 or under any
+later version published by the Free Software Foundation.
+
+LibDAQ is an open source project that is governed exclusively by the GPL V2
+and any third party desiring to use, modify or distribute LibDAQ must do so by
+strictly following the terms and conditions of GPL V2. Anyone using, modifying
+or distributing LibDAQ does not have the option to chose to use, modify or
+distribute LibDAQ under any revised or new version of the GPL, including
+without limitation, the GNU General Public License Version 3.
+
+For ease of reference, the comparable notice that is used with LibDAQ
+(contained in the 'README' file) is as follows:
+
+"This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License Version 2 as published by the Free
+Software Foundation. You may not use, modify or distribute this program under
+any other version of the GNU General Public License."
+
+If you have any questions about this statement, please feel free to email
+snort-info@snort.org.
+*****************************************************************************
+
+                    GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
 
- Copyright (C) 1989, 1991 Free Software Foundation, Inc., <http://fsf.org/>
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
@@ -290,8 +344,8 @@ to attach them to the start of each source file to most effectively
 convey the exclusion of warranty; and each file should have at least
 the "copyright" line and a pointer to where the full notice is found.
 
-    {description}
-    Copyright (C) {year}  {fullname}
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -329,7 +383,7 @@ necessary.  Here is a sample; alter the names:
   Yoyodyne, Inc., hereby disclaims all copyright interest in the program
   `Gnomovision' (which makes passes at compilers) written by James Hacker.
 
-  {signature of Ty Coon}, 1 April 1989
+  <signature of Ty Coon>, 1 April 1989
   Ty Coon, President of Vice
 
 This General Public License does not permit incorporating your program into
@@ -337,4 +391,3 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
-
