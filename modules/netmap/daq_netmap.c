@@ -22,8 +22,8 @@
 #include "config.h"
 #endif
 
+#include <poll.h>
 #include <stdbool.h>
-#include <sys/poll.h>
 
 #define NETMAP_WITH_LIBS
 #include <net/netmap_user.h>
