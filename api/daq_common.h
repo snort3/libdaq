@@ -92,7 +92,6 @@ typedef const struct _daq_msg *DAQ_Msg_h;
 #define DAQ_ERROR_INVAL     -7  /* Invalid argument/request error */
 #define DAQ_ERROR_EXISTS    -8  /* Argument or device already exists */
 #define DAQ_ERROR_AGAIN     -9  /* Try again */
-#define DAQ_READFILE_EOF    -42 /* Hit the end of the file being read! */
 
 typedef enum
 {
