@@ -23,18 +23,12 @@
 #include "config.h"
 #endif
 
-#ifndef WIN32
-#include <sys/types.h>
-#include <netinet/in.h>
-#endif
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <pcap.h>
 #include <pthread.h>
-#include <unistd.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "daq_module_api.h"
 

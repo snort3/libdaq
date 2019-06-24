@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#ifndef WIN32
 #include <dirent.h>
 #include <dlfcn.h>
 #include <inttypes.h>
@@ -33,38 +32,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#if defined(HPUX)
-#define MODULE_EXT ".sl"
-#else
-#define MODULE_EXT ".so"
-#endif
-
-#define dlclose_func "dlclose"
-#define dlopen_func_name "dlopen"
-#define dlsym_func_name "dlsym"
-
-#else /* !WIN32 */
-#include <windows.h>
-#include <inttypes.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#define MODULE_EXT "dll"
-
-#define dlclose(args) FreeLibrary(args)
-#define dlclose_func_name "FreeLibrary"
-#define dlopen(path, arg2) LoadLibrary(path)
-#define dlopen_func_name "LoadLibrary"
-#define dlsym(handle, func) GetProcAddress(handle, func)
-#define dlsym_func_name "GetProcAddress"
-#define dlerror() GetLastError()
-
-#define getcwd _getcwd  
-#ifndef PATH_MAX
-#define PATH_MAX MAX_PATH
-#endif
-
-#endif
 
 #include "daq.h"
 #include "daq_api_internal.h"
@@ -240,15 +207,15 @@ static int daq_load_dynamic_module(const char *filename)
         return DAQ_ERROR;
     }
 
-    if ((dl_handle = dlopen(filename, RTLD_NOW)) == NULL)
+    if ((dl_handle = dlopen(filename, RTLD_NOW|RTLD_LOCAL)) == NULL)
     {
-        fprintf(stderr, "%s: %s: %s\n", filename, dlopen_func_name, dlerror());
+        fprintf(stderr, "%s: dlopen: %s\n", filename, dlerror());
         return DAQ_ERROR;
     }
 
     if ((dm = (const DAQ_ModuleAPI_t*)dlsym(dl_handle, "DAQ_MODULE_DATA")) == NULL)
     {
-        fprintf(stderr, "%s: %s: %s\n", filename, dlsym_func_name, dlerror());
+        fprintf(stderr, "%s: dlsym: %s\n", filename, dlerror());
         dlclose(dl_handle);
         return DAQ_ERROR;
     }
@@ -281,8 +248,6 @@ DAQ_LINKAGE int daq_load_static_modules(const DAQ_ModuleAPI_t **modules)
 
 DAQ_LINKAGE int daq_load_dynamic_modules(const char *directory_list[])
 {
-    static const char *extension = MODULE_EXT;
-#ifndef WIN32
     char dirpath[NAME_SIZE];
     DIR *dirp;
     struct dirent *de;
@@ -304,7 +269,7 @@ DAQ_LINKAGE int daq_load_dynamic_modules(const char *directory_list[])
         while ((de = readdir(dirp)) != NULL)
         {
             p = strrchr(de->d_name, '.');
-            if (!p || strcmp(p, extension))
+            if (!p || strcmp(p, ".so"))
                 continue;
             snprintf(dirpath, sizeof(dirpath), "%s/%s", *directory_list, de->d_name);
 
@@ -321,73 +286,6 @@ DAQ_LINKAGE int daq_load_dynamic_modules(const char *directory_list[])
         }
         closedir(dirp);
     }
-#else
-    /* Find all shared library files in path */
-    char path_buf[PATH_MAX];
-    char dyn_lib_name[PATH_MAX];
-    char drive[_MAX_DRIVE];
-    char dir[_MAX_DIR];
-    char fname[_MAX_FNAME];
-    char ext[_MAX_EXT];
-    HANDLE fSearch;
-    WIN32_FIND_DATA FindFileData;
-    int pathLen = 0;
-    const char *directory;
-    int useDrive = 0;
-
-    for (; directory_list && *directory_list; directory_list++)
-    {
-        if (!(**directory_list))
-            continue;
-
-        if ((strncpy(path_buf, *directory_list, PATH_MAX) == NULL) ||
-            (strlen(path_buf) != strlen(*directory_list)))
-        {
-            fprintf(stderr, "Path is too long: %s\n", *directory_list);
-            continue;
-        }
-
-        pathLen = strlen(path_buf);
-        if ((path_buf[pathLen - 1] == '\\') ||
-            (path_buf[pathLen - 1] == '/'))
-        {
-            /* A directory was specified with trailing dir character */
-            _splitpath(path_buf, drive, dir, fname, ext);
-            _makepath(path_buf, drive, dir, "*", MODULE_EXT);
-            directory = &dir[0];
-            useDrive = 1;
-        }
-        else /* A directory was specified */
-        {
-            _splitpath(path_buf, drive, dir, fname, ext);
-            if (strcmp(extension, ""))
-            {
-                fprintf(stderr, "Improperly formatted directory name: %s\n", *directory_list);
-                continue;
-            }
-
-            _makepath(path_buf, "", path_buf, "*", MODULE_EXT);
-            directory = *directory_list;
-        }
-
-        fSearch = FindFirstFile(path_buf, &FindFileData);
-        while (fSearch != NULL && fSearch != (HANDLE)-1)
-        {
-            if (useDrive)
-                _makepath(dyn_lib_name, drive, directory, FindFileData.cFileName, NULL);
-            else
-                _makepath(dyn_lib_name, NULL, directory, FindFileData.cFileName, NULL);
-
-            daq_load_dynamic_module(dyn_lib_name);
-
-            if (!FindNextFile(fSearch, &FindFileData))
-            {
-                break;
-            }
-        }
-        FindClose(fSearch);
-    }
-#endif
     return DAQ_SUCCESS;
 }
 

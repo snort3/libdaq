@@ -28,23 +28,7 @@
 
 extern int daq_verbosity;
 
-#ifdef WIN32
-inline void DEBUG(char *fmt, ...)
-{
-
-    if (daq_verbosity > 0)
-    {
-        va_list ap;
-        va_start(ap, fmt);
-
-        printf(fmt, ap);
-
-        va_end(ap);
-    }
-}
-#else
 #define DEBUG(...) do { if (daq_verbosity > 0) { printf(__VA_ARGS__); } } while (0)
-#endif
 
 DAQ_Config_h daq_module_config_get_config(DAQ_ModuleConfig_h modcfg);
 DAQ_Instance_h daq_modinst_get_instance(DAQ_ModuleInstance_h modinst);

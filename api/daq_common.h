@@ -26,35 +26,12 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <unistd.h>
-#ifndef WIN32
 #include <netinet/in.h>
 #include <sys/time.h>
-#else
-/* for struct timeavl */
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#endif
+#include <stdint.h>
+#include <unistd.h>
 
 #ifndef DAQ_SO_PUBLIC
-#if defined _WIN32 || defined __CYGWIN__
-#  if defined DAQ_DLL
-#    ifdef __GNUC__
-#      define DAQ_SO_PUBLIC __attribute__((dllexport))
-#    else
-#      define DAQ_SO_PUBLIC __declspec(dllexport)
-#    endif
-#  else
-#    ifdef __GNUC__
-#      define DAQ_SO_PUBLIC __attribute__((dllimport))
-#    else
-#      define DAQ_SO_PUBLIC __declspec(dllimport)
-#    endif
-#  endif
-#  define DLL_LOCAL
-#else
 #  ifdef HAVE_VISIBILITY
 #    define DAQ_SO_PUBLIC  __attribute__ ((visibility("default")))
 #    define DAQ_SO_PRIVATE __attribute__ ((visibility("hidden")))
@@ -63,17 +40,8 @@ extern "C" {
 #    define DAQ_SO_PRIVATE
 #  endif
 #endif
-#endif
 
-#ifdef _WIN32
-# ifdef DAQ_DLL
-#  define DAQ_LINKAGE DAQ_SO_PUBLIC
-# else
-#  define DAQ_LINKAGE
-# endif
-#else
-# define DAQ_LINKAGE DAQ_SO_PUBLIC
-#endif
+#define DAQ_LINKAGE DAQ_SO_PUBLIC
 
 typedef const struct _daq_module_api *DAQ_Module_h;
 typedef struct _daq_module_config *DAQ_ModuleConfig_h;
