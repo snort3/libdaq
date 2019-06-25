@@ -88,7 +88,7 @@ typedef struct _daq_base_api
     int (*config_next_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);
     /* Module/Instance operations */
     int (*resolve_subapi) (DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
-    void (*set_errbuf) (DAQ_ModuleInstance_h modinst, const char *format, ...);
+    void (*set_errbuf) (DAQ_ModuleInstance_h modinst, const char *format, ...) __attribute__((format (printf, 2, 3)));
 } DAQ_BaseAPI_t;
 
 

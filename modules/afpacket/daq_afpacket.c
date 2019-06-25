@@ -429,7 +429,7 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
     val = 1;
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_QDISC_BYPASS, &val, sizeof(val)) < 0)
     {
-        SET_ERROR(afpc->modinst, "Couldn't configure bypassing qdisc: %s", val, strerror(errno));
+        SET_ERROR(afpc->modinst, "Couldn't configure bypassing qdisc on TX: %s", strerror(errno));
         goto err;
     }
 
@@ -437,7 +437,7 @@ static AFPacketInstance *create_instance(AFPacket_Context_t *afpc, const char *d
     val = 1;
     if (setsockopt(instance->fd, SOL_PACKET, PACKET_LOSS, &val, sizeof(val)) < 0)
     {
-        SET_ERROR(afpc->modinst, "Couldn't configure bypassing qdisc: %s", val, strerror(errno));
+        SET_ERROR(afpc->modinst, "Couldn't configure dropping malformed TX packets: %s", strerror(errno));
         goto err;
     }
 

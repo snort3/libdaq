@@ -725,7 +725,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
             }
             else
             {
-                SET_ERROR(nfqc->modinst, "%s: Socket receive failed: %d - %s (%d)",
+                SET_ERROR(nfqc->modinst, "%s: Socket receive failed: %zd - %s (%d)",
                         __func__, ret, strerror(errno), errno);
                 *rstat = DAQ_RSTAT_ERROR;
             }
@@ -735,7 +735,7 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
         ret = mnl_cb_run(desc->nlmsg_buf, ret, 0, nfqc->portid, process_message_cb, desc);
         if (ret < 0)
         {
-            SET_ERROR(nfqc->modinst, "%s: Netlink message processing failed: %d - %s (%d)",
+            SET_ERROR(nfqc->modinst, "%s: Netlink message processing failed: %zd - %s (%d)",
                     __func__, ret, strerror(errno), errno);
             *rstat = DAQ_RSTAT_ERROR;
             break;

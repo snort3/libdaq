@@ -33,7 +33,7 @@ extern int daq_verbosity;
 DAQ_Config_h daq_module_config_get_config(DAQ_ModuleConfig_h modcfg);
 DAQ_Instance_h daq_modinst_get_instance(DAQ_ModuleInstance_h modinst);
 int daq_modinst_resolve_subapi(DAQ_ModuleInstance_h modinst, DAQ_InstanceAPI_t *api);
-void daq_instance_set_errbuf(DAQ_Instance_h instance, const char *format, ...);
+void daq_instance_set_errbuf(DAQ_Instance_h instance, const char *format, ...) __attribute__((format (printf, 2, 3)));
 void daq_instance_set_errbuf_va(DAQ_Instance_h instance, const char *format, va_list ap);
 void populate_base_api(DAQ_BaseAPI_t *base_api);
 
