@@ -774,14 +774,6 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("NOT_FORWARDING ");
         if (hdr->flags & DAQ_PKT_FLAG_PRE_ROUTING)
             printf("PRE_ROUTING ");
-        if (hdr->flags & DAQ_PKT_FLAG_SSL_DETECTED)
-            printf("SSL_DETECTED ");
-        if (hdr->flags & DAQ_PKT_FLAG_SSL_SHELLO)
-            printf("SSL_SHELLO ");
-        if (hdr->flags & DAQ_PKT_FLAG_SSL_SERVER_KEYX)
-            printf("SSL_SERVER_KEYX ");
-        if (hdr->flags & DAQ_PKT_FLAG_SSL_CLIENT_KEYX)
-            printf("SSL_CLIENT_KEYX ");
         if (hdr->flags & DAQ_PKT_FLAG_IGNORE_VLAN)
             printf("IGNORE_VLAN ");
         if (hdr->flags & DAQ_PKT_FLAG_REAL_ADDRESSES)

@@ -101,30 +101,26 @@ typedef struct _daq_msg
     void *priv;                 /* Pointer to module instance's private data for this message. (Optional) */
 } DAQ_Msg_t;
 
-#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x000001 /* The DAQ module reports that the checksum for this packet is good. */
-#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x000002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_NOT_FORWARDING     0x000004 /* The DAQ module will not be actively forwarding this packet
+#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x00001 /* The DAQ module reports that the checksum for this packet is good. */
+#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_NOT_FORWARDING     0x00004 /* The DAQ module will not be actively forwarding this packet
                                                     regardless of the verdict (e.g, Passive or Inline Tap interfaces). */
-#define DAQ_PKT_FLAG_PRE_ROUTING        0x000008 /* The packet is being routed via us but packet modifications
+#define DAQ_PKT_FLAG_PRE_ROUTING        0x00008 /* The packet is being routed via us but packet modifications
                                                     (MAC and TTL) have not yet been made. */
-#define DAQ_PKT_FLAG_SSL_DETECTED       0x000010 /* Packet is ssl client hello */
-#define DAQ_PKT_FLAG_SSL_SHELLO         0x000020 /* Packet is ssl server hello */
-#define DAQ_PKT_FLAG_SSL_SERVER_KEYX    0x000040 /* Packet is ssl server keyx */
-#define DAQ_PKT_FLAG_SSL_CLIENT_KEYX    0x000080 /* Packet is ssl client keyx */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x000100 /* Ignore vlan tags in the packet */
-#define DAQ_PKT_FLAG_REAL_ADDRESSES     0x000200 /* The real address values in the header are valid */
-#define DAQ_PKT_FLAG_REAL_SIP_V6        0x000400 /* The real source address is IPv6 */
-#define DAQ_PKT_FLAG_REAL_DIP_V6        0x000800 /* The real destination address is IPv6 */
-#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x001000 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x002000 /* The packet is destined for local delivery */
-#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x004000 /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x008000 /* Scrubbed tcp options maybe available */
-#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x010000 /* HA State is availble for the flow this packet is associated with. */
-#define DAQ_PKT_FLAG_ERROR_PACKET       0x020000 /* Lower level reports that the packet has errors. */
-#define DAQ_PKT_FLAG_RETRY_PACKET       0x040000 /* Packet is from the retry queue. */
-#define DAQ_PKT_FLAG_TRACE_ENABLED      0x080000 /* Tracing due to packet trace or capture with trace */
-#define DAQ_PKT_FLAG_SIMULATED          0x100000 /* Packet is simulated/virtual */
-#define DAQ_PKT_FLAG_PARSED             0x200000 /* Packet has been parsed and has decode data is available. */
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00010 /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_REAL_ADDRESSES     0x00020 /* The real address values in the header are valid */
+#define DAQ_PKT_FLAG_REAL_SIP_V6        0x00040 /* The real source address is IPv6 */
+#define DAQ_PKT_FLAG_REAL_DIP_V6        0x00080 /* The real destination address is IPv6 */
+#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x00100 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x00200 /* The packet is destined for local delivery */
+#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x00400 /* The packet was originated locally */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x00800 /* Scrubbed tcp options maybe available */
+#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x01000 /* HA State is availble for the flow this packet is associated with. */
+#define DAQ_PKT_FLAG_ERROR_PACKET       0x02000 /* Lower level reports that the packet has errors. */
+#define DAQ_PKT_FLAG_RETRY_PACKET       0x04000 /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x08000 /* Tracing due to packet trace or capture with trace */
+#define DAQ_PKT_FLAG_SIMULATED          0x10000 /* Packet is simulated/virtual */
+#define DAQ_PKT_FLAG_PARSED             0x20000 /* Packet has been parsed and has decode data is available. */
 
 #define DAQ_PKT_OFFSET_INVALID          0x0fffffff
 
