@@ -26,7 +26,6 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
 #include <daq_common.h>
 
 /* Library version information functions. */
@@ -42,7 +41,6 @@ DAQ_LINKAGE DAQ_Module_h daq_find_module(const char *name);
 DAQ_LINKAGE DAQ_Module_h daq_modules_first(void);
 DAQ_LINKAGE DAQ_Module_h daq_modules_next(void);
 DAQ_LINKAGE void daq_unload_modules(void);
-DAQ_LINKAGE void daq_print_stats(DAQ_Stats_t *stats, FILE *fp);
 
 /* Enumeration to String translation functions. */
 DAQ_LINKAGE const char *daq_mode_string(DAQ_Mode mode);
