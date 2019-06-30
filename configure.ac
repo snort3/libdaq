@@ -131,7 +131,9 @@ AC_ARG_ENABLE(afpacket-module,
               [enable_afpacket_module="$enableval"], [enable_afpacket_module="$DEFAULT_ENABLE"])
 if test "$enable_afpacket_module" = yes; then
     AC_CHECK_HEADERS([linux/if_ether.h linux/if_packet.h], [], [enable_afpacket_module=no])
-    AC_CHECK_DECLS([TPACKET2_HDRLEN, PACKET_TX_RING], [], [enable_afpacket_module=no], [[#include <linux/if_packet.h>]])
+    # AKA check for Linux 3.14
+    AC_CHECK_DECLS([PACKET_FANOUT_QM, PACKET_QDISC_BYPASS, TP_STATUS_VLAN_TPID_VALID], [],
+                   [enable_afpacket_module=no], [[#include <linux/if_packet.h>]])
     if test "$enable_afpacket_module" = yes -a "$LIBPCAP_AVAILABLE" = yes ; then
         DAQ_AFPACKET_LIBS="-lpcap -lpthread"
     fi

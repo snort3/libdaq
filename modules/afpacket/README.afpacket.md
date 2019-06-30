@@ -26,7 +26,7 @@ The AFPacket DAQ module will always run the interfaces in promiscuous mode.
 
 Requirements
 ------------
-* Linux kernel version 2.6.31 or higher (TPACKET v2 and PACKET_TX_RING support)
+* Linux kernel version 3.14 or higher
 * libpcap is optional (required for BPF support)
 
 Interface Preparation

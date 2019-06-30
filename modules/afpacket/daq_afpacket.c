@@ -23,7 +23,7 @@
 #include "config.h"
 #endif
 
-#define _GNU_SOURCE
+#define _GNU_SOURCE // For POLLRDHUP
 
 #include <errno.h>
 #include <limits.h>
@@ -99,14 +99,12 @@ typedef struct _af_packet_instance
     bool active;
 } AFPacketInstance;
 
-#ifdef PACKET_FANOUT
 typedef struct _af_packet_fanout_cfg
 {
     uint16_t fanout_flags;
     uint16_t fanout_type;
     bool enabled;
 } AFPacketFanoutCfg;
-#endif
 
 typedef struct _af_packet_pkt_desc
 {
@@ -133,9 +131,7 @@ typedef struct _afpacket_context
     int snaplen;
     int timeout;
     uint32_t ring_size;
-#ifdef PACKET_FANOUT
     AFPacketFanoutCfg fanout_cfg;
-#endif
     bool use_tx_ring;
     bool debug;
     /* State */
@@ -664,7 +660,6 @@ static int create_instance_rings(AFPacket_Context_t *afpc, AFPacketInstance *ins
     return DAQ_SUCCESS;
 }
 
-#ifdef PACKET_FANOUT
 static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
     int fanout_arg;
@@ -678,7 +673,6 @@ static int configure_fanout(AFPacket_Context_t *afpc, AFPacketInstance *instance
 
     return DAQ_SUCCESS;
 }
-#endif
 
 static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
 {
@@ -686,11 +680,9 @@ static int start_instance(AFPacket_Context_t *afpc, AFPacketInstance *instance)
     if (bind_instance_interface(afpc, instance, ETH_P_ALL) != 0)
         return -1;
 
-#ifdef PACKET_FANOUT
     /* Configure packet fanout if requested.  This must happen after the final binding. */
     if (afpc->fanout_cfg.enabled && configure_fanout(afpc, instance) != DAQ_SUCCESS)
         return -1;
-#endif
 
     instance->active = true;
 
@@ -849,7 +841,6 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
             size_str = varValue;
         else if (!strcmp(varKey, "debug"))
             afpc->debug = true;
-#ifdef PACKET_FANOUT
         else if (!strcmp(varKey, "fanout_type"))
         {
             if (!varValue)
@@ -867,14 +858,10 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_CPU;
             else if (!strcmp(varValue, "rollover"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_ROLLOVER;
-#ifdef PACKET_FANOUT_RND
             else if (!strcmp(varValue, "rnd"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_RND;
-#endif
-#ifdef PACKET_FANOUT_QM
             else if (!strcmp(varValue, "qm"))
                 afpc->fanout_cfg.fanout_type = PACKET_FANOUT_QM;
-#endif
             else
             {
                 SET_ERROR(modinst, "%s: Unrecognized argument for %s: '%s'!", __func__, varKey, varValue);
@@ -899,7 +886,6 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
                 goto err;
             }
         }
-#endif /* PACKET_FANOUT */
         else if (!strcmp(varKey, "use_tx_ring"))
             afpc->use_tx_ring = true;
 
@@ -1416,11 +1402,7 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
            MAC addresses backward into the reserved space to make room for the VLAN tag and filling
            that tag structure in.  */
         if (
-#if defined(TP_STATUS_VLAN_VALID)
                 (entry->hdr.h2->tp_vlan_tci || (entry->hdr.h2->tp_status & TP_STATUS_VLAN_VALID)) &&
-#else
-                entry->hdr.h2->tp_vlan_tci &&
-#endif
                 tp_snaplen >= (unsigned int) vlan_offset)
         {
             struct vlan_tag *tag;
@@ -1429,11 +1411,9 @@ static unsigned afpacket_daq_msg_receive(void *handle, const unsigned max_recv, 
             memmove((void *) data, data + VLAN_TAG_LEN, vlan_offset);
 
             tag = (struct vlan_tag *) (data + vlan_offset);
-#if defined(TP_STATUS_VLAN_TPID_VALID)
             if (entry->hdr.h2->tp_vlan_tpid && (entry->hdr.h2->tp_status & TP_STATUS_VLAN_TPID_VALID))
                 tag->vlan_tpid = htons(entry->hdr.h2->tp_vlan_tpid);
             else
-#endif
                 tag->vlan_tpid = htons(ETH_P_8021Q);
             tag->vlan_tci = htons(entry->hdr.h2->tp_vlan_tci);
 
