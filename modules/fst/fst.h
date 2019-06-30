@@ -432,7 +432,7 @@ bool FstKey::populate(const DAQ_PktHdr_t *pkthdr, const DecodeData *dd)
     else
     {
         ipver = 0;
-        return swapped;
+        return false;
     }
 
     /* L4 */

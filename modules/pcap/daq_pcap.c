@@ -355,24 +355,23 @@ static int pcap_daq_install_filter(Pcap_Context_t *pc, const char *filter)
 static int pcap_daq_set_filter(void *handle, const char *filter)
 {
     Pcap_Context_t *pc = (Pcap_Context_t *) handle;
-    struct bpf_program fcode;
-    pcap_t *dead_handle;
-    int rval;
 
     if (pc->handle)
     {
-        if ((rval = pcap_daq_install_filter(handle, filter)) != 0)
+        int rval = pcap_daq_install_filter(handle, filter);
+        if (rval != DAQ_SUCCESS)
             return rval;
     }
     else
     {
         /* Try to validate the BPF with a dead PCAP handle. */
-        dead_handle = pcap_open_dead(DLT_EN10MB, pc->snaplen);
+        pcap_t *dead_handle = pcap_open_dead(DLT_EN10MB, pc->snaplen);
         if (!dead_handle)
         {
             SET_ERROR(pc->modinst, "%s: Could not allocate a dead PCAP handle!", __func__);
             return DAQ_ERROR_NOMEM;
         }
+        struct bpf_program fcode;
         pthread_mutex_lock(&bpf_mutex);
         if (pcap_compile(dead_handle, &fcode, filter, 1, pc->netmask) < 0)
         {

@@ -448,7 +448,7 @@ static int nfq_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
         should be safe from truncation.  */
     nfqc->nlmsg_bufsize = nfqc->snaplen + MNL_SOCKET_BUFFER_SIZE;
     if (nfqc->debug)
-        printf("Netlink message buffer size is %ld\n", nfqc->nlmsg_bufsize);
+        printf("Netlink message buffer size is %zu\n", nfqc->nlmsg_bufsize);
 
     /* Allocate a scratch buffer for general usage by the context (basically for anything that's not
         receiving a packet) */

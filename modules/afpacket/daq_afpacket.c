@@ -262,7 +262,7 @@ static int bind_instance_interface(AFPacket_Context_t *afpc, AFPacketInstance *i
 
 static int set_up_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFPacketRing *ring)
 {
-    unsigned int idx, block, block_offset, frame, frame_offset;
+    unsigned int idx, block, frame, frame_offset;
 
     /* Allocate a ring to hold packet pointers. */
     ring->entries = calloc(ring->layout.tp_frame_nr, sizeof(AFPacketEntry));
@@ -276,7 +276,7 @@ static int set_up_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFP
     idx = 0;
     for (block = 0; block < ring->layout.tp_block_nr; block++)
     {
-        block_offset = block * ring->layout.tp_block_size;
+        unsigned int block_offset = block * ring->layout.tp_block_size;
         for (frame = 0; frame < (ring->layout.tp_block_size / ring->layout.tp_frame_size) && idx < ring->layout.tp_frame_nr; frame++)
         {
             frame_offset = frame * ring->layout.tp_frame_size;
@@ -295,9 +295,6 @@ static int set_up_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFP
 
 static void destroy_instance(AFPacketInstance *instance)
 {
-    unsigned int ringsize;
-    struct tpacket_req req;
-
     if (instance)
     {
         if (instance->fd != -1)
@@ -317,11 +314,12 @@ static void destroy_instance(AFPacketInstance *instance)
             /* Unmap the kernel packet ring. */
             if (instance->buffer != MAP_FAILED)
             {
-                ringsize = instance->rx_ring.size + instance->tx_ring.size;
+                unsigned int ringsize = instance->rx_ring.size + instance->tx_ring.size;
                 munmap(instance->buffer, ringsize);
                 instance->buffer = MAP_FAILED;
             }
             /* Tell the kernel to destroy the rings. */
+            struct tpacket_req req;
             memset(&req, 0, sizeof(req));
             setsockopt(instance->fd, SOL_PACKET, PACKET_RX_RING, (void *) &req, sizeof(req));
             if (instance->tx_ring.size)
@@ -577,16 +575,14 @@ static int calculate_layout(AFPacket_Context_t *afpc, AFPacketInstance *instance
 #define DEFAULT_ORDER 5
 static int create_ring(AFPacket_Context_t *afpc, AFPacketInstance *instance, AFPacketRing *ring, int optname)
 {
-    int rc, order;
-
-    /* Starting with page allocations of order 3, try to allocate an RX ring in the kernel. */
-    for (order = DEFAULT_ORDER; order >= 0; order--)
+    /* Starting with page allocations of order 5, try to allocate an RX ring in the kernel. */
+    for (int order = DEFAULT_ORDER; order >= 0; order--)
     {
         if (calculate_layout(afpc, instance, &ring->layout, order))
             return DAQ_ERROR;
 
         /* Ask the kernel to create the ring. */
-        rc = setsockopt(instance->fd, SOL_PACKET, optname, (void*) &ring->layout, sizeof(struct tpacket_req));
+        int rc = setsockopt(instance->fd, SOL_PACKET, optname, (void*) &ring->layout, sizeof(struct tpacket_req));
         if (rc)
         {
             if (errno == ENOMEM)
@@ -1275,7 +1271,6 @@ static inline DAQ_RecvStatus wait_for_packet(AFPacket_Context_t *afpc)
     AFPacketInstance *instance;
     struct pollfd pfd[AF_PACKET_MAX_INTERFACES];
     uint32_t i;
-    int ret = 0;
 
     for (i = 0, instance = afpc->instances; instance; i++, instance = instance->next)
     {
@@ -1309,7 +1304,7 @@ static inline DAQ_RecvStatus wait_for_packet(AFPacket_Context_t *afpc)
         else
             poll_timeout = 1000;
 
-        ret = poll(pfd, afpc->intf_count, poll_timeout);
+        int ret = poll(pfd, afpc->intf_count, poll_timeout);
         /* If some number of of sockets have events returned, check them all for badness. */
         if (ret > 0)
         {

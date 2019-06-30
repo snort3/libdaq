@@ -202,7 +202,7 @@ static int fst_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
 
 static void fst_daq_destroy(void *handle)
 {
-    FstContext *fc = (FstContext *) handle;
+    FstContext *fc = static_cast<FstContext*>(handle);
 
     fc->flow_table.clear();
     delete[] fc->pool.pool;
@@ -211,7 +211,7 @@ static void fst_daq_destroy(void *handle)
 
 static int fst_daq_start(void *handle)
 {
-    FstContext *fc = (FstContext*) handle;
+    FstContext *fc = static_cast<FstContext*>(handle);
 
     int rval = CALL_SUBAPI_NOARGS(fc, start);
     if (rval != DAQ_SUCCESS)
@@ -281,7 +281,7 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
         return true;
     }
 
-    const DAQ_PktHdr_t *orig_pkthdr = (const DAQ_PktHdr_t *) orig_msg->hdr;
+    const DAQ_PktHdr_t *orig_pkthdr = static_cast<const DAQ_PktHdr_t*>(orig_msg->hdr);
     fc->flow_table.process_timeouts(&orig_pkthdr->ts);
 
     if (!process_lost_souls(fc, msgs, max_recv, idx))
@@ -392,7 +392,7 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
 
 static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arglen)
 {
-    FstContext *fc = (FstContext *) handle;
+    FstContext *fc = static_cast<FstContext*>(handle);
     int rval = DAQ_ERROR_NOTSUP;
 
     if (CHECK_SUBAPI(fc, ioctl))
@@ -404,12 +404,12 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
         {
             if (arglen != sizeof(DIOCTL_SetFlowOpaque))
                 return DAQ_ERROR_INVAL;
-            DIOCTL_SetFlowOpaque *sfo = (DIOCTL_SetFlowOpaque *) arg;
+            DIOCTL_SetFlowOpaque *sfo = static_cast<DIOCTL_SetFlowOpaque*>(arg);
             if (!sfo->msg)
                 return DAQ_ERROR_INVAL;
             if (sfo->msg->owner == fc->modinst)
             {
-                FstMsgDesc *desc = (FstMsgDesc *) sfo->msg->priv;
+                FstMsgDesc *desc = static_cast<FstMsgDesc*>(sfo->msg->priv);
                 std::shared_ptr<FstEntry> entry = desc->entry;
                 entry->flow_stats.opaque = sfo->value;
                 entry->flags |= DAQ_PKT_FLAG_OPAQUE_IS_VALID;
@@ -421,12 +421,12 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
         {
             if (arglen != sizeof(DIOCTL_FlowHAState))
                 return DAQ_ERROR_INVAL;
-            DIOCTL_FlowHAState *fhs = (DIOCTL_FlowHAState *) arg;
+            DIOCTL_FlowHAState *fhs = static_cast<DIOCTL_FlowHAState*>(arg);
             if (!fhs->msg || (!fhs->data && fhs->length != 0))
                 return DAQ_ERROR_INVAL;
             if (fhs->msg->owner == fc->modinst)
             {
-                FstMsgDesc *desc = (FstMsgDesc *) fhs->msg->priv;
+                FstMsgDesc *desc = static_cast<FstMsgDesc*>(fhs->msg->priv);
                 std::shared_ptr<FstEntry> entry = desc->entry;
                 if (fhs->length > 0)
                 {
@@ -450,12 +450,12 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
         {
             if (arglen != sizeof(DIOCTL_FlowHAState))
                 return DAQ_ERROR_INVAL;
-            DIOCTL_FlowHAState *fhs = (DIOCTL_FlowHAState *) arg;
+            DIOCTL_FlowHAState *fhs = static_cast<DIOCTL_FlowHAState*>(arg);
             if (!fhs->msg)
                 return DAQ_ERROR_INVAL;
             if (fhs->msg->owner == fc->modinst)
             {
-                FstMsgDesc *desc = (FstMsgDesc *) fhs->msg->priv;
+                FstMsgDesc *desc = static_cast<FstMsgDesc*>(fhs->msg->priv);
                 std::shared_ptr<FstEntry> entry = desc->entry;
                 fhs->data = entry->ha_state;
                 fhs->length = entry->ha_state_len;
@@ -472,7 +472,7 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
 
 static unsigned fst_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
-    FstContext *fc = (FstContext *) handle;
+    FstContext *fc = static_cast<FstContext*>(handle);
     unsigned idx = 0;
 
     /* If there's anyone sitting in limbo, process them first. */
@@ -547,11 +547,11 @@ static unsigned fst_daq_msg_receive(void *handle, const unsigned max_recv, const
 
 static int fst_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
-    FstContext *fc = (FstContext *) handle;
+    FstContext *fc = static_cast<FstContext*>(handle);
 
     if (msg->owner == fc->modinst)
     {
-        FstMsgDesc *desc = (FstMsgDesc *) msg->priv;
+        FstMsgDesc *desc = static_cast<FstMsgDesc*>(msg->priv);
         std::shared_ptr<FstEntry> entry = desc->entry;
 
         if (fc->binding_verdicts)

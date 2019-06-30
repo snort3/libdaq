@@ -284,7 +284,7 @@ static int replace_icmp_data(DAQTestPacket *dtp)
     dlen = ntohs(dtp->dd.ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     data = (uint8_t *) icmp + sizeof(IcmpHdr);
     offset = 0;
-    if (dlen > sizeof(sizeof(struct timeval)))
+    if (dlen > sizeof(struct timeval))
     {
         printf("Accounting for ping timing data (%zu bytes).\n", sizeof(struct timeval));
         offset = sizeof(struct timeval);
@@ -776,12 +776,6 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("PRE_ROUTING ");
         if (hdr->flags & DAQ_PKT_FLAG_IGNORE_VLAN)
             printf("IGNORE_VLAN ");
-        if (hdr->flags & DAQ_PKT_FLAG_REAL_ADDRESSES)
-            printf("REAL_ADDRESSES ");
-        if (hdr->flags & DAQ_PKT_FLAG_REAL_SIP_V6)
-            printf("REAL_SIP_V6 ");
-        if (hdr->flags & DAQ_PKT_FLAG_REAL_DIP_V6)
-            printf("REAL_DIP_V6 ");
         if (hdr->flags & DAQ_PKT_FLAG_FLOWID_IS_VALID)
             printf("FLOWID_IS_VALID ");
         if (hdr->flags & DAQ_PKT_FLAG_LOCALLY_DESTINED)
@@ -910,21 +904,19 @@ static void print_daq_stats(DAQ_Stats_t *stats)
 
 static void print_daq_modules(void)
 {
-    const DAQ_VariableDesc_t *var_desc_table;
-    DAQ_Module_h module;
-    int num_var_descs, i;
-
-    module = daq_modules_first();
+    DAQ_Module_h module = daq_modules_first();
     while (module)
     {
         printf("\n[%s]\n", daq_module_get_name(module));
         printf(" Version: %u\n", daq_module_get_version(module));
         printf(" Type: 0x%x\n", daq_module_get_type(module));
-        num_var_descs = daq_module_get_variable_descs(module, &var_desc_table);
+
+        const DAQ_VariableDesc_t *var_desc_table;
+        int num_var_descs = daq_module_get_variable_descs(module, &var_desc_table);
         if (num_var_descs)
         {
             printf(" Variables:\n");
-            for (i = 0; i < num_var_descs; i++)
+            for (int i = 0; i < num_var_descs; i++)
             {
                 printf("  %s ", var_desc_table[i].name);
                 if (var_desc_table[i].flags & DAQ_VAR_DESC_REQUIRES_ARGUMENT)
@@ -934,6 +926,7 @@ static void print_daq_modules(void)
                 printf("- %s\n", var_desc_table[i].description);
             }
         }
+
         module = daq_modules_next();
     }
     printf("\n");
@@ -1262,8 +1255,6 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 static void print_config(DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
-    IPv4Addr *ip;
-    char addr_str[INET_ADDRSTRLEN];
     unsigned i;
 
     printf("[Config]\n");
@@ -1301,8 +1292,9 @@ static void print_config(DAQTestConfig *cfg)
     if (cfg->ip_addrs)
     {
         printf("  Handling ARPs for:\n");
-        for (ip = cfg->ip_addrs; ip; ip = ip->next)
+        for (IPv4Addr *ip = cfg->ip_addrs; ip; ip = ip->next)
         {
+            char addr_str[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &ip->addr, addr_str, sizeof(addr_str));
             printf("  %s\n", addr_str);
         }

@@ -779,7 +779,6 @@ static inline DAQ_RecvStatus wait_for_packet(Netmap_Context_t *nmc)
     NetmapInstance *instance;
     struct pollfd pfd[NETMAP_MAX_INTERFACES];
     uint32_t i;
-    int ret = 0;
 
     for (i = 0, instance = nmc->instances; instance; i++, instance = instance->next)
     {
@@ -813,7 +812,7 @@ static inline DAQ_RecvStatus wait_for_packet(Netmap_Context_t *nmc)
         else
             poll_timeout = 1000;
 
-        ret = poll(pfd, nmc->intf_count, poll_timeout);
+        int ret = poll(pfd, nmc->intf_count, poll_timeout);
         /* If some number of of sockets have events returned, check them all for badness. */
         if (ret > 0)
         {

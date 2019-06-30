@@ -426,6 +426,12 @@ DAQ_LINKAGE int daq_instance_config_free(DAQ_Instance_t *instance, void *old_con
 
 DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const unsigned max_recv, DAQ_Msg_h msgs[], DAQ_RecvStatus *rstat)
 {
+    if (!rstat)
+    {
+        daq_instance_set_errbuf(instance, "No receive status given to set!");
+        return 0;
+    }
+
     if (!instance)
     {
         *rstat = DAQ_RSTAT_INVALID;
@@ -435,13 +441,6 @@ DAQ_LINKAGE unsigned daq_instance_msg_receive(DAQ_Instance_t *instance, const un
     if (!msgs)
     {
         daq_instance_set_errbuf(instance, "No message vector given to populate!");
-        *rstat = DAQ_RSTAT_INVALID;
-        return 0;
-    }
-
-    if (!rstat)
-    {
-        daq_instance_set_errbuf(instance, "No receive status given to set!");
         *rstat = DAQ_RSTAT_INVALID;
         return 0;
     }
