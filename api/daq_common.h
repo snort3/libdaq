@@ -90,41 +90,72 @@ typedef enum
     for use by DAQ modules.  Applications should use the pseudo-opaque DAQ_Msg_h and the inline
     accessor functions (daq_msg_*) from daq.h. */
 
+/* The DAQ message structure.  Ordered by element size to avoid padding. */
+#define DAQ_MSG_META_SLOTS  8
 typedef struct _daq_msg
 {
-    DAQ_MsgType type;           /* Message type (one of DAQ_MsgType or from the user-defined range). */
-    size_t hdr_len;             /* Length of the header structure pointed to by 'hdr'. */
-    void *hdr;                  /* Pointer to the message header structure for this message. */
-    uint32_t data_len;          /* Length of the data pointed to by 'data'.  Should be 0 if 'data' is NULL. */
-    uint8_t *data;              /* Pointer to the variable-length message data. (Optional) */
-    DAQ_ModuleInstance_h owner; /* Handle for the module instance this message belongs to. */
-    void *priv;                 /* Pointer to module instance's private data for this message. (Optional) */
+    void *hdr;                      /* Pointer to the message header structure for this message */
+    uint8_t *data;                  /* Pointer to the variable-length message data (Optional) */
+    void *meta[DAQ_MSG_META_SLOTS]; /* Dynamic message metadata slots */
+    DAQ_ModuleInstance_h owner;     /* Handle for the module instance this message belongs to */
+    void *priv;                     /* Pointer to module instance's private data for this message (Optional) */
+    size_t hdr_len;                 /* Length of the header structure pointed to by 'hdr' */
+    DAQ_MsgType type;               /* Message type (one of DAQ_MsgType or from the user-defined range) */
+    uint32_t data_len;              /* Length of the data pointed to by 'data'.  Should be 0 if 'data' is NULL */
 } DAQ_Msg_t;
 
-#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x00001 /* The DAQ module reports that the checksum for this packet is good. */
-#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00002 /* The DAQ module actively set the opaque value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_NOT_FORWARDING     0x00004 /* The DAQ module will not be actively forwarding this packet
+/* The DAQ packet header structure. */
+#define DAQ_PKT_FLAG_HW_TCP_CS_GOOD     0x0001  /* The DAQ module reports that the checksum for this packet is good. */
+#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x0002  /* The DAQ module actively set the opaque value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_NOT_FORWARDING     0x0004  /* The DAQ module will not be actively forwarding this packet
                                                     regardless of the verdict (e.g, Passive or Inline Tap interfaces). */
-#define DAQ_PKT_FLAG_PRE_ROUTING        0x00008 /* The packet is being routed via us but packet modifications
+#define DAQ_PKT_FLAG_PRE_ROUTING        0x0008  /* The packet is being routed via us but packet modifications
                                                     (MAC and TTL) have not yet been made. */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00010 /* Ignore vlan tags in the packet */
-#define DAQ_PKT_FLAG_REAL_ADDRESSES     0x00020 /* The real address values in the header are valid */
-#define DAQ_PKT_FLAG_REAL_SIP_V6        0x00040 /* The real source address is IPv6 */
-#define DAQ_PKT_FLAG_REAL_DIP_V6        0x00080 /* The real destination address is IPv6 */
-#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x00100 /* The DAQ module actively set the flow ID value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x00200 /* The packet is destined for local delivery */
-#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x00400 /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x00800 /* Scrubbed tcp options maybe available */
-#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x01000 /* HA State is availble for the flow this packet is associated with. */
-#define DAQ_PKT_FLAG_ERROR_PACKET       0x02000 /* Lower level reports that the packet has errors. */
-#define DAQ_PKT_FLAG_RETRY_PACKET       0x04000 /* Packet is from the retry queue. */
-#define DAQ_PKT_FLAG_TRACE_ENABLED      0x08000 /* Tracing due to packet trace or capture with trace */
-#define DAQ_PKT_FLAG_SIMULATED          0x10000 /* Packet is simulated/virtual */
-#define DAQ_PKT_FLAG_PARSED             0x20000 /* Packet has been parsed and has decode data is available. */
-#define DAQ_PKT_FLAG_NEW_FLOW           0x40000 /* The packet was the first of a new flow. */
-#define DAQ_PKT_FLAG_REV_FLOW           0x80000 /* The packet is going the reverse direction of the flow initiator.*/
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x0010  /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x0020  /* The DAQ module actively set the flow ID value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x0040  /* The packet is destined for local delivery */
+#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x0080  /* The packet was originated locally */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x0100  /* Scrubbed tcp options may be available */
+#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x0200  /* HA State is availble for the flow this packet is associated with. */
+#define DAQ_PKT_FLAG_ERROR_PACKET       0x0400  /* Lower level reports that the packet has errors. */
+#define DAQ_PKT_FLAG_RETRY_PACKET       0x0800  /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x1000  /* Tracing due to packet trace or capture with trace */
+#define DAQ_PKT_FLAG_SIMULATED          0x2000  /* Packet is simulated/virtual */
+#define DAQ_PKT_FLAG_NEW_FLOW           0x4000  /* The packet was the first of a new flow. */
+#define DAQ_PKT_FLAG_REV_FLOW           0x8000  /* The packet is going the reverse direction of the flow initiator.*/
 
-#define DAQ_PKT_OFFSET_INVALID          0x0fffffff
+#define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
+#define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
+typedef struct _daq_pkt_hdr
+{
+    struct timeval ts;          /* Timestamp */
+    uint32_t pktlen;            /* Original length of this packet (off the wire) */
+    int32_t ingress_index;      /* Index of the inbound interface. */
+    int32_t egress_index;       /* Index of the outbound interface. */
+    int32_t ingress_group;      /* Index of the inbound group. */
+    int32_t egress_group;       /* Index of the outbound group. */
+    uint32_t opaque;            /* Opaque context value from the DAQ module or underlying hardware.
+                                    Directly related to the opaque value in FlowStats. */
+    uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
+    uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
+    uint16_t address_space_id;  /* Unique ID of the address space */
+} DAQ_PktHdr_t;
+
+#define DAQ_PKT_META_NAPT_INFO      0
+#define DAQ_PKT_META_DECODE_DATA    1
+
+/* "Real" address and port information for Network Address and Port Translated (NAPT'd) connections.
+    This represents the destination addresses and ports seen on egress in both directions. */
+#define DAQ_NAPT_INFO_FLAG_SIP_V6   0x01    /* The source address is IPv6 */
+#define DAQ_NAPT_INFO_FLAG_DIP_V6   0x02    /* The destination address is IPv6 */
+typedef struct _daq_napt_info
+{
+    struct in6_addr src_addr;
+    struct in6_addr dst_addr;
+    uint16_t src_port;
+    uint16_t dst_port;
+    uint8_t flags;
+} DAQ_NAPTInfo_t;
 
 typedef union {
     uint32_t all;
@@ -149,6 +180,7 @@ typedef union {
     } flags;
 } DAQ_PktDecodeFlags_t;
 
+#define DAQ_PKT_DECODE_OFFSET_INVALID   0x0fffffff
 typedef struct _daq_pkt_decode_data
 {
     uint32_t l2_offset;
@@ -163,33 +195,6 @@ typedef struct _daq_pkt_decode_data
     uint32_t payload_offset;
     DAQ_PktDecodeFlags_t flags;
 } DAQ_PktDecodeData_t;
-
-/* The DAQ packet header structure passed to DAQ Analysis Functions.
- * This should NEVER be modified by user applications. */
-#define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
-#define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
-typedef struct _daq_pkt_hdr
-{
-    struct timeval ts;          /* Timestamp */
-    uint32_t pktlen;            /* Original length of this packet (off wire) */
-    uint16_t address_space_id;  /* Unique ID of the address space */
-    int32_t ingress_index;      /* Index of the inbound interface. */
-    int32_t egress_index;       /* Index of the outbound interface. */
-    int32_t ingress_group;      /* Index of the inbound group. */
-    int32_t egress_group;       /* Index of the outbound group. */
-    uint32_t opaque;            /* Opaque context value from the DAQ module or underlying hardware.
-                                    Directly related to the opaque value in FlowStats. */
-    uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
-    uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
-
-    DAQ_PktDecodeData_t decode_data;    /* Decoded packet data */
-
-    /* Real values for NAT'ed connections */
-    struct in6_addr real_sIP;
-    struct in6_addr real_dIP;
-    uint16_t n_real_sPort;
-    uint16_t n_real_dPort;
-} DAQ_PktHdr_t;
 
 typedef struct _daq_flow_desc
 {
@@ -222,7 +227,6 @@ typedef struct _daq_flow_desc
 typedef struct _daq_payload_hdr
 {
     struct timeval ts;          /* Timestamp */
-    uint32_t len;               /* Length of the payload */
     uint32_t flags;             /* Flags for the payload (DAQ_PLD_FLAG_*) */
     DAQ_FlowDesc_t flow_desc;   /* Description of the flow this payload came from */
 } DAQ_PayloadHdr_t;

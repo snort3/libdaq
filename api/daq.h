@@ -143,6 +143,11 @@ static inline uint8_t *daq_msg_get_data(DAQ_Msg_h msg)
     return msg->data;
 }
 
+static inline const void *daq_msg_get_meta(DAQ_Msg_h msg, uint8_t slot)
+{
+    return msg->meta[slot];
+}
+
 #ifdef __cplusplus
 }
 #endif
