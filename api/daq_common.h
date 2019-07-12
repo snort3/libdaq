@@ -121,6 +121,8 @@ typedef struct _daq_msg
 #define DAQ_PKT_FLAG_TRACE_ENABLED      0x08000 /* Tracing due to packet trace or capture with trace */
 #define DAQ_PKT_FLAG_SIMULATED          0x10000 /* Packet is simulated/virtual */
 #define DAQ_PKT_FLAG_PARSED             0x20000 /* Packet has been parsed and has decode data is available. */
+#define DAQ_PKT_FLAG_NEW_FLOW           0x40000 /* The packet was the first of a new flow. */
+#define DAQ_PKT_FLAG_REV_FLOW           0x80000 /* The packet is going the reverse direction of the flow initiator.*/
 
 #define DAQ_PKT_OFFSET_INVALID          0x0fffffff
 
