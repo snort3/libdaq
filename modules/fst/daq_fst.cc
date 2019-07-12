@@ -327,7 +327,6 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
                 break;
         }
         fc->flow_table.move_node_to_timeout_list(node, tol_id);
-        entry->update_stats(orig_pkthdr, swapped);
         debugf("Created new flow %u\n", entry->flow_id);
 
         if (!process_new_soul(fc, entry, msgs, max_recv, idx))
@@ -338,6 +337,10 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
         /* Make sure there's still a free descriptor for the actual packet message */
         if (fc->pool.exhausted())
             return false;
+
+        /* Don't update the entry stats until we're sure we'll be handling this packet message or
+            it will be double counted. */
+        entry->update_stats(orig_pkthdr, swapped);
     }
     else
     {
@@ -384,6 +387,13 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
     pkthdr->flags |= DAQ_PKT_FLAG_FLOWID_IS_VALID;
     if (entry->ha_state)
         pkthdr->flags |= DAQ_PKT_FLAG_HA_STATE_AVAIL;
+    if (entry->flags & FST_ENTRY_FLAG_NEW)
+    {
+        pkthdr->flags |= DAQ_PKT_FLAG_NEW_FLOW;
+        entry->flags &= ~FST_ENTRY_FLAG_NEW;
+    }
+    if (!swapped != !(entry->flags & FST_ENTRY_FLAG_SWAPPED))
+        pkthdr->flags |= DAQ_PKT_FLAG_REV_FLOW;
 
     msgs[idx++] = &desc->msg;
 

@@ -71,11 +71,12 @@ struct FstEntry
     uint8_t *ha_state = nullptr;
     uint32_t ha_state_len = 0;
     uint32_t flow_id;
-#define FST_ENTRY_FLAG_SWAPPED      0x1
-#define FST_ENTRY_FLAG_WHITELISTED  0x2
-#define FST_ENTRY_FLAG_BLACKLISTED  0x4
-#define FST_ENTRY_FLAG_OPAQUE_SET   0x8
-    uint32_t flags = 0;
+#define FST_ENTRY_FLAG_NEW          0x01
+#define FST_ENTRY_FLAG_SWAPPED      0x02
+#define FST_ENTRY_FLAG_WHITELISTED  0x04
+#define FST_ENTRY_FLAG_BLACKLISTED  0x08
+#define FST_ENTRY_FLAG_OPAQUE_SET   0x10
+    uint32_t flags = FST_ENTRY_FLAG_NEW;
 };
 
 struct FstNode
@@ -190,6 +191,7 @@ FstEntry::FstEntry(const DAQ_PktHdr_t *pkthdr, const FstKey &key, uint32_t id, b
     }
 
     flow_stats.sof_timestamp = pkthdr->ts;
+    flow_stats.eof_timestamp = pkthdr->ts;
 
     flow_stats.vlan_tag = key.vlan_tag;
     flow_stats.address_space_id = key.addr_space_id;
