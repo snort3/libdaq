@@ -776,6 +776,12 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("PRE_ROUTING ");
         if (hdr->flags & DAQ_PKT_FLAG_IGNORE_VLAN)
             printf("IGNORE_VLAN ");
+        if (hdr->flags & DAQ_PKT_FLAG_REAL_ADDRESSES)
+            printf("REAL_ADDRESSES ");
+        if (hdr->flags & DAQ_PKT_FLAG_REAL_SIP_V6)
+            printf("REAL_SIP_V6 ");
+        if (hdr->flags & DAQ_PKT_FLAG_REAL_DIP_V6)
+            printf("REAL_DIP_V6 ");
         if (hdr->flags & DAQ_PKT_FLAG_FLOWID_IS_VALID)
             printf("FLOWID_IS_VALID ");
         if (hdr->flags & DAQ_PKT_FLAG_LOCALLY_DESTINED)
@@ -788,6 +794,18 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("HA_STATE_AVAIL ");
         if (hdr->flags & DAQ_PKT_FLAG_ERROR_PACKET)
             printf("ERROR_PACKET ");
+        if (hdr->flags & DAQ_PKT_FLAG_RETRY_PACKET)
+            printf("RETRY_PACKET ");
+        if (hdr->flags & DAQ_PKT_FLAG_TRACE_ENABLED)
+            printf("TRACE_ENABLED ");
+        if (hdr->flags & DAQ_PKT_FLAG_SIMULATED)
+            printf("SIMULATED ");
+        if (hdr->flags & DAQ_PKT_FLAG_PARSED)
+            printf("PARSED ");
+        if (hdr->flags & DAQ_PKT_FLAG_NEW_FLOW)
+            printf("NEW_FLOW ");
+        if (hdr->flags & DAQ_PKT_FLAG_REV_FLOW)
+            printf("REV_FLOW ");
         printf("\n");
     }
     if (cfg->dump_packets)
