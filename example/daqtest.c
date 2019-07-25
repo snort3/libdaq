@@ -800,6 +800,21 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("REV_FLOW ");
         printf("\n");
     }
+
+    const DAQ_NAPTInfo_t *napti = (const DAQ_NAPTInfo_t *) daq_msg_get_meta(msg, DAQ_PKT_META_NAPT_INFO);
+    if (napti)
+    {
+        char src_addr_str[INET6_ADDRSTRLEN], dst_addr_str[INET6_ADDRSTRLEN];
+        uint16_t src_port, dst_port;
+
+        inet_ntop(daq_napt_info_src_addr_family(napti), &napti->src_addr, src_addr_str, sizeof(src_addr_str));
+        src_port = ntohs(napti->src_port);
+        inet_ntop(daq_napt_info_dst_addr_family(napti), &napti->dst_addr, dst_addr_str, sizeof(dst_addr_str));
+        dst_port = ntohs(napti->dst_port);
+
+        printf("NAPT: %s : %hu -> %s : %hu\n", src_addr_str, src_port, dst_addr_str, dst_port);
+    }
+
     if (cfg->dump_packets)
         print_hex_dump(data, daq_msg_get_data_len(msg));
 

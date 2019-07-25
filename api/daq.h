@@ -148,6 +148,16 @@ static inline const void *daq_msg_get_meta(DAQ_Msg_h msg, uint8_t slot)
     return msg->meta[slot];
 }
 
+static inline int daq_napt_info_src_addr_family(const DAQ_NAPTInfo_t *napti)
+{
+    return (napti->flags & DAQ_NAPT_INFO_FLAG_SIP_V6) ? AF_INET6 : AF_INET;
+}
+
+static inline int daq_napt_info_dst_addr_family(const DAQ_NAPTInfo_t *napti)
+{
+    return (napti->flags & DAQ_NAPT_INFO_FLAG_DIP_V6) ? AF_INET6 : AF_INET;
+}
+
 #ifdef __cplusplus
 }
 #endif
