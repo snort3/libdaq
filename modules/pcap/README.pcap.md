@@ -21,6 +21,14 @@ timeout will never occur if packets are not being received, causing the poll()
 to potentially hang indefinitely.  Enabling immediate delivery mode will cause
 LibPCAP to use TPACKET_V2 instead of TPACKET_V3.
 
+Most DAQ modules operating in file readback mode do not bother returning a
+timeout receive status, no matter the timestamps involved.  To have the PCAP
+DAQ module simulate these, use the 'readback_timeout' variable.  With that
+enabled, packets with time deltas greater than the configured timeout duration
+will be held for a subsequent receive call and a timeout status returned.
+Given a great enough delta, multiple timeouts may occur before the next packet
+is returned.  This option has no effect in non-file readback mode.
+
 The PCAP DAQ module does not count filtered packets.
 
 Requirements

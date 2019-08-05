@@ -63,8 +63,10 @@ typedef struct _pcap_context
     bool promisc_mode;
     bool immediate_mode;
     int timeout;
+    struct timeval timeout_tv;
     int buffer_size;
     DAQ_Mode mode;
+    bool readback_timeout;
     /* State */
     DAQ_ModuleInstance_h modinst;
     DAQ_Stats_t stats;
@@ -72,6 +74,8 @@ typedef struct _pcap_context
     PcapMsgPool pool;
     pcap_t *handle;
     FILE *fp;
+    struct timeval last_recv;
+    PcapPktDesc *pending_desc;
     uint32_t netmask;
     bool nonblocking;
     volatile bool interrupted;
@@ -91,6 +95,7 @@ static DAQ_VariableDesc_t pcap_variable_descriptions[] = {
     { "buffer_size", "Packet buffer space to allocate in bytes", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
     { "no_promiscuous", "Disables opening the interface in promiscuous mode", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
     { "no_immediate", "Disables immediate mode for traffic capture (may cause unbounded blocking)", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "readback_timeout", "Return timeout receive status in file readback mode", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -245,8 +250,11 @@ static int pcap_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
 
     pc->snaplen = daq_base_api.config_get_snaplen(modcfg);
     pc->timeout = daq_base_api.config_get_timeout(modcfg);
+    pc->timeout_tv.tv_sec = pc->timeout / 1000;
+    pc->timeout_tv.tv_usec = (pc->timeout % 1000) * 1000;
     pc->promisc_mode = true;
     pc->immediate_mode = true;
+    pc->readback_timeout = false;
 
     const char *varKey, *varValue;
     daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
@@ -259,6 +267,8 @@ static int pcap_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
             pc->promisc_mode = false;
         else if (!strcmp(varKey, "no_immediate"))
             pc->immediate_mode = false;
+        else if (!strcmp(varKey, "readback_timeout"))
+            pc->readback_timeout = true;
 
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
@@ -587,6 +597,25 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             break;
         }
 
+        /* If there is a pending descriptor from the readback timeout feature, check if it's ready
+            to be realized.  If it is, finish receiving it and carry on. */
+        if (pc->pending_desc)
+        {
+            struct timeval delta;
+            timersub(&pc->pending_desc->pkthdr.ts, &pc->last_recv, &delta);
+            if (timercmp(&delta, &pc->timeout_tv, >))
+            {
+                timeradd(&pc->last_recv, &pc->timeout_tv, &pc->last_recv);
+                *rstat = DAQ_RSTAT_TIMEOUT;
+                break;
+            }
+            pc->pool.info.available--;
+            msgs[idx] = &pc->pending_desc->msg;
+            pc->stats.packets_received++;
+            pc->pending_desc = NULL;
+            continue;
+        }
+
         /* Make sure that we have a packet descriptor available to populate *before*
             calling into libpcap. */
         PcapPktDesc *desc = pc->pool.freelist;
@@ -644,8 +673,6 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             break;
         }
 
-        /* Increment the module instance's packet counter. */
-        pc->stats.packets_received++;
         /* Update hw packet counters to make sure we detect counter overflow */
         if (++pc->hwupdate_count == DAQ_PCAP_ROLLOVER_LIM)
             update_hw_stats(pc);
@@ -668,8 +695,30 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
             place the message in the return vector. */
         pc->pool.freelist = desc->next;
         desc->next = NULL;
+        /* If the readback timeout feature is enabled, check to see if the configured timeout has
+            elapsed between the previous packet and this one.  If it has, store the descriptor for
+            later without modifying counters and return the timeout receive status. */
+        if (pc->mode == DAQ_MODE_READ_FILE && pc->readback_timeout && pc->timeout > 0)
+        {
+            if (timerisset(&pc->last_recv) && timercmp(&pkthdr->ts, &pc->last_recv, >))
+            {
+                struct timeval delta;
+                timersub(&pkthdr->ts, &pc->last_recv, &delta);
+                if (timercmp(&delta, &pc->timeout_tv, >))
+                {
+                    pc->pending_desc = desc;
+                    timeradd(&pc->last_recv, &pc->timeout_tv, &pc->last_recv);
+                    *rstat = DAQ_RSTAT_TIMEOUT;
+                    break;
+                }
+            }
+            pc->last_recv = pkthdr->ts;
+        }
         pc->pool.info.available--;
         msgs[idx] = &desc->msg;
+
+        /* Finally, increment the module instance's packet counter. */
+        pc->stats.packets_received++;
     }
 
     return idx;
