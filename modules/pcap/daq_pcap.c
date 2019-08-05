@@ -609,6 +609,7 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
                 *rstat = DAQ_RSTAT_TIMEOUT;
                 break;
             }
+            pc->last_recv = pc->pending_desc->pkthdr.ts;
             pc->pool.info.available--;
             msgs[idx] = &pc->pending_desc->msg;
             pc->stats.packets_received++;
