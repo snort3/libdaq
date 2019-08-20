@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "daq.h"
 #include "daq_module_api.h"
 
 #define DAQ_BPF_VERSION 1
@@ -175,7 +174,6 @@ static uint32_t bpf_daq_get_capabilities(void* handle)
     return caps;
 }
 
-/* Module->msg_receive() */
 static unsigned bpf_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     BPF_Context_t *bc = (BPF_Context_t *) handle;
@@ -194,11 +192,9 @@ static unsigned bpf_daq_msg_receive(void *handle, const unsigned max_recv, const
         if (msg->type != DAQ_MSG_TYPE_PACKET)
             continue;
 
-        const DAQ_PktHdr_t *hdr = daq_msg_get_pkthdr(msg);
-        void *data = daq_msg_get_data(msg);
-        uint32_t data_len = daq_msg_get_data_len(msg);
+        const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
 
-        if (bpf_filter(bc->fcode.bf_insns, data, hdr->pktlen, data_len) == 0)
+        if (bpf_filter(bc->fcode.bf_insns, msg->data, hdr->pktlen, msg->data_len) == 0)
         {
             /* FIXIT-L Check return code for finalizing messages and return some sort of error if it fails */
             CALL_SUBAPI(bc, msg_finalize, msg, DAQ_VERDICT_PASS);
