@@ -32,7 +32,8 @@
 
 #define DAQ_DUMP_VERSION 5
 
-#define DAQ_DUMP_PCAP_FILE "inline-out.pcap"
+#define DEFAULT_TX_DUMP_FILE "inline-out.pcap"
+#define DEFAULT_RX_DUMP_FILE "inline-in.pcap"
 
 #define SET_ERROR(modinst, ...)    daq_base_api.set_errbuf(modinst, __VA_ARGS__)
 
@@ -50,16 +51,21 @@ typedef struct
     DAQ_ModuleInstance_h modinst;
     DAQ_InstanceAPI_t subapi;
 
-    pcap_dumper_t *dumper;
-    char *filename;
-    bool output;
+    pcap_dumper_t *tx_dumper;
+    char *tx_filename;
+    bool dump_tx;
+
+    pcap_dumper_t *rx_dumper;
+    char *rx_filename;
+    bool dump_rx;
 
     DAQ_Stats_t stats;
 } DumpContext;
 
 static DAQ_VariableDesc_t dump_variable_descriptions[] = {
-    { "file", "PCAP filename to output transmitted packets to (default: " DAQ_DUMP_PCAP_FILE ")", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
-    { "output", "Set to none to prevent output from being written to file (deprecated)", DAQ_VAR_DESC_REQUIRES_ARGUMENT }
+    { "file", "PCAP filename to output transmitted packets to (default: " DEFAULT_TX_DUMP_FILE ")", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "output", "Set to none to prevent output from being written to file (deprecated)", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "dump-rx", "Also dump received packets to their own PCAP file (default: " DEFAULT_RX_DUMP_FILE ")", 0 }
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -101,7 +107,8 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
         return DAQ_ERROR_NOMEM;
     }
     dc->modinst = modinst;
-    dc->output = true;
+    dc->dump_tx = true;
+    dc->dump_rx = false;
 
     if (daq_base_api.resolve_subapi(modinst, &dc->subapi) != DAQ_SUCCESS)
     {
@@ -115,10 +122,10 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
     {
         if (!strcmp(varKey, "file"))
         {
-            dc->filename = strdup(varValue);
-            if (!dc->filename)
+            dc->tx_filename = strdup(varValue);
+            if (!dc->tx_filename)
             {
-                SET_ERROR(modinst, "%s: Couldn't allocate memory for the PCAP output filename", __func__);
+                SET_ERROR(modinst, "%s: Couldn't allocate memory for the TX PCAP filename", __func__);
                 free(dc);
                 return DAQ_ERROR_NOMEM;
             }
@@ -126,12 +133,26 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
         else if (!strcmp(varKey, "output"))
         {
             if (!strcmp(varValue, "none"))
-                dc->output = false;
+                dc->dump_tx = false;
             else
             {
                 SET_ERROR(modinst, "%s: Invalid output type (%s)", __func__, varValue);
                 free(dc);
                 return DAQ_ERROR_INVAL;
+            }
+        }
+        else if (!strcmp(varKey, "dump-rx"))
+        {
+            dc->dump_rx = true;
+            if (varValue)
+            {
+                dc->rx_filename = strdup(varValue);
+                if (!dc->rx_filename)
+                {
+                    SET_ERROR(modinst, "%s: Couldn't allocate memory for the RX PCAP filename", __func__);
+                    free(dc);
+                    return DAQ_ERROR_NOMEM;
+                }
             }
         }
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
@@ -146,10 +167,14 @@ static void dump_daq_destroy(void *handle)
 {
     DumpContext *dc = (DumpContext *) handle;
 
-    if (dc->dumper)
-        pcap_dump_close(dc->dumper);
-    if (dc->filename)
-        free(dc->filename);
+    if (dc->tx_dumper)
+        pcap_dump_close(dc->tx_dumper);
+    if (dc->tx_filename)
+        free(dc->tx_filename);
+    if (dc->rx_dumper)
+        pcap_dump_close(dc->rx_dumper);
+    if (dc->rx_filename)
+        free(dc->rx_filename);
     free(dc);
 }
 
@@ -164,20 +189,39 @@ static int dump_daq_start(void *handle)
     int dlt = CALL_SUBAPI_NOARGS(dc, get_datalink_type);
     int snaplen = CALL_SUBAPI_NOARGS(dc, get_snaplen);
 
-    if (dc->output)
+    if (dc->dump_tx)
     {
-        const char *filename = dc->filename ? dc->filename : DAQ_DUMP_PCAP_FILE;
-        pcap_t *pcap;
-
-        pcap = pcap_open_dead(dlt, snaplen);
+        const char *filename = dc->tx_filename ? dc->tx_filename : DEFAULT_TX_DUMP_FILE;
+        pcap_t *pcap = pcap_open_dead(dlt, snaplen);
         if (!pcap)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
             SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
             return DAQ_ERROR;
         }
-        dc->dumper = pcap_dump_open(pcap, filename);
-        if (!dc->dumper)
+        dc->tx_dumper = pcap_dump_open(pcap, filename);
+        if (!dc->tx_dumper)
+        {
+            CALL_SUBAPI_NOARGS(dc, stop);
+            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", filename, pcap_geterr(pcap));
+            pcap_close(pcap);
+            return DAQ_ERROR;
+        }
+        pcap_close(pcap);
+    }
+
+    if (dc->dump_rx)
+    {
+        const char *filename = dc->rx_filename ? dc->rx_filename : DEFAULT_RX_DUMP_FILE;
+        pcap_t *pcap = pcap_open_dead(dlt, snaplen);
+        if (!pcap)
+        {
+            CALL_SUBAPI_NOARGS(dc, stop);
+            SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
+            return DAQ_ERROR;
+        }
+        dc->rx_dumper = pcap_dump_open(pcap, filename);
+        if (!dc->rx_dumper)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
             SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", filename, pcap_geterr(pcap));
@@ -194,17 +238,17 @@ static int dump_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, cons
 {
     DumpContext *dc = (DumpContext*) handle;
 
-    if (dc->dumper && type == DAQ_MSG_TYPE_PACKET)
+    if (dc->tx_dumper && type == DAQ_MSG_TYPE_PACKET)
     {
         const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) hdr;
-        struct pcap_pkthdr phdr;
+        struct pcap_pkthdr pcap_hdr;
 
-        phdr.ts.tv_sec = pkthdr->ts.tv_sec;
-        phdr.ts.tv_usec = pkthdr->ts.tv_usec;
-        phdr.caplen = data_len;
-        phdr.len = data_len;
+        pcap_hdr.ts.tv_sec = pkthdr->ts.tv_sec;
+        pcap_hdr.ts.tv_usec = pkthdr->ts.tv_usec;
+        pcap_hdr.caplen = data_len;
+        pcap_hdr.len = data_len;
 
-        pcap_dump((u_char*)dc->dumper, &phdr, data);
+        pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
     }
 
     if (CHECK_SUBAPI(dc, inject))
@@ -221,19 +265,19 @@ static int dump_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, cons
 static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const uint8_t *data, uint32_t data_len, int reverse)
 {
     DumpContext *dc = (DumpContext*) handle;
-    const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
 
-    if (dc->dumper)
+    if (dc->tx_dumper && msg->type == DAQ_MSG_TYPE_PACKET)
     {
-        struct pcap_pkthdr phdr;
+        const DAQ_PktHdr_t *pkthdr = (const DAQ_PktHdr_t *) msg->hdr;
+        struct pcap_pkthdr pcap_hdr;
 
         // Reuse the timestamp from the original packet for the injected packet
-        phdr.ts.tv_sec = hdr->ts.tv_sec;
-        phdr.ts.tv_usec = hdr->ts.tv_usec;
-        phdr.caplen = data_len;
-        phdr.len = data_len;
+        pcap_hdr.ts.tv_sec = pkthdr->ts.tv_sec;
+        pcap_hdr.ts.tv_usec = pkthdr->ts.tv_usec;
+        pcap_hdr.caplen = data_len;
+        pcap_hdr.len = data_len;
 
-        pcap_dump((u_char*)dc->dumper, &phdr, data);
+        pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
     }
 
     if (CHECK_SUBAPI(dc, inject_relative))
@@ -255,10 +299,16 @@ static int dump_daq_stop(void *handle)
     if (rval != DAQ_SUCCESS)
         return rval;
 
-    if (dc->dumper)
+    if (dc->tx_dumper)
     {
-        pcap_dump_close(dc->dumper);
-        dc->dumper = NULL;
+        pcap_dump_close(dc->tx_dumper);
+        dc->tx_dumper = NULL;
+    }
+
+    if (dc->rx_dumper)
+    {
+        pcap_dump_close(dc->rx_dumper);
+        dc->rx_dumper = NULL;
     }
 
     return DAQ_SUCCESS;
@@ -299,27 +349,52 @@ static uint32_t dump_daq_get_capabilities(void *handle)
     return caps;
 }
 
-static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+static unsigned dump_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
-    DumpContext *dc = (DumpContext *) handle;
+    DumpContext *dc = (DumpContext*) handle;
+    unsigned num_receive = CALL_SUBAPI(dc, msg_receive, max_recv, msgs, rstat);
 
-    dc->stats.verdicts[verdict]++;
-    if (msg->type == DAQ_MSG_TYPE_PACKET)
+    if (dc->rx_dumper)
     {
-        DAQ_PktHdr_t *hdr = (DAQ_PktHdr_t *) msg->hdr;
-        const uint8_t *data = msg->data;
-        static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
-
-        if (dc->dumper && s_fwd[verdict])
+        for (unsigned idx = 0; idx < num_receive; idx++)
         {
+            const DAQ_Msg_t *msg = msgs[idx];
+
+            if (msg->type != DAQ_MSG_TYPE_PACKET)
+                continue;
+
+            const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
+            const uint8_t *data = msg->data;
             struct pcap_pkthdr pcap_hdr;
 
             pcap_hdr.ts.tv_sec = hdr->ts.tv_sec;
             pcap_hdr.ts.tv_usec = hdr->ts.tv_usec;
             pcap_hdr.caplen = msg->data_len;
             pcap_hdr.len = hdr->pktlen;
-            pcap_dump((u_char *) dc->dumper, &pcap_hdr, data);
+            pcap_dump((u_char *) dc->rx_dumper, &pcap_hdr, data);
         }
+    }
+
+    return num_receive;
+}
+
+static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
+{
+    static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
+    DumpContext *dc = (DumpContext *) handle;
+
+    dc->stats.verdicts[verdict]++;
+    if (dc->tx_dumper && msg->type == DAQ_MSG_TYPE_PACKET && s_fwd[verdict])
+    {
+        const DAQ_PktHdr_t *hdr = (const DAQ_PktHdr_t *) msg->hdr;
+        const uint8_t *data = msg->data;
+        struct pcap_pkthdr pcap_hdr;
+
+        pcap_hdr.ts.tv_sec = hdr->ts.tv_sec;
+        pcap_hdr.ts.tv_usec = hdr->ts.tv_usec;
+        pcap_hdr.caplen = msg->data_len;
+        pcap_hdr.len = hdr->pktlen;
+        pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
     }
 
     return CALL_SUBAPI(dc, msg_finalize, msg, verdict);
@@ -358,7 +433,7 @@ DAQ_ModuleAPI_t dump_daq_module_data =
     /* .config_load = */ NULL,
     /* .config_swap = */ NULL,
     /* .config_free = */ NULL,
-    /* .msg_receive = */ NULL,
+    /* .msg_receive = */ dump_daq_msg_receive,
     /* .msg_finalize = */ dump_daq_msg_finalize,
     /* .get_msg_pool_info = */ NULL,
 };
