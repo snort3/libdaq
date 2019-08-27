@@ -74,11 +74,13 @@ typedef struct _pcap_context
     PcapMsgPool pool;
     pcap_t *handle;
     FILE *fp;
-    struct timeval last_recv;
-    PcapPktDesc *pending_desc;
     uint32_t netmask;
     bool nonblocking;
     volatile bool interrupted;
+    /* Readback timeout state */
+    struct timeval last_recv;
+    PcapPktDesc *pending_desc;
+    bool final_readback_timeout;
     /* Stats tracking */
     uint32_t base_recv;
     uint32_t base_drop;
@@ -664,7 +666,16 @@ static unsigned pcap_daq_msg_receive(void *handle, const unsigned max_recv, cons
                 /* LibPCAP brilliantly decides to return -2 if it hit EOF in readback OR pcap_breakloop()
                     was called.  Let's try to differentiate by checking to see if we asked for a break. */
                 if (!pc->interrupted && pc->mode == DAQ_MODE_READ_FILE)
-                    *rstat = DAQ_RSTAT_EOF;
+                {
+                    /* Insert a final timeout receive status when readback timeout mode is enabled. */
+                    if (pc->readback_timeout && !pc->final_readback_timeout)
+                    {
+                        pc->final_readback_timeout = true;
+                        *rstat = DAQ_RSTAT_TIMEOUT;
+                    }
+                    else
+                        *rstat = DAQ_RSTAT_EOF;
+                }
                 else
                 {
                     pc->interrupted = false;
