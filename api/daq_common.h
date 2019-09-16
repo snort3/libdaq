@@ -157,8 +157,12 @@ typedef struct _daq_napt_info
     uint8_t flags;
 } DAQ_NAPTInfo_t;
 
+/* Decoded packet information parsed from the Packet message's data.  Currently, all fields refer
+    to the first protocol of each layer encountered (no information is conveyed about encapsulated
+    duplicate protocols like IP-in-IP).  The offsets for layers not found are set to
+    DAQ_PKT_DECODE_OFFSET_INVALID. */
 typedef union {
-    uint32_t all;
+    uint16_t all;
 
     struct {
         uint32_t l2:1;              /* Parsed known L2 protocol */
@@ -168,32 +172,31 @@ typedef union {
         uint32_t l4:1;              /* Parsed known L4 protocol */
         uint32_t l4_checksum:1;     /* L4 checksum was calculated and validated. */
 
-        uint32_t vlan:1;            /* VLAN header found and parsed */
+        uint32_t vlan:1;            /* Parsed VLAN header */
         uint32_t vlan_qinq:1;       /* Stacked VLAN header (QinQ) found and parsed */
 
-        uint32_t ipv4:1;
-        uint32_t ipv6:1;
+        /* Well-known L2 protocols (found and parsed) */
+        uint32_t ethernet:1;        /* Ethernet II */
 
-        uint32_t udp:1;
-        uint32_t tcp:1;
-        uint32_t icmp:1;
-    } flags;
+        /* Well-known L3 protocols (found and parsed) */
+        uint32_t ipv4:1;            /* IPv4 */
+        uint32_t ipv6:1;            /* IPv6 */
+
+        /* Well-known L4 protocols (found and parsed) */
+        uint32_t udp:1;             /* UDP */
+        uint32_t tcp:1;             /* TCP */
+        uint32_t icmp:1;            /* ICMP */
+    } bits;
 } DAQ_PktDecodeFlags_t;
 
-#define DAQ_PKT_DECODE_OFFSET_INVALID   0x0fffffff
+#define DAQ_PKT_DECODE_OFFSET_INVALID   0xffff
 typedef struct _daq_pkt_decode_data
 {
-    uint32_t l2_offset;
-    uint16_t vlan_s_tag;
-    uint16_t vlan_c_tag;
-    uint32_t l3_offset;
-    uint32_t l3_protocol;
-    uint32_t l3_len;
-    uint32_t l4_offset;
-    uint32_t l4_protocol;
-    uint32_t l4_len;
-    uint32_t payload_offset;
     DAQ_PktDecodeFlags_t flags;
+    uint16_t l2_offset;
+    uint16_t l3_offset;
+    uint16_t l4_offset;
+    uint16_t payload_offset;
 } DAQ_PktDecodeData_t;
 
 typedef struct _daq_flow_desc
