@@ -289,9 +289,9 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
 
     DecodeData dd;
     memset(&dd, 0, sizeof(dd));
-    if (!decode_packet(fc, orig_msg->data, orig_msg->data_len, &dd))
+    if (!decode_packet(fc, orig_msg->data, orig_msg->data_len, &dd) || (!dd.ip && !dd.ip6))
     {
-        /* If we can't decode it, we're not going to bother to try classifying it. */
+        /* If we can't decode it or it's non-IP, we're not going to bother trying to classify it. */
         msgs[idx++] = orig_msg;
         return true;
     }
