@@ -320,7 +320,7 @@ static int replace_icmp_data(DAQTestPacket *dtp)
 
 static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
 {
-    const uint8_t *request = dtp->dd.packet_data;
+    const uint8_t *request = daq_msg_get_data(dtp->msg);
     uint8_t *reply;
     const EthHdr *eth_request;
     EthHdr *eth_reply;
@@ -355,7 +355,7 @@ static uint8_t *forge_etharp_reply(DAQTestPacket *dtp, const uint8_t *mac_addr)
 
 static size_t forge_icmp_reply(DAQTestPacket *dtp, uint8_t **reply_ptr)
 {
-    const uint8_t *request = dtp->dd.packet_data;
+    const uint8_t *request = daq_msg_get_data(dtp->msg);
     uint8_t *reply;
     size_t iphdr_offset;
     size_t reply_len;
@@ -465,7 +465,8 @@ static DAQ_Verdict process_ping(DAQTestPacket *dtp)
 
         case PING_ACTION_CLONE:
             printf("Injecting cloned ICMP packet.\n");
-            rc = daq_instance_inject_relative(dtp->ctxt->instance, dtp->msg, dtp->dd.packet_data, dtp->dd.packet_data_len, 0);
+            rc = daq_instance_inject_relative(dtp->ctxt->instance, dtp->msg, daq_msg_get_data(dtp->msg),
+                    daq_msg_get_data_len(dtp->msg), 0);
             if (rc == DAQ_ERROR_NOTSUP)
                 printf("This module does not support packet injection.\n");
             else if (rc != DAQ_SUCCESS)
@@ -483,7 +484,7 @@ static DAQ_Verdict process_icmp(DAQTestPacket *dtp)
     dlen = ntohs(dtp->dd.ip->tot_len) - sizeof(IpHdr) - sizeof(IcmpHdr);
     printf("  ICMP: Type %hhu  Code %hhu  Checksum %hu%s  (%u bytes of data)\n",
            dtp->dd.icmp->type, dtp->dd.icmp->code, dtp->dd.icmp->checksum,
-           dtp->dd.icmp_bad_checksums ? " (incorrect)" : "", dlen);
+           !dtp->dd.decoded_data.flags.bits.l4_checksum ? " (incorrect)" : "", dlen);
     if (dtp->dd.icmp->type == ICMP_ECHO || dtp->dd.icmp->type == ICMP_ECHOREPLY)
     {
         printf("   Echo: ID %hu  Sequence %hu\n",
@@ -501,7 +502,7 @@ static DAQ_Verdict process_icmp6(DAQTestPacket *dtp)
     dlen = ntohs(dtp->dd.ip6->ip6_plen) - sizeof(Ip6Hdr) - sizeof(Icmp6Hdr);
     printf("  ICMPv6: Type %hhu  Code %hhu  Checksum %hu%s  (%u bytes of data)\n",
            dtp->dd.icmp6->icmp6_type, dtp->dd.icmp6->icmp6_code, dtp->dd.icmp6->icmp6_cksum,
-           dtp->dd.icmp6_bad_checksums ? " (incorrect)" : "", dlen);
+           !dtp->dd.decoded_data.flags.bits.l4_checksum ? " (incorrect)" : "", dlen);
     if (dtp->dd.icmp6->icmp6_type == ICMP6_ECHO_REQUEST || dtp->dd.icmp6->icmp6_type == ICMP6_ECHO_REPLY)
     {
         printf("   Echo: ID %hu  Sequence %hu\n",
@@ -516,7 +517,7 @@ static DAQ_Verdict process_udp(DAQTestPacket *dtp)
 {
     printf("  UDP: %hu -> %hu  Checksum %hu%s  (%hu bytes of data)\n",
            ntohs(dtp->dd.udp->uh_sport), ntohs(dtp->dd.udp->uh_dport), ntohs(dtp->dd.udp->uh_sum),
-           dtp->dd.udp_bad_checksums ? " (incorrect)" : "", ntohs(dtp->dd.udp->uh_ulen));
+           !dtp->dd.decoded_data.flags.bits.l4_checksum ? " (incorrect)" : "", ntohs(dtp->dd.udp->uh_ulen));
 
     return dtp->ctxt->cfg->default_verdict;
 }
@@ -531,7 +532,7 @@ static DAQ_Verdict process_tcp(DAQTestPacket *dtp)
         dlen = ntohs(dtp->dd.ip6->ip6_plen) - (dtp->dd.tcp->th_off * 4);
     printf("  TCP: %hu -> %hu  Checksum %hu%s  (%u bytes of data)\n",
            ntohs(dtp->dd.tcp->th_sport), ntohs(dtp->dd.tcp->th_dport), ntohs(dtp->dd.tcp->th_sum),
-           dtp->dd.tcp_bad_checksums ? " (incorrect)" : "", dlen);
+           !dtp->dd.decoded_data.flags.bits.l4_checksum ? " (incorrect)" : "", dlen);
 
     return dtp->ctxt->cfg->default_verdict;
 }
@@ -628,7 +629,7 @@ static DAQ_Verdict process_ip(DAQTestPacket *dtp)
     inet_ntop(AF_INET, &addr, dst_addr_str, sizeof(dst_addr_str));
     printf(" IP: %s -> %s (%hu bytes) (checksum: %hu%s) (protocol: %hhu)\n",
             src_addr_str, dst_addr_str, ntohs(dtp->dd.ip->tot_len), dtp->dd.ip->check,
-            dtp->dd.ip_bad_checksums ? " (incorrect)" : "", dtp->dd.ip->protocol);
+            !dtp->dd.decoded_data.flags.bits.l3_checksum ? " (incorrect)" : "", dtp->dd.ip->protocol);
 
     switch (dtp->dd.ip->protocol)
     {
@@ -662,7 +663,7 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
         {
             const VlanTagHdr *vlan;
 
-            vlan = (const VlanTagHdr *) (dtp->dd.packet_data + offset);
+            vlan = (const VlanTagHdr *) (daq_msg_get_data(dtp->msg) + offset);
             ether_type = ntohs(vlan->vth_proto);
             offset += sizeof(*vlan);
             printf(" %hu/%hu", VTH_VLAN(vlan), VTH_PRIORITY(vlan));
@@ -716,9 +717,7 @@ static DAQ_Verdict process_packet(DAQTestPacket *dtp)
 
 static bool decode_packet(const uint8_t *packet, uint32_t len, DecodeData *dd)
 {
-    dd->packet_data = packet;
-    dd->packet_data_len = len;
-
+    decode_data_init(dd, packet);
     switch (dlt)
     {
         case DLT_EN10MB:
@@ -813,6 +812,44 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
         dst_port = ntohs(napti->dst_port);
 
         printf("NAPT: %s : %hu -> %s : %hu\n", src_addr_str, src_port, dst_addr_str, dst_port);
+    }
+
+    const DAQ_PktDecodeData_t *pdd = (const DAQ_PktDecodeData_t *) daq_msg_get_meta(msg, DAQ_PKT_META_DECODE_DATA);
+    if (pdd)
+    {
+        printf("Decode Data:\n");
+        printf("  Offsets: L2 = %hu, L3 = %hu, L4 = %hu, PL = %hu\n", pdd->l2_offset,
+                pdd->l3_offset, pdd->l4_offset, pdd->payload_offset);
+        printf("  Flags:");
+        if (pdd->flags.bits.l2)
+            printf(" L2");
+        if (pdd->flags.bits.l2_checksum)
+            printf(" L2_CKSUM");
+        if (pdd->flags.bits.l3)
+            printf(" L3");
+        if (pdd->flags.bits.l3_checksum)
+            printf(" L3_CKSUM");
+        if (pdd->flags.bits.l4)
+            printf(" L4");
+        if (pdd->flags.bits.l4_checksum)
+            printf(" L4_CKSUM");
+        if (pdd->flags.bits.vlan)
+            printf(" VLAN");
+        if (pdd->flags.bits.vlan_qinq)
+            printf(" VLAN_QINQ");
+        if (pdd->flags.bits.ethernet)
+            printf(" ETH");
+        if (pdd->flags.bits.ipv4)
+            printf(" IPv4");
+        if (pdd->flags.bits.ipv6)
+            printf(" IPv6");
+        if (pdd->flags.bits.udp)
+            printf(" UDP");
+        if (pdd->flags.bits.tcp)
+            printf(" TCP");
+        if (pdd->flags.bits.icmp)
+            printf(" ICMP");
+        printf("\n");
     }
 
     if (cfg->dump_packets)

@@ -55,6 +55,7 @@ struct FstMsgDesc
 {
     DAQ_Msg_t msg;
     DAQ_PktHdr_t pkthdr;
+    DAQ_PktDecodeData_t decoded;
     std::shared_ptr<FstEntry> entry;
     const DAQ_Msg_t *wrapped_msg;
 };
@@ -113,6 +114,7 @@ void FstMsgPool::put_free(FstMsgDesc *desc)
 
 static bool decode_packet(FstContext *fc, const uint8_t *packet_data, uint32_t packet_data_len, DecodeData *dd)
 {
+    decode_data_init(dd, packet_data);
     switch (fc->dlt)
     {
         case DLT_EN10MB:
@@ -241,6 +243,7 @@ static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned
         msg->hdr = &entry->flow_stats;
         msg->data_len = 0;
         msg->data = nullptr;
+        msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
         msgs[idx++] = &desc->msg;
 
         debugf("Produced EoF message for flow %u\n", entry->flow_id);
@@ -266,6 +269,7 @@ static bool process_new_soul(FstContext *fc, std::shared_ptr<FstEntry> entry, co
     msg->hdr = &entry->flow_stats;
     msg->data_len = 0;
     msg->data = nullptr;
+    msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
     msgs[idx++] = &desc->msg;
 
     debugf("Produced SoF message for flow %u\n", entry->flow_id);
@@ -288,7 +292,6 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
         return false;
 
     DecodeData dd;
-    memset(&dd, 0, sizeof(dd));
     if (!decode_packet(fc, orig_msg->data, orig_msg->data_len, &dd) || (!dd.ip && !dd.ip6))
     {
         /* If we can't decode it or it's non-IP, we're not going to bother trying to classify it. */
@@ -394,6 +397,10 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
     }
     if (!swapped != !(entry->flags & FST_ENTRY_FLAG_SWAPPED))
         pkthdr->flags |= DAQ_PKT_FLAG_REV_FLOW;
+
+    /* Finally, set up the decode data slot. */
+    desc->decoded = dd.decoded_data;
+    msg->meta[DAQ_PKT_META_DECODE_DATA] = &desc->decoded;
 
     msgs[idx++] = &desc->msg;
 

@@ -25,6 +25,7 @@
 extern "C" {
 #endif
 
+#include "daq_common.h"
 #include "netinet_compat.h"
 
 #define VTH_PRIORITY(vh)  ((unsigned short)((ntohs((vh)->vth_pri_cfi_vlan) & 0xe000) >> 13))
@@ -38,8 +39,8 @@ typedef struct
 
 typedef struct
 {
+    DAQ_PktDecodeData_t decoded_data;
     const uint8_t *packet_data;
-    uint32_t packet_data_len;
     const EthHdr *eth;
     const VlanTagHdr *vlan;
     const EthArpHdr *arp;
@@ -50,11 +51,6 @@ typedef struct
     const TcpHdr *tcp;
     const UdpHdr *udp;
     uint16_t vlan_tags;
-    uint8_t ip_bad_checksums;
-    uint8_t icmp_bad_checksums;
-    uint8_t icmp6_bad_checksums;
-    uint8_t tcp_bad_checksums;
-    uint8_t udp_bad_checksums;
     bool ignore_checksums;
 } DecodeData;
 
@@ -147,6 +143,8 @@ static inline uint16_t in_cksum_v6(const Ip6Hdr *ip6, const uint16_t *data, uint
 
 static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+
     if (len < sizeof(IcmpHdr))
         return false;
     const IcmpHdr *icmp = (const IcmpHdr *) cursor;
@@ -156,15 +154,24 @@ static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *
     {
         if (!dd->ignore_checksums)
             return false;
-        dd->icmp_bad_checksums++;
     }
+    else
+        dd->decoded_data.flags.bits.l4_checksum = true;
 
     dd->icmp = icmp;
+    dd->decoded_data.flags.bits.l4 = true;
+    dd->decoded_data.flags.bits.icmp = true;
+
+    cursor += sizeof(*icmp);
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
     return true;
 }
 
 static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+
     if (len < sizeof(Icmp6Hdr))
         return false;
     const Icmp6Hdr *icmp6 = (const Icmp6Hdr *) cursor;
@@ -173,15 +180,24 @@ static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData 
     {
         if (!dd->ignore_checksums)
             return false;
-        dd->icmp6_bad_checksums++;
     }
+    else
+        dd->decoded_data.flags.bits.l4_checksum = true;
 
     dd->icmp6 = icmp6;
+    dd->decoded_data.flags.bits.l4 = true;
+    dd->decoded_data.flags.bits.icmp = true;
+
+    cursor += sizeof(*icmp6);
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
     return true;
 }
 
 static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+
     if (len < sizeof(TcpHdr))
         return false;
     const TcpHdr *tcp = (const TcpHdr *) cursor;
@@ -195,8 +211,9 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
         {
             if (!dd->ignore_checksums)
                 return false;
-            dd->tcp_bad_checksums++;
         }
+        else
+            dd->decoded_data.flags.bits.l4_checksum = true;
     }
     else
     {
@@ -204,16 +221,25 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
         {
             if (!dd->ignore_checksums)
                 return false;
-            dd->tcp_bad_checksums++;
         }
+        else
+            dd->decoded_data.flags.bits.l4_checksum = true;
     }
 
     dd->tcp = tcp;
+    dd->decoded_data.flags.bits.l4 = true;
+    dd->decoded_data.flags.bits.tcp = true;
+
+    cursor += hlen;
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
     return true;
 }
 
 static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+
     if (len < sizeof(UdpHdr))
         return false;
     const UdpHdr *udp = (const UdpHdr *) cursor;
@@ -227,8 +253,9 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
         {
             if (!dd->ignore_checksums)
                 return false;
-            dd->udp_bad_checksums++;
         }
+        else
+            dd->decoded_data.flags.bits.l4_checksum = true;
     }
     else
     {
@@ -236,16 +263,25 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
         {
             if (!dd->ignore_checksums)
                 return false;
-            dd->udp_bad_checksums++;
         }
+        else
+            dd->decoded_data.flags.bits.l4_checksum = true;
     }
 
     dd->udp = udp;
+    dd->decoded_data.flags.bits.l4 = true;
+    dd->decoded_data.flags.bits.udp = true;
+
+    cursor += sizeof(*udp);
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
     return true;
 }
 
 static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l3_offset = cursor - dd->packet_data;
+
     if (len < sizeof(Ip6Hdr))
         return false;
 
@@ -258,9 +294,11 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
     if (offset + plen != len)
         return false;
 
-    uint8_t next_hdr = ip6->ip6_nxt;
     dd->ip6 = ip6;
+    dd->decoded_data.flags.bits.l3 = true;
+    dd->decoded_data.flags.bits.ipv6 = true;
 
+    uint8_t next_hdr = ip6->ip6_nxt;
     while (offset < len)
     {
         switch (next_hdr)
@@ -295,11 +333,16 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
         }
     }
 
+    cursor += offset;
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
     return true;
 }
 
 static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l3_offset = cursor - dd->packet_data;
+
     if (len < sizeof(IpHdr))
         return false;
 
@@ -322,12 +365,15 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
     {
         if (!dd->ignore_checksums)
             return false;
-        dd->ip_bad_checksums++;
     }
+    else
+        dd->decoded_data.flags.bits.l3_checksum = true;
+
+    dd->ip = ip;
+    dd->decoded_data.flags.bits.l3 = true;
+    dd->decoded_data.flags.bits.ipv4 = true;
 
     uint16_t offset = hlen;
-    dd->ip = ip;
-
     switch (dd->ip->protocol)
     {
         case IPPROTO_TCP:
@@ -337,6 +383,9 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
         case IPPROTO_ICMP:
             return decode_icmp(cursor + offset, len - offset, dd);
     }
+
+    cursor += offset;
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     return true;
 }
@@ -351,6 +400,8 @@ static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *d
 
 static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.l2_offset = cursor - dd->packet_data;
+
     if (len < sizeof(EthHdr))
         return false;
 
@@ -359,6 +410,9 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     uint16_t offset = sizeof(*eth);
 
     dd->eth = eth;
+    dd->decoded_data.flags.bits.l2 = true;
+    dd->decoded_data.flags.bits.ethernet = true;
+
     while (ether_type == ETHERTYPE_VLAN)
     {
         if (offset + sizeof(VlanTagHdr) > len)
@@ -368,7 +422,10 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
         offset += sizeof(*vlan);
         /* Keep track of the innermost VLAN tag and a count of the total */
         dd->vlan = vlan;
+        dd->decoded_data.flags.bits.vlan = true;
         dd->vlan_tags++;
+        if (dd->vlan_tags > 1)
+            dd->decoded_data.flags.bits.vlan_qinq = true;
     }
     switch (ether_type)
     {
@@ -379,7 +436,11 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
         case ETHERTYPE_IPV6:
             return decode_ip6(cursor + offset, len - offset, dd);
     }
-    return false;
+
+    cursor += offset;
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+
+    return true;
 }
 
 static inline bool decode_raw(const uint8_t *cursor, uint32_t len, DecodeData *dd)
@@ -392,6 +453,16 @@ static inline bool decode_raw(const uint8_t *cursor, uint32_t len, DecodeData *d
     if (ipver == 6)
         return decode_ip6(cursor, len, dd);
     return false;
+}
+
+static inline void decode_data_init(DecodeData *dd, const uint8_t *packet_data)
+{
+    memset(dd, 0, sizeof(*dd));
+    dd->packet_data = packet_data;
+    dd->decoded_data.l2_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
+    dd->decoded_data.l3_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
+    dd->decoded_data.l4_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
+    dd->decoded_data.payload_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
 }
 
 #ifdef __cplusplus
