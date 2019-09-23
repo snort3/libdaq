@@ -765,8 +765,6 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     if (hdr->flags)
     {
         printf("Flags (0x%X): ", hdr->flags);
-        if (hdr->flags & DAQ_PKT_FLAG_HW_TCP_CS_GOOD)
-            printf("HW_TCP_CS_GOOD ");
         if (hdr->flags & DAQ_PKT_FLAG_OPAQUE_IS_VALID)
             printf("OPAQUE_IS_VALID ");
         if (hdr->flags & DAQ_PKT_FLAG_NOT_FORWARDING)
