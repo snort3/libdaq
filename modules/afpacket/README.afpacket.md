@@ -41,7 +41,7 @@ in inline mode as it will then forward only the truncated portion of the packet
 that is available to it.  To disable LRO (Large Receive Offload) and GRO
 (Generic Receive Offload), use ethtool like this:
 
-    ethtool -K eth0 gro off gso off
+    ethtool -K eth0 lro off gro off
 
 Ring Buffer Memory
 ------------------
