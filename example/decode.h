@@ -295,7 +295,7 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
         }
     }
 
-    return false;
+    return true;
 }
 
 static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd)
@@ -338,7 +338,7 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
             return decode_icmp(cursor + offset, len - offset, dd);
     }
 
-    return false;
+    return true;
 }
 
 static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
