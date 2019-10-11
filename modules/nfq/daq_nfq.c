@@ -698,6 +698,14 @@ static unsigned nfq_daq_msg_receive(void *handle, const unsigned max_recv, const
     *rstat = DAQ_RSTAT_OK;
     while (idx < max_recv)
     {
+        /* If the receive has been canceled, break out of the loop and return. */
+        if (nfqc->interrupted)
+        {
+            nfqc->interrupted = false;
+            *rstat = DAQ_RSTAT_INTERRUPTED;
+            break;
+        }
+
         /* Make sure that we have a packet descriptor available to populate. */
         NfqPktDesc *desc = nfqc->pool.freelist;
         if (!desc)
