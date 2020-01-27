@@ -185,7 +185,6 @@ AM_COND_IF([BUILD_DUMP_MODULE], [AC_CONFIG_FILES([modules/dump/libdaq_static_dum
 AC_ARG_ENABLE(fst-module,
               AS_HELP_STRING([--disable-fst-module],[do not build the bundled FST module]),
               [enable_fst_module="$enableval"], [enable_fst_module="$DEFAULT_ENABLE"])
-AM_CONDITIONAL([BUILD_FST_MODULE], [test "$enable_fst_module" = yes])
 if test "$enable_fst_module" = yes; then
     if test "$HAVE_CXX11" = 1 ; then
         DAQ_FST_LIBS="-lstdc++"
@@ -200,6 +199,7 @@ if test "$enable_fst_module" = yes; then
         enable_fst_module=no
     fi
 fi
+AM_CONDITIONAL([BUILD_FST_MODULE], [test "$enable_fst_module" = yes])
 AM_COND_IF([BUILD_FST_MODULE], [AC_CONFIG_FILES([modules/fst/libdaq_static_fst.pc])])
 
 # Netmap Module
