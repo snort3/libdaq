@@ -373,6 +373,8 @@ typedef enum
     DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN,
     DIOCTL_GET_FLOW_TCP_SCRUBBED_SYN_ACK,
     DIOCTL_CREATE_EXPECTED_FLOW,
+    DIOCTL_DIRECT_INJECT_PAYLOAD,
+    DIOCTL_DIRECT_INJECT_RESET,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
@@ -536,6 +538,39 @@ typedef struct _DAQ_EFlow_Setup_t
     uint8_t* data;      /* [Future] opaque data blob to return with the expected flow */
     unsigned length;    /* [Future] length of the opaque data blob */
 } DIOCTL_CreateExpectedFlow;
+
+/*
+ * Command: DIOCTL_DIRECT_INJECT_PAYLOAD
+ * Description: Directly inject L5 payload data on a flow relative to the reference message.  The module
+ *              should handle any packetizing necessary to get the data onto the wire.
+ * Argument: DIOCTL_DirectInjectPayload
+ */
+typedef struct
+{
+    const uint8_t *data;
+    uint32_t length;
+} DAQ_DIPayloadSegment;
+
+typedef struct
+{
+    DAQ_Msg_h msg;                          // [in] Message belonging to the flow to be injected on
+    const DAQ_DIPayloadSegment **segments;  // [in] Array of data segments to be injected
+    uint8_t num_segments;                   // [in] Number of elements in the data segment array
+    uint8_t reverse;                        // [in] If non-zero, inject the data in the opposite direction
+                                            //      relative to the message
+} DIOCTL_DirectInjectPayload;
+
+/*
+ * Command: DIOCTL_DIRECT_INJECT_RESET
+ * Description: Directly inject an L4 reset on a flow relative to the reference message.  The module
+ *              should handle any packet generation necessary to get the reset onto the wire.
+ * Argument: DIOCTL_DirectInjectReset
+ */
+typedef struct
+{
+    DAQ_Msg_h msg;      // [in] Message belonging to the flow to be injected on
+    uint8_t reverse;    // [in] If non-zero, inject the reset in the opposite direction relative to the message
+} DIOCTL_DirectInjectReset;
 
 #ifdef __cplusplus
 }
