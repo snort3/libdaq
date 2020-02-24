@@ -393,6 +393,32 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
                     key->vlan_id, key->vlan_cnots, cef->flags, cef->timeout_ms);
             break;
         }
+        case DIOCTL_DIRECT_INJECT_PAYLOAD:
+        {
+            if (arglen != sizeof(DIOCTL_DirectInjectPayload))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_DirectInjectPayload *dip = (DIOCTL_DirectInjectPayload *) arg;
+            fprintf(tc->outfile, "IOCTL: DirectInjectPayload: ");
+            print_msg(tc, dip->msg);
+            fprintf(tc->outfile, " (%hhu segments)%s\n", dip->num_segments, dip->reverse ? " (reverse)" : "");
+            for (int i = 0; i < dip->num_segments; i++)
+            {
+                const DAQ_DIPayloadSegment *segment = dip->segments[i];
+                fprintf(tc->outfile, "  Segment %d (%u)\n", i, segment->length);
+                hexdump(tc->outfile, segment->data, segment->length, "    ");
+            }
+            break;
+        }
+        case DIOCTL_DIRECT_INJECT_RESET:
+        {
+            if (arglen != sizeof(DIOCTL_DirectInjectReset))
+                return DAQ_ERROR_INVAL;
+            DIOCTL_DirectInjectReset *dir = (DIOCTL_DirectInjectReset *) arg;
+            fprintf(tc->outfile, "IOCTL: DirectInjectReset: ");
+            print_msg(tc, dir->msg);
+            fprintf(tc->outfile, "%s\n", dir->reverse ? " (reverse)" : "");
+            break;
+        }
 
         default:
             fprintf(tc->outfile, "IOCTL: %d (%zu)\n", cmd, arglen);
