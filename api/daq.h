@@ -26,6 +26,10 @@
 extern "C" {
 #endif
 
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#include <sys/socket.h>     // Needed for AF_INET*
+#endif
+
 #include <daq_common.h>
 
 /* Library version information functions. */
