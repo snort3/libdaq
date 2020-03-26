@@ -416,7 +416,11 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
             DIOCTL_DirectInjectReset *dir = (DIOCTL_DirectInjectReset *) arg;
             fprintf(tc->outfile, "IOCTL: DirectInjectReset: ");
             print_msg(tc, dir->msg);
-            fprintf(tc->outfile, "%s\n", dir->reverse ? " (reverse)" : "");
+            if (dir->direction == DAQ_DIR_BOTH)
+                fprintf(tc->outfile, " (both)");
+            else if (dir->direction == DAQ_DIR_REVERSE)
+                fprintf(tc->outfile, " (reverse)");
+            fprintf(tc->outfile, "\n");
             break;
         }
 

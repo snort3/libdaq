@@ -567,10 +567,13 @@ typedef struct
  *              should handle any packet generation necessary to get the reset onto the wire.
  * Argument: DIOCTL_DirectInjectReset
  */
+#define DAQ_DIR_FORWARD 0   // Forward injection
+#define DAQ_DIR_REVERSE 1   // Reverse injection
+#define DAQ_DIR_BOTH    2   // Both forward and reverse injection
 typedef struct
 {
     DAQ_Msg_h msg;      // [in] Message belonging to the flow to be injected on
-    uint8_t reverse;    // [in] If non-zero, inject the reset in the opposite direction relative to the message
+    uint8_t direction;  // [in] Direction in which to inject the reset relative to the message (DAQ_DIR_*)
 } DIOCTL_DirectInjectReset;
 
 #ifdef __cplusplus
