@@ -429,7 +429,7 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
                 FstMsgDesc *desc = static_cast<FstMsgDesc*>(sfo->msg->priv);
                 std::shared_ptr<FstEntry> entry = desc->entry;
                 entry->flow_stats.opaque = sfo->value;
-                entry->flags |= DAQ_PKT_FLAG_OPAQUE_IS_VALID;
+                entry->flags |= FST_ENTRY_FLAG_OPAQUE_SET;
                 rval = DAQ_SUCCESS;
             }
             break;
