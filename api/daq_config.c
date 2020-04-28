@@ -59,6 +59,8 @@ typedef struct _daq_config
     uint32_t msg_pool_size;         /* Size of the message pool to create (quantity) */
     int snaplen;                    /* Maximum packet capture length */
     unsigned timeout;               /* Read timeout for acquire loop in milliseconds (0 = unlimited) */
+    unsigned total_instances;       /* Total number of concurrent DAQ instances expected (0 = unspecified) */
+    unsigned instance_id;           /* ID for the instance to be created (0 = unspecified) */
     DAQ_ModuleConfig_t *module_configs;
     DAQ_ModuleConfig_t *iterator;
 } DAQ_Config_t;
@@ -449,6 +451,42 @@ DAQ_LINKAGE unsigned daq_config_get_timeout(DAQ_Config_t *cfg)
 {
     if (cfg)
         return cfg->timeout;
+
+    return 0;
+}
+
+DAQ_LINKAGE int daq_config_set_total_instances(DAQ_Config_h cfg, unsigned total)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    cfg->total_instances = total;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE unsigned daq_config_get_total_instances(DAQ_Config_h cfg)
+{
+    if (cfg)
+        return cfg->total_instances;
+
+    return 0;
+}
+
+DAQ_LINKAGE int daq_config_set_instance_id(DAQ_Config_h cfg, unsigned id)
+{
+    if (!cfg)
+        return DAQ_ERROR_INVAL;
+
+    cfg->instance_id = id;
+
+    return DAQ_SUCCESS;
+}
+
+DAQ_LINKAGE unsigned daq_config_get_instance_id(DAQ_Config_h cfg)
+{
+    if (cfg)
+        return cfg->instance_id;
 
     return 0;
 }

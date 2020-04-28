@@ -178,6 +178,15 @@ DAQ_LINKAGE int daq_instance_instantiate(const DAQ_Config_h config, DAQ_Instance
         return DAQ_ERROR_INVAL;
     }
 
+    /* Sanity check to make sure that the instance ID configuration is valid. */
+    unsigned total_instances = daq_config_get_total_instances(config);
+    unsigned instance_id = daq_config_get_instance_id(config);
+    if (total_instances && instance_id > total_instances)
+    {
+        snprintf(errbuf, len, "Can't instantiate with an invalid instance ID!");
+        return DAQ_ERROR_INVAL;
+    }
+
     DAQ_ModuleConfig_h modcfg = daq_config_bottom_module_config(config);
     if (!modcfg)
     {

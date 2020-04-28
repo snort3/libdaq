@@ -70,7 +70,7 @@ typedef struct _daq_instance_api {
 } DAQ_InstanceAPI_t;
 
 
-#define DAQ_BASE_API_VERSION    0x00030001
+#define DAQ_BASE_API_VERSION    0x00030002
 
 typedef struct _daq_base_api
 {
@@ -82,6 +82,8 @@ typedef struct _daq_base_api
     int (*config_get_snaplen) (DAQ_ModuleConfig_h modcfg);
     unsigned (*config_get_timeout) (DAQ_ModuleConfig_h modcfg);
     unsigned (*config_get_msg_pool_size) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*config_get_total_instances) (DAQ_ModuleConfig_h modcfg);
+    unsigned (*config_get_instance_id) (DAQ_ModuleConfig_h modcfg);
     DAQ_Mode (*config_get_mode) (DAQ_ModuleConfig_h modcfg);
     const char *(*config_get_variable) (DAQ_ModuleConfig_h modcfg, const char *key);
     int (*config_first_variable) (DAQ_ModuleConfig_h modcfg, const char **key, const char **value);

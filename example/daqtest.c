@@ -98,6 +98,7 @@ typedef struct _DAQTestConfig
     bool performance_mode;
     bool dump_packets;
     bool ignore_checksum_errors;
+    bool explicit_thread_count;
 } DAQTestConfig;
 
 typedef struct _DAQTestThreadContext
@@ -1301,6 +1302,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                     fprintf(stderr, "Invalid thread count specified: %s\n\n", optarg);
                     return -1;
                 }
+                cfg->explicit_thread_count = true;
                 break;
 
             default:
@@ -1521,6 +1523,8 @@ static int create_daq_config(DAQTestConfig *cfg, DAQ_Config_h *daqcfg_ptr)
     daq_config_set_input(daqcfg, cfg->input);
     daq_config_set_snaplen(daqcfg, cfg->snaplen);
     daq_config_set_timeout(daqcfg, cfg->timeout);
+    if (cfg->explicit_thread_count)
+        daq_config_set_total_instances(daqcfg, cfg->thread_count);
 
     for (dtmc = cfg->module_configs; dtmc; dtmc = dtmc->next)
     {
@@ -1629,6 +1633,9 @@ int main(int argc, char *argv[])
     {
         DAQTestThreadContext *dttc = &threads[i];
         char errbuf[256];
+
+        if (cfg.explicit_thread_count)
+            daq_config_set_instance_id(daqcfg, i + 1);
 
         if ((rval = daq_instance_instantiate(daqcfg, &dttc->instance, errbuf, sizeof(errbuf))) != 0)
         {

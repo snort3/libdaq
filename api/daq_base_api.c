@@ -51,6 +51,18 @@ static unsigned base_api_config_get_timeout(DAQ_ModuleConfig_h modcfg)
     return daq_config_get_timeout(cfg);
 }
 
+static unsigned base_api_config_get_total_instances(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_total_instances(cfg);
+}
+
+static unsigned base_api_config_get_instance_id(DAQ_ModuleConfig_h modcfg)
+{
+    DAQ_Config_h cfg = daq_module_config_get_config(modcfg);
+    return daq_config_get_instance_id(cfg);
+}
+
 static void base_api_set_errbuf(DAQ_ModuleInstance_h modinst, const char *format, ...)
 {
     DAQ_Instance_h instance = daq_modinst_get_instance(modinst);
@@ -68,6 +80,8 @@ void populate_base_api(DAQ_BaseAPI_t *base_api)
     base_api->config_get_snaplen = base_api_config_get_snaplen;
     base_api->config_get_timeout = base_api_config_get_timeout;
     base_api->config_get_msg_pool_size = base_api_config_get_msg_pool_size;
+    base_api->config_get_total_instances = base_api_config_get_total_instances;
+    base_api->config_get_instance_id = base_api_config_get_instance_id;
     base_api->config_get_mode = daq_module_config_get_mode;
     base_api->config_get_variable = daq_module_config_get_variable;
     base_api->config_first_variable = daq_module_config_first_variable;
