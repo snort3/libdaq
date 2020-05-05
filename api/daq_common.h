@@ -105,24 +105,25 @@ typedef struct _daq_msg
 } DAQ_Msg_t;
 
 /* The DAQ packet header structure. */
-#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x0001  /* The DAQ module actively set the opaque value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_NOT_FORWARDING     0x0002  /* The DAQ module will not be actively forwarding this packet
+#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00001  /* The DAQ module actively set the opaque value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_NOT_FORWARDING     0x00002  /* The DAQ module will not be actively forwarding this packet
                                                     regardless of the verdict (e.g, Passive or Inline Tap interfaces). */
-#define DAQ_PKT_FLAG_PRE_ROUTING        0x0004  /* The packet is being routed via us but packet modifications
+#define DAQ_PKT_FLAG_PRE_ROUTING        0x00004  /* The packet is being routed via us but packet modifications
                                                     (MAC and TTL) have not yet been made. */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x0008  /* Ignore vlan tags in the packet */
-#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x0010  /* The DAQ module actively set the flow ID value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x0020  /* The packet is destined for local delivery */
-#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x0040  /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x0080  /* Scrubbed tcp options may be available */
-#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x0100  /* HA State is availble for the flow this packet is associated with. */
-#define DAQ_PKT_FLAG_ERROR_PACKET       0x0200  /* Lower level reports that the packet has errors. */
-#define DAQ_PKT_FLAG_RETRY_PACKET       0x0400  /* Packet is from the retry queue. */
-#define DAQ_PKT_FLAG_TRACE_ENABLED      0x0800  /* The packet has been flagged for tracing by the lower layer. */
-#define DAQ_PKT_FLAG_SIMULATED          0x1000  /* Packet is simulated/virtual */
-#define DAQ_PKT_FLAG_NEW_FLOW           0x2000  /* The packet was the first of a new flow. */
-#define DAQ_PKT_FLAG_REV_FLOW           0x4000  /* The packet is going the reverse direction of the flow initiator.*/
-#define DAQ_PKT_FLAG_DEBUG_ENABLED      0x8000  /* The packet has been flagged for debugging by the lower layer. */
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00008  /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x00010  /* The DAQ module actively set the flow ID value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x00020  /* The packet is destined for local delivery */
+#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x00040  /* The packet was originated locally */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x00080  /* Scrubbed tcp options may be available */
+#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x00100  /* HA State is availble for the flow this packet is associated with. */
+#define DAQ_PKT_FLAG_ERROR_PACKET       0x00200  /* Lower level reports that the packet has errors. */
+#define DAQ_PKT_FLAG_RETRY_PACKET       0x00400  /* Packet is from the retry queue. */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x00800  /* The packet has been flagged for tracing by the lower layer. */
+#define DAQ_PKT_FLAG_SIMULATED          0x01000  /* Packet is simulated/virtual */
+#define DAQ_PKT_FLAG_NEW_FLOW           0x02000  /* The packet was the first of a new flow. */
+#define DAQ_PKT_FLAG_REV_FLOW           0x04000  /* The packet is going the reverse direction of the flow initiator.*/
+#define DAQ_PKT_FLAG_DEBUG_ENABLED      0x08000  /* The packet has been flagged for debugging by the lower layer. */
+#define DAQ_PKT_FLAG_SIGNIFICANT_GROUPS 0x10000  /* Interface groups should be used for flow classification. */
 
 #define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
 #define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
@@ -251,6 +252,8 @@ typedef struct _daq_ha_state_data
     void *data;
 } DAQ_HA_State_Data_t;
 
+#define DAQ_FS_FLAG_SIGNIFICANT_GROUPS 0x1
+
 /* Flow statistics structure used for DAQ_MSG_TYPE_SOF and DAQ_MSG_TYPE_EOF. */
 typedef struct _flow_stats
 {
@@ -279,6 +282,7 @@ typedef struct _flow_stats
     uint16_t vlan_tag;
     uint16_t address_space_id;
     uint8_t protocol;
+    uint8_t flags;
 } Flow_Stats_t;
 
 /* Packet verdicts passed to daq_msg_finalize(). */

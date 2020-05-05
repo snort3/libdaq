@@ -798,6 +798,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("REV_FLOW ");
         if (hdr->flags & DAQ_PKT_FLAG_DEBUG_ENABLED)
             printf("DEBUG_ENABLED ");
+        if (hdr->flags & DAQ_PKT_FLAG_SIGNIFICANT_GROUPS)
+            printf("SIGNIFICANT_GROUPS ");
         printf("\n");
     }
 
@@ -915,6 +917,13 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
         printf("  VLAN: %hu\n", stats->vlan_tag);
     if (stats->opaque != 0)
         printf("  Opaque: %u\n", stats->opaque);
+    if (stats->flags)
+    {
+        printf("  Flags (0x%X): ", stats->flags);
+        if (stats->flags & DAQ_FS_FLAG_SIGNIFICANT_GROUPS)
+            printf("SIGNIFICANT_GROUPS ");
+        printf("\n");
+    }
     printf("  Initiator:\n");
     tmpIp = (const struct in6_addr*)stats->initiatorIp;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
