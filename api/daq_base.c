@@ -151,22 +151,26 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
     for (node = module_list; node; node = node->next)
     {
         if (!strcmp(node->module->name, dm->name))
+        {
+            if (node->module->module_version >= dm->module_version)
+            {
+                DEBUG("DAQ module with name '%s' was already loaded with version %u (versus %u)!\n",
+                        node->module->name, node->module->module_version, dm->module_version);
+                return DAQ_ERROR_EXISTS;
+            }
             break;
+        }
     }
 
-    /* If so, and this version is newer, use it instead.  Otherwise, create a new node. */
-    if (node)
+    /* Okay, we want to use this new module.  Try preparing it for future use first. */
+    populate_base_api(&base_api);
+    if ((rval = dm->load(&base_api)) != DAQ_SUCCESS)
     {
-        if (node->module->module_version >= dm->module_version)
-        {
-            DEBUG("DAQ module with name '%s' was already loaded with version %u (versus %u)!\n",
-                    node->module->name, node->module->module_version, dm->module_version);
-            return DAQ_ERROR_EXISTS;
-        }
-        if (node->dl_handle)
-            dlclose(node->dl_handle);
+        fprintf(stderr, "%s: Error preparing module for use! (%d)\n", dm->name, rval);
+        return rval;
     }
-    else
+
+    if (!node)
     {
         node = calloc(1, sizeof(DAQ_ListNode_t));
         if (!node)
@@ -175,13 +179,13 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
         module_list = node;
         num_modules++;
     }
-
-    /* Prepare the DAQ module for future use. */
-    populate_base_api(&base_api);
-    if ((rval = dm->load(&base_api)) != DAQ_SUCCESS)
+    else
     {
-        fprintf(stderr, "%s: Error preparing module for use! (%d)\n", dm->name, rval);
-        return rval;
+        /* Unload the older version of the module. */
+        if (node->module->unload)
+            node->module->unload();
+        if (node->dl_handle)
+            dlclose(node->dl_handle);
     }
 
     DEBUG("Registered daq module: %s\n", dm->name);
