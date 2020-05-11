@@ -14,3 +14,9 @@ some indentifying information from the packet message header.
 By default, the output file will be named 'inline-out.txt' in the current
 directory.  The default filename can be overridden with the 'file' variable. A
 useful technique for debugging is to set the 'file' variable to /dev/stdout.
+
+When running with multiple instances, the output filename will be mangled to
+start with the instance ID followed by an underscore.  For example, the default
+output filename would be '2_inline-out.txt' for the second instance.  The output
+filename must be bare (no directory structure, relative nor absolute) in such a
+configuration.

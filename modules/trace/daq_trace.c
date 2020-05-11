@@ -107,10 +107,16 @@ static int trace_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_tabl
 
 static int trace_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
-    TraceContext *tc;
-    const char *varKey, *varValue;
+    // Simple multi-instance sanity check
+    unsigned total_instances = daq_base_api.config_get_total_instances(modcfg);
+    unsigned instance_id = daq_base_api.config_get_instance_id(modcfg);
+    if (total_instances > 1 && instance_id == 0)
+    {
+        SET_ERROR(modinst, "%s: Instance ID required for multi-instance (%u instances expected)", __func__, total_instances);
+        return DAQ_ERROR_INVAL;
+    }
 
-    tc = calloc(1, sizeof(TraceContext));
+    TraceContext *tc = calloc(1, sizeof(TraceContext));
     if (!tc)
     {
         SET_ERROR(modinst, "%s: Couldn't allocate memory for the DAQ context", __func__);
@@ -125,21 +131,42 @@ static int trace_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInst
         return DAQ_ERROR_INVAL;
     }
 
+    const char *filename = DAQ_TRACE_FILENAME;
+    const char *varKey, *varValue;
     daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "file"))
-        {
-            tc->filename = strdup(varValue);
-            if (!tc->filename)
-            {
-                SET_ERROR(modinst, "%s: Couldn't allocate memory for the text output filename", __func__);
-                free(tc);
-                return DAQ_ERROR_NOMEM;
-            }
-        }
+            filename = varValue;
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
+
+    // Mangle the output filename with a prefix in the multi-instance scenario
+    char prefix[32];
+    if (instance_id > 0)
+    {
+        // For now, only support mangling base filenames (no directory path allowed)
+        if (strchr(filename, '/'))
+        {
+            SET_ERROR(modinst, "%s: Invalid filename for multi-instance: %s", __func__, filename);
+            free(tc);
+            return DAQ_ERROR_INVAL;
+        }
+
+        snprintf(prefix, sizeof(prefix), "%u_", instance_id);
+    }
+    else
+        prefix[0] = '\0';
+
+    size_t len = strlen(filename) + strlen(prefix) + 1;
+    tc->filename = malloc(len);
+    if (!tc->filename)
+    {
+        SET_ERROR(modinst, "%s: Couldn't allocate memory for the text output filename", __func__);
+        free(tc);
+        return DAQ_ERROR_NOMEM;
+    }
+    snprintf(tc->filename, len, "%s%s", prefix, filename);
 
     *ctxt_ptr = tc;
 
@@ -152,8 +179,7 @@ static void trace_daq_destroy(void *handle)
 
     if (tc->outfile)
         fclose(tc->outfile);
-    if (tc->filename)
-        free(tc->filename);
+    free(tc->filename);
     free(tc);
 }
 
