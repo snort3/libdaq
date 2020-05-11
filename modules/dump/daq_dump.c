@@ -53,11 +53,9 @@ typedef struct
 
     pcap_dumper_t *tx_dumper;
     char *tx_filename;
-    bool dump_tx;
 
     pcap_dumper_t *rx_dumper;
     char *rx_filename;
-    bool dump_rx;
 
     DAQ_Stats_t stats;
 } DumpContext;
@@ -97,18 +95,22 @@ static int dump_daq_get_variable_descs(const DAQ_VariableDesc_t **var_desc_table
 
 static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstance_h modinst, void **ctxt_ptr)
 {
-    DumpContext *dc;
-    const char *varKey, *varValue;
+    // Simple multi-instance sanity check
+    unsigned total_instances = daq_base_api.config_get_total_instances(modcfg);
+    unsigned instance_id = daq_base_api.config_get_instance_id(modcfg);
+    if (total_instances > 1 && instance_id == 0)
+    {
+        SET_ERROR(modinst, "%s: Instance ID required for multi-instance (%u instances expected)", __func__, total_instances);
+        return DAQ_ERROR_INVAL;
+    }
 
-    dc = calloc(1, sizeof(DumpContext));
+    DumpContext *dc = calloc(1, sizeof(DumpContext));
     if (!dc)
     {
         SET_ERROR(modinst, "%s: Couldn't allocate memory for the DAQ context", __func__);
         return DAQ_ERROR_NOMEM;
     }
     dc->modinst = modinst;
-    dc->dump_tx = true;
-    dc->dump_rx = false;
 
     if (daq_base_api.resolve_subapi(modinst, &dc->subapi) != DAQ_SUCCESS)
     {
@@ -117,23 +119,20 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
         return DAQ_ERROR_INVAL;
     }
 
+    const char *tx_filename = DEFAULT_TX_DUMP_FILE;
+    const char *rx_filename = NULL;
+    const char *varKey, *varValue;
     daq_base_api.config_first_variable(modcfg, &varKey, &varValue);
     while (varKey)
     {
         if (!strcmp(varKey, "file"))
-        {
-            dc->tx_filename = strdup(varValue);
-            if (!dc->tx_filename)
-            {
-                SET_ERROR(modinst, "%s: Couldn't allocate memory for the TX PCAP filename", __func__);
-                free(dc);
-                return DAQ_ERROR_NOMEM;
-            }
-        }
+            tx_filename = varValue;
+        else if (!strcmp(varKey, "dump-rx"))
+            rx_filename = varValue ? varValue : DEFAULT_RX_DUMP_FILE;
         else if (!strcmp(varKey, "output"))
         {
             if (!strcmp(varValue, "none"))
-                dc->dump_tx = false;
+                tx_filename = NULL;
             else
             {
                 SET_ERROR(modinst, "%s: Invalid output type (%s)", __func__, varValue);
@@ -141,21 +140,58 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
                 return DAQ_ERROR_INVAL;
             }
         }
-        else if (!strcmp(varKey, "dump-rx"))
-        {
-            dc->dump_rx = true;
-            if (varValue)
-            {
-                dc->rx_filename = strdup(varValue);
-                if (!dc->rx_filename)
-                {
-                    SET_ERROR(modinst, "%s: Couldn't allocate memory for the RX PCAP filename", __func__);
-                    free(dc);
-                    return DAQ_ERROR_NOMEM;
-                }
-            }
-        }
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
+    }
+
+    // Mangle the output filenames with a prefix in the multi-instance scenario
+    char prefix[32];
+    if (instance_id > 0)
+    {
+        // For now, only support mangling base filenames (no directory path allowed)
+        if (tx_filename && strchr(tx_filename, '/'))
+        {
+            SET_ERROR(modinst, "%s: Invalid TX PCAP filename for multi-instance: %s", __func__, tx_filename);
+            free(dc);
+            return DAQ_ERROR_INVAL;
+        }
+
+        if (rx_filename && strchr(rx_filename, '/'))
+        {
+            SET_ERROR(modinst, "%s: Invalid RX PCAP filename for multi-instance: %s", __func__, rx_filename);
+            free(dc);
+            return DAQ_ERROR_INVAL;
+        }
+
+        snprintf(prefix, sizeof(prefix), "%u_", instance_id);
+    }
+    else
+        prefix[0] = '\0';
+
+    if (tx_filename)
+    {
+        size_t len = strlen(tx_filename) + strlen(prefix) + 1;
+        dc->tx_filename = malloc(len);
+        if (!dc->tx_filename)
+        {
+            SET_ERROR(modinst, "%s: Couldn't allocate memory for the TX PCAP filename", __func__);
+            free(dc);
+            return DAQ_ERROR_NOMEM;
+        }
+        snprintf(dc->tx_filename, len, "%s%s", prefix, tx_filename);
+    }
+
+    if (rx_filename)
+    {
+        size_t len = strlen(rx_filename) + strlen(prefix) + 1;
+        dc->rx_filename = malloc(len);
+        if (!dc->rx_filename)
+        {
+            SET_ERROR(modinst, "%s: Couldn't allocate memory for the RX PCAP filename", __func__);
+            free(dc->tx_filename);
+            free(dc);
+            return DAQ_ERROR_NOMEM;
+        }
+        snprintf(dc->rx_filename, len, "%s%s", prefix, rx_filename);
     }
 
     *ctxt_ptr = dc;
@@ -169,12 +205,10 @@ static void dump_daq_destroy(void *handle)
 
     if (dc->tx_dumper)
         pcap_dump_close(dc->tx_dumper);
-    if (dc->tx_filename)
-        free(dc->tx_filename);
+    free(dc->tx_filename);
     if (dc->rx_dumper)
         pcap_dump_close(dc->rx_dumper);
-    if (dc->rx_filename)
-        free(dc->rx_filename);
+    free(dc->rx_filename);
     free(dc);
 }
 
@@ -189,9 +223,8 @@ static int dump_daq_start(void *handle)
     int dlt = CALL_SUBAPI_NOARGS(dc, get_datalink_type);
     int snaplen = CALL_SUBAPI_NOARGS(dc, get_snaplen);
 
-    if (dc->dump_tx)
+    if (dc->tx_filename)
     {
-        const char *filename = dc->tx_filename ? dc->tx_filename : DEFAULT_TX_DUMP_FILE;
         pcap_t *pcap = pcap_open_dead(dlt, snaplen);
         if (!pcap)
         {
@@ -199,20 +232,19 @@ static int dump_daq_start(void *handle)
             SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
             return DAQ_ERROR;
         }
-        dc->tx_dumper = pcap_dump_open(pcap, filename);
+        dc->tx_dumper = pcap_dump_open(pcap, dc->tx_filename);
         if (!dc->tx_dumper)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", filename, pcap_geterr(pcap));
+            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", dc->tx_filename, pcap_geterr(pcap));
             pcap_close(pcap);
             return DAQ_ERROR;
         }
         pcap_close(pcap);
     }
 
-    if (dc->dump_rx)
+    if (dc->rx_filename)
     {
-        const char *filename = dc->rx_filename ? dc->rx_filename : DEFAULT_RX_DUMP_FILE;
         pcap_t *pcap = pcap_open_dead(dlt, snaplen);
         if (!pcap)
         {
@@ -220,11 +252,11 @@ static int dump_daq_start(void *handle)
             SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
             return DAQ_ERROR;
         }
-        dc->rx_dumper = pcap_dump_open(pcap, filename);
+        dc->rx_dumper = pcap_dump_open(pcap, dc->rx_filename);
         if (!dc->rx_dumper)
         {
             CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", filename, pcap_geterr(pcap));
+            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", dc->rx_filename, pcap_geterr(pcap));
             pcap_close(pcap);
             return DAQ_ERROR;
         }

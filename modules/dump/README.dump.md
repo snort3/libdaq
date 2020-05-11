@@ -16,6 +16,12 @@ variable.  The 'dump-rx' variable takes an optional argument for the filename
 to dump received packets to; it defaults to 'inline-in.pcap' if no argument is
 given.
 
+When running with multiple instances, the both the TX and RX output filenames
+will be mangled to start with the instance ID followed by an underscore.  For
+example, the default TX output filename would be '2_inline-out.pcap' for the
+second instance.  Both the TX and RX output filenames must be bare (no directory
+structure, relative nor absolute) in such a configuration.
+
 Requirements
 ------------
 * libpcap >= 1.0.0
