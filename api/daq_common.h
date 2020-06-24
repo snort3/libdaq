@@ -118,10 +118,11 @@ typedef struct _daq_msg
 #define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x0100  /* HA State is availble for the flow this packet is associated with. */
 #define DAQ_PKT_FLAG_ERROR_PACKET       0x0200  /* Lower level reports that the packet has errors. */
 #define DAQ_PKT_FLAG_RETRY_PACKET       0x0400  /* Packet is from the retry queue. */
-#define DAQ_PKT_FLAG_TRACE_ENABLED      0x0800  /* Tracing due to packet trace or capture with trace */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x0800  /* The packet has been flagged for tracing by the lower layer. */
 #define DAQ_PKT_FLAG_SIMULATED          0x1000  /* Packet is simulated/virtual */
 #define DAQ_PKT_FLAG_NEW_FLOW           0x2000  /* The packet was the first of a new flow. */
 #define DAQ_PKT_FLAG_REV_FLOW           0x4000  /* The packet is going the reverse direction of the flow initiator.*/
+#define DAQ_PKT_FLAG_DEBUG_ENABLED      0x8000  /* The packet has been flagged for debugging by the lower layer. */
 
 #define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
 #define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */

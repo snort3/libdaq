@@ -796,6 +796,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("NEW_FLOW ");
         if (hdr->flags & DAQ_PKT_FLAG_REV_FLOW)
             printf("REV_FLOW ");
+        if (hdr->flags & DAQ_PKT_FLAG_DEBUG_ENABLED)
+            printf("DEBUG_ENABLED ");
         printf("\n");
     }
 
