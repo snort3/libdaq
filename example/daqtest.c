@@ -853,6 +853,10 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
         printf("\n");
     }
 
+    const DAQ_PktTcpAckData_t *ptad = (const DAQ_PktTcpAckData_t *) daq_msg_get_meta(msg, DAQ_PKT_META_TCP_ACK_DATA);
+    if (ptad)
+        printf("TCP ACK Data: SN = %u, WS = %hu\n", ptad->tcp_ack_seq_num, ptad->tcp_window_size);
+
     if (cfg->dump_packets)
         print_hex_dump(data, daq_msg_get_data_len(msg));
 

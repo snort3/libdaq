@@ -143,6 +143,7 @@ typedef struct _daq_pkt_hdr
 
 #define DAQ_PKT_META_NAPT_INFO      0
 #define DAQ_PKT_META_DECODE_DATA    1
+#define DAQ_PKT_META_TCP_ACK_DATA   2
 
 /* "Real" address and port information for Network Address and Port Translated (NAPT'd) connections.
     This represents the destination addresses and ports seen on egress in both directions. */
@@ -198,6 +199,12 @@ typedef struct _daq_pkt_decode_data
     uint16_t l4_offset;
     uint16_t payload_offset;
 } DAQ_PktDecodeData_t;
+
+typedef struct _daq_pkt_tcp_ack_data
+{
+    uint32_t tcp_ack_seq_num;
+    uint16_t tcp_window_size;
+} DAQ_PktTcpAckData_t;
 
 typedef struct _daq_flow_desc
 {
