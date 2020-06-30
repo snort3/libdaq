@@ -30,6 +30,37 @@
 #include "decode.h"
 #include "PMurHash.h"
 
+#define SEQ_GT(a,b)  ((int)((a) - (b)) >  0)
+
+class FstTcpTracker
+{
+public:
+    enum TcpTrackerState : uint8_t
+    {
+        TCP_NONE,
+        TCP_3WHS_SYN,
+        TCP_3WHS_SYN_ACK,
+        TCP_3WHS_ACK,
+        TCP_ESTABLISHED,
+        TCP_CLOSING,
+    };
+
+    FstTcpTracker() = default;
+    ~FstTcpTracker() = default;
+
+    void eval(const DecodeData &dd, bool c2s);
+    bool process_bare_ack(const DecodeData &dd, bool c2s);
+    bool get_meta_ack_data(DAQ_PktTcpAckData_t &ptad, bool c2s);
+
+    TcpTrackerState get_tcp_state() const
+    { return tcp_state; }
+
+private:
+    TcpTrackerState tcp_state = TCP_NONE;
+    DAQ_PktTcpAckData_t c2s_meta_ack_data = { };
+    DAQ_PktTcpAckData_t s2c_meta_ack_data = { };
+};
+
 struct FstKey
 {
     union
@@ -67,6 +98,7 @@ struct FstEntry
     ~FstEntry() { delete[] ha_state; }
     void update_stats(const DAQ_PktHdr_t *pkthdr, bool swapped);
 
+    FstTcpTracker tcp_tracker;
     Flow_Stats_t flow_stats = { };
     uint8_t *ha_state = nullptr;
     uint32_t ha_state_len = 0;
@@ -141,6 +173,76 @@ private:
     };
     size_t max_size = 0;
 };
+
+static inline bool is_tcp_flag_set(const TcpHdr *tcp, uint8_t flag)
+{ return (tcp->th_flags & flag) == flag; }
+
+void FstTcpTracker::eval(const DecodeData &dd, bool c2s)
+{
+    const TcpHdr *tcp = dd.tcp;
+
+    switch (tcp_state)
+    {
+        case TCP_NONE:
+            if (c2s && is_tcp_flag_set(tcp, TH_SYN) && !is_tcp_flag_set(tcp, TH_ACK))
+                tcp_state = TCP_3WHS_SYN;
+            break;
+
+        case TCP_3WHS_SYN:
+            if (!c2s && is_tcp_flag_set(tcp, TH_SYN | TH_ACK))
+                tcp_state = TCP_3WHS_SYN_ACK;
+            break;
+
+        case TCP_3WHS_SYN_ACK:
+            if (c2s && is_tcp_flag_set(tcp, TH_ACK) && !is_tcp_flag_set(tcp, TH_SYN))
+                tcp_state = TCP_3WHS_ACK;
+            break;
+
+        case TCP_3WHS_ACK:
+            tcp_state = TCP_ESTABLISHED;
+            break;
+
+        case TCP_ESTABLISHED:
+            if (is_tcp_flag_set(tcp, TH_FIN))
+                tcp_state = TCP_CLOSING;
+            break;
+
+        case TCP_CLOSING:
+            break;
+
+        default:
+            break;
+    }
+}
+
+bool FstTcpTracker::process_bare_ack(const DecodeData &dd, bool c2s)
+{
+    const TcpHdr *tcp = dd.tcp;
+
+    if (tcp_state != TCP_ESTABLISHED || !is_tcp_flag_set(tcp, TH_ACK) || dd.tcp_data_segment)
+        return false;
+
+    uint32_t ack = ntohl(tcp->th_ack);
+    DAQ_PktTcpAckData_t &meta_ack_data = c2s ? c2s_meta_ack_data : s2c_meta_ack_data;
+    if (SEQ_GT(ack, meta_ack_data.tcp_ack_seq_num))
+    {
+        meta_ack_data.tcp_ack_seq_num = ack;
+        meta_ack_data.tcp_window_size = ntohs(tcp->window);
+    }
+    return true;
+}
+
+bool FstTcpTracker::get_meta_ack_data(DAQ_PktTcpAckData_t &ptad, bool c2s)
+{
+    DAQ_PktTcpAckData_t &meta_ack_data = c2s ? s2c_meta_ack_data : c2s_meta_ack_data;
+    if ( meta_ack_data.tcp_ack_seq_num )
+    {
+        ptad = meta_ack_data;
+        meta_ack_data = { };
+        return true;
+    }
+    return false;
+}
 
 FstEntry::FstEntry(const DAQ_PktHdr_t *pkthdr, const FstKey &key, uint32_t id, bool swapped)
 {

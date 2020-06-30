@@ -52,6 +52,7 @@ typedef struct
     const UdpHdr *udp;
     uint16_t vlan_tags;
     bool ignore_checksums;
+    bool tcp_data_segment;
 } DecodeData;
 
 /*
@@ -229,6 +230,7 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     dd->tcp = tcp;
     dd->decoded_data.flags.bits.l4 = true;
     dd->decoded_data.flags.bits.tcp = true;
+    dd->tcp_data_segment = (len > hlen) ? true : false;
 
     cursor += hlen;
     dd->decoded_data.payload_offset = cursor - dd->packet_data;

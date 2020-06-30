@@ -36,6 +36,17 @@ them.  In the future, this should become configurable behavior.
 There is a hardcoded flow state table size of 1024 entries.  This will also
 become configurable in the future.
 
+TCP Bare ACK Filtering
+------------------
+
+The FST DAQ module supports an experimental mode where it will filter bare ACKs
+on established TCP flows and provide the sequence number and window size from
+those ACKs as metadata on subsequent data packets going the opposite direction
+on the same flow.
+
+This feature is enabled by configuring the module with the 'enable_meta_ack'
+variable.
+
 IOCTLs
 ------
 

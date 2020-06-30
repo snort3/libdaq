@@ -22,7 +22,9 @@
 #include "config.h"
 #endif
 
+#include <cassert>
 #include <cstring>
+#include <queue>
 #include <vector>
 
 #include "daq_dlt.h"
@@ -31,6 +33,7 @@
 
 //#define DEBUG_DAQ_FST
 #ifdef DEBUG_DAQ_FST
+#include <cstdio>
 #define debugf(...) printf(__VA_ARGS__)
 #else
 #define debugf(...)
@@ -56,6 +59,8 @@ struct FstMsgDesc
     DAQ_Msg_t msg;
     DAQ_PktHdr_t pkthdr;
     DAQ_PktDecodeData_t decoded;
+    DAQ_PktTcpAckData_t tcp_meta_ack;
+    uint32_t acks_to_finalize;
     std::shared_ptr<FstEntry> entry;
     const DAQ_Msg_t *wrapped_msg;
 };
@@ -75,6 +80,7 @@ struct FstContext
 {
     /* Configuration */
     bool binding_verdicts = true;
+    bool meta_ack_enabled = false;
     /* State */
     DAQ_ModuleInstance_h modinst;
     DAQ_InstanceAPI_t subapi;
@@ -84,11 +90,15 @@ struct FstContext
     int dlt;
     FlowStateTable flow_table;
     std::deque<DAQ_Msg_h> limbo;
+    std::queue<DAQ_Msg_h> held_bare_acks;
+    uint32_t acks_to_finalize = 0;
+    uint64_t processed = 0;
 };
 
 
 static DAQ_VariableDesc_t fst_variable_descriptions[] = {
     { "no_binding_verdicts", "Disables enforcement of binding verdicts", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "enable_meta_ack", "Enables support for filtering bare TCP acks", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -177,6 +187,9 @@ static int fst_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
     {
         if (!strcmp(varKey, "no_binding_verdicts"))
             fc->binding_verdicts = false;
+        else if (!strcmp(varKey, "enable_meta_ack"))
+            fc->meta_ack_enabled = true;
+
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
 
@@ -224,6 +237,23 @@ static int fst_daq_start(void *handle)
     return DAQ_SUCCESS;
 }
 
+static int fst_daq_stop(void *handle)
+{
+    FstContext *fc = static_cast<FstContext*>(handle);
+
+    assert(fc->held_bare_acks.size() == fc->acks_to_finalize);
+    while (!fc->held_bare_acks.empty())
+    {
+        DAQ_Msg_h bam = fc->held_bare_acks.front();
+        fc->held_bare_acks.pop();
+        debugf("Finalizing orphaned bare ACK (%u to go)\n", fc->acks_to_finalize);
+        CALL_SUBAPI(fc, msg_finalize, bam, DAQ_VERDICT_PASS);
+        fc->acks_to_finalize--;
+    }
+
+    return CALL_SUBAPI_NOARGS(fc, stop);
+}
+
 static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned max_recv, unsigned &idx)
 {
     while (!fc->flow_table.purgatory_empty())
@@ -236,6 +266,7 @@ static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned
         /* Populate the message descriptor */
         desc->entry = entry;
         desc->wrapped_msg = nullptr;
+        desc->acks_to_finalize = 0;
         /* Next, set up the DAQ EoF message. */
         DAQ_Msg_t *msg = &desc->msg;
         msg->type = DAQ_MSG_TYPE_EOF;
@@ -244,9 +275,10 @@ static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned
         msg->data_len = 0;
         msg->data = nullptr;
         msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
+        msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = nullptr;
         msgs[idx++] = &desc->msg;
 
-        debugf("Produced EoF message for flow %u\n", entry->flow_id);
+        debugf("%" PRIu64 ": Produced EoF message for flow %u\n", fc->processed, entry->flow_id);
 
         /* Corner case: EoF filled the last slot available, return that processing was incomplete. */
         if (idx == max_recv)
@@ -262,6 +294,7 @@ static bool process_new_soul(FstContext *fc, std::shared_ptr<FstEntry> entry, co
     FstMsgDesc *desc = fc->pool.get_free();
     desc->entry = entry;
     desc->wrapped_msg = nullptr;
+    desc->acks_to_finalize = 0;
     /* Next, set up the DAQ SoF message. */
     DAQ_Msg_t *msg = &desc->msg;
     msg->type = DAQ_MSG_TYPE_SOF;
@@ -270,15 +303,18 @@ static bool process_new_soul(FstContext *fc, std::shared_ptr<FstEntry> entry, co
     msg->data_len = 0;
     msg->data = nullptr;
     msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
+    msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = nullptr;
     msgs[idx++] = &desc->msg;
 
-    debugf("Produced SoF message for flow %u\n", entry->flow_id);
+    debugf("%" PRIu64 ": Produced SoF message for flow %u\n", fc->processed, entry->flow_id);
 
     return true;
 }
 
 static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ_Msg_t *msgs[], unsigned max_recv, unsigned &idx)
 {
+    fc->processed++;
+
     if (orig_msg->type != DAQ_MSG_TYPE_PACKET)
     {
         msgs[idx++] = orig_msg;
@@ -330,7 +366,7 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
                 break;
         }
         fc->flow_table.move_node_to_timeout_list(node, tol_id);
-        debugf("Created new flow %u\n", entry->flow_id);
+        debugf("%" PRIu64 ": Created new flow %u\n", fc->processed, entry->flow_id);
 
         if (!process_new_soul(fc, entry, msgs, max_recv, idx))
             return false;
@@ -348,7 +384,7 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
     else
     {
         entry = node->entry;
-        debugf("Found existing flow %u (0x%x)\n", entry->flow_id, entry->flags);
+        debugf("%" PRIu64 ": Found existing flow %u (0x%x)\n", fc->processed, entry->flow_id, entry->flags);
         entry->update_stats(orig_pkthdr, swapped);
         if (entry->flags & (FST_ENTRY_FLAG_WHITELISTED | FST_ENTRY_FLAG_BLACKLISTED))
         {
@@ -357,12 +393,28 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
                 verdict = DAQ_VERDICT_WHITELIST;
             else
                 verdict = DAQ_VERDICT_BLACKLIST;
-            debugf("%s message for flow %u\n", (verdict == DAQ_VERDICT_WHITELIST) ? "Whitelisted" : "Blacklisted", entry->flow_id);
+            debugf("%" PRIu64 ": %s message for flow %u\n", fc->processed, (verdict == DAQ_VERDICT_WHITELIST) ?
+                    "Whitelisted" : "Blacklisted", entry->flow_id);
             /* FIXIT-L Check return code for finalizing messages and return some sort of error if it fails */
             CALL_SUBAPI(fc, msg_finalize, orig_msg, verdict);
             return true;
         }
+    }
 
+    bool c2s = (!swapped == !(entry->flags & FST_ENTRY_FLAG_SWAPPED));
+
+    if (key.protocol == IPPROTO_TCP)
+    {
+        FstTcpTracker &tcp_tracker = entry->tcp_tracker;
+        tcp_tracker.eval(dd, c2s);
+
+        if (fc->meta_ack_enabled && tcp_tracker.process_bare_ack(dd, c2s))
+        {
+            debugf("%" PRIu64 ": Consuming bare ACK on flow %u\n", fc->processed, entry->flow_id);
+            fc->held_bare_acks.push(orig_msg);
+            ++fc->acks_to_finalize;
+            return true;
+        }
     }
 
     /* Populate the message descriptor */
@@ -395,12 +447,28 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
         pkthdr->flags |= DAQ_PKT_FLAG_NEW_FLOW;
         entry->flags &= ~FST_ENTRY_FLAG_NEW;
     }
-    if (!swapped != !(entry->flags & FST_ENTRY_FLAG_SWAPPED))
+    if (!c2s)
         pkthdr->flags |= DAQ_PKT_FLAG_REV_FLOW;
 
     /* Finally, set up the decode data slot. */
     desc->decoded = dd.decoded_data;
     msg->meta[DAQ_PKT_META_DECODE_DATA] = &desc->decoded;
+    /* And (maybe) the TCP meta ACK slot. */
+    msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = nullptr;
+    if (fc->meta_ack_enabled)
+    {
+        if (key.protocol == IPPROTO_TCP && dd.tcp_data_segment &&
+                entry->tcp_tracker.get_meta_ack_data(desc->tcp_meta_ack, c2s))
+        {
+            msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = &desc->tcp_meta_ack;
+        }
+        if (fc->acks_to_finalize)
+        {
+            desc->acks_to_finalize = fc->acks_to_finalize;
+            fc->acks_to_finalize = 0;
+            debugf("%" PRIu64 ": Scheduled %u bare ACKs to be finalized\n", fc->processed, desc->acks_to_finalize);
+        }
+    }
 
     msgs[idx++] = &desc->msg;
 
@@ -571,6 +639,20 @@ static int fst_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict 
         FstMsgDesc *desc = static_cast<FstMsgDesc*>(msg->priv);
         std::shared_ptr<FstEntry> entry = desc->entry;
 
+        if (fc->meta_ack_enabled)
+        {
+            while (desc->acks_to_finalize)
+            {
+                assert(!fc->held_bare_acks.empty());
+                debugf("Finalizing bare ACK (%u/%zu to go)\n",
+                        desc->acks_to_finalize, fc->held_bare_acks.size());
+                DAQ_Msg_h bam = fc->held_bare_acks.front();
+                fc->held_bare_acks.pop();
+                CALL_SUBAPI(fc, msg_finalize, bam, verdict);
+                desc->acks_to_finalize--;
+            }
+        }
+
         if (fc->binding_verdicts)
         {
             if (verdict == DAQ_VERDICT_WHITELIST)
@@ -612,7 +694,7 @@ DAQ_ModuleAPI_t fst_daq_module_data =
     /* .inject = */ NULL,
     /* .inject_relative = */ NULL,
     /* .interrupt = */ NULL,
-    /* .stop = */ NULL,
+    /* .stop = */ fst_daq_stop,
     /* .ioctl = */ fst_daq_ioctl,
     /* .get_stats = */ NULL,
     /* .reset_stats = */ NULL,
