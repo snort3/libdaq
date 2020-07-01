@@ -1422,10 +1422,17 @@ static void *processing_thread(void *arg)
             ctxt->oldconfig = oldconfig;
         }
 
-        DAQ_RecvStatus rstat;
-        unsigned num_recv;
 
-        num_recv = daq_instance_msg_receive(ctxt->instance, cfg->batch_size, ctxt->msgs, &rstat);
+        unsigned batch_size = cfg->batch_size;
+        if (cfg->packet_limit)
+        {
+            unsigned long remainder = cfg->packet_limit - ctxt->packet_count;
+            if (cfg->batch_size > remainder)
+                batch_size = remainder;
+        }
+
+        DAQ_RecvStatus rstat;
+        unsigned num_recv = daq_instance_msg_receive(ctxt->instance, batch_size, ctxt->msgs, &rstat);
         recv_counters[rstat]++;
         if (num_recv > max_recv)
             max_recv = num_recv;
