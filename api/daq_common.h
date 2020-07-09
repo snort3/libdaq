@@ -200,10 +200,13 @@ typedef struct _daq_pkt_decode_data
     uint16_t payload_offset;
 } DAQ_PktDecodeData_t;
 
+/* Relevant contents of empty TCP ACK packets that have been elided by the dataplane.  This
+    metadata should only be populated on a subsequent TCP data packet on the same flow headed in
+    the opposite direction. */
 typedef struct _daq_pkt_tcp_ack_data
 {
-    uint32_t tcp_ack_seq_num;
-    uint16_t tcp_window_size;
+    uint32_t tcp_ack_seq_num;   /* TCP Ack Number for elided ACK (in network byte order) */
+    uint16_t tcp_window_size;   /* TCP Window Size for elided ACK (in network byte order) */
 } DAQ_PktTcpAckData_t;
 
 typedef struct _daq_flow_desc

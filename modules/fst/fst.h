@@ -222,12 +222,11 @@ bool FstTcpTracker::process_bare_ack(const DecodeData &dd, bool c2s)
     if (tcp_state != TCP_ESTABLISHED || !is_tcp_flag_set(tcp, TH_ACK) || dd.tcp_data_segment)
         return false;
 
-    uint32_t ack = ntohl(tcp->th_ack);
     DAQ_PktTcpAckData_t &meta_ack_data = c2s ? c2s_meta_ack_data : s2c_meta_ack_data;
-    if (SEQ_GT(ack, meta_ack_data.tcp_ack_seq_num))
+    if (SEQ_GT(ntohl(tcp->th_ack), ntohl(meta_ack_data.tcp_ack_seq_num)))
     {
-        meta_ack_data.tcp_ack_seq_num = ack;
-        meta_ack_data.tcp_window_size = ntohs(tcp->window);
+        meta_ack_data.tcp_ack_seq_num = tcp->th_ack;
+        meta_ack_data.tcp_window_size = tcp->window;
     }
     return true;
 }
