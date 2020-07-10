@@ -37,12 +37,12 @@ class FstTcpTracker
 public:
     enum TcpTrackerState : uint8_t
     {
-        TCP_NONE,
-        TCP_3WHS_SYN,
-        TCP_3WHS_SYN_ACK,
-        TCP_3WHS_ACK,
-        TCP_ESTABLISHED,
-        TCP_CLOSING,
+        TTS_NONE,
+        TTS_3WHS_SYN,
+        TTS_3WHS_SYN_ACK,
+        TTS_3WHS_ACK,
+        TTS_ESTABLISHED,
+        TTS_CLOSING,
     };
 
     FstTcpTracker() = default;
@@ -56,7 +56,7 @@ public:
     { return tcp_state; }
 
 private:
-    TcpTrackerState tcp_state = TCP_NONE;
+    TcpTrackerState tcp_state = TTS_NONE;
     DAQ_PktTcpAckData_t c2s_meta_ack_data = { };
     DAQ_PktTcpAckData_t s2c_meta_ack_data = { };
 };
@@ -183,31 +183,31 @@ void FstTcpTracker::eval(const DecodeData &dd, bool c2s)
 
     switch (tcp_state)
     {
-        case TCP_NONE:
+        case TTS_NONE:
             if (c2s && is_tcp_flag_set(tcp, TH_SYN) && !is_tcp_flag_set(tcp, TH_ACK))
-                tcp_state = TCP_3WHS_SYN;
+                tcp_state = TTS_3WHS_SYN;
             break;
 
-        case TCP_3WHS_SYN:
+        case TTS_3WHS_SYN:
             if (!c2s && is_tcp_flag_set(tcp, TH_SYN | TH_ACK))
-                tcp_state = TCP_3WHS_SYN_ACK;
+                tcp_state = TTS_3WHS_SYN_ACK;
             break;
 
-        case TCP_3WHS_SYN_ACK:
+        case TTS_3WHS_SYN_ACK:
             if (c2s && is_tcp_flag_set(tcp, TH_ACK) && !is_tcp_flag_set(tcp, TH_SYN))
-                tcp_state = TCP_3WHS_ACK;
+                tcp_state = TTS_3WHS_ACK;
             break;
 
-        case TCP_3WHS_ACK:
-            tcp_state = TCP_ESTABLISHED;
+        case TTS_3WHS_ACK:
+            tcp_state = TTS_ESTABLISHED;
             break;
 
-        case TCP_ESTABLISHED:
+        case TTS_ESTABLISHED:
             if (is_tcp_flag_set(tcp, TH_FIN))
-                tcp_state = TCP_CLOSING;
+                tcp_state = TTS_CLOSING;
             break;
 
-        case TCP_CLOSING:
+        case TTS_CLOSING:
             break;
 
         default:
@@ -219,7 +219,7 @@ bool FstTcpTracker::process_bare_ack(const DecodeData &dd, bool c2s)
 {
     const TcpHdr *tcp = dd.tcp;
 
-    if (tcp_state != TCP_ESTABLISHED || !is_tcp_flag_set(tcp, TH_ACK) || dd.tcp_data_segment)
+    if (tcp_state != TTS_ESTABLISHED || !is_tcp_flag_set(tcp, TH_ACK) || dd.tcp_data_segment)
         return false;
 
     DAQ_PktTcpAckData_t &meta_ack_data = c2s ? c2s_meta_ack_data : s2c_meta_ack_data;
