@@ -226,7 +226,7 @@ bool FstTcpTracker::process_bare_ack(const DecodeData &dd, bool c2s)
     if (SEQ_GT(ntohl(tcp->th_ack), ntohl(meta_ack_data.tcp_ack_seq_num)))
     {
         meta_ack_data.tcp_ack_seq_num = tcp->th_ack;
-        meta_ack_data.tcp_window_size = tcp->window;
+        meta_ack_data.tcp_window_size = tcp->th_win;
     }
     return true;
 }
