@@ -894,21 +894,21 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
 
     printf("\nReceived %s message.\n", msg->type == DAQ_MSG_TYPE_SOF ? "SoF" : "EoF");
 
-    if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN || stats->ingressZone != DAQ_PKTHDR_UNKNOWN)
+    if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN || stats->ingressGroup != DAQ_PKTHDR_UNKNOWN)
     {
         printf("  Ingress:\n");
         if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN)
             printf("    Interface: %d\n", stats->ingressIntf);
-        if (stats->ingressZone != DAQ_PKTHDR_UNKNOWN)
-            printf("    Zone: %d\n", stats->ingressZone);
+        if (stats->ingressGroup != DAQ_PKTHDR_UNKNOWN)
+            printf("    Group: %hd\n", stats->ingressGroup);
     }
-    if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN || stats->egressZone != DAQ_PKTHDR_UNKNOWN)
+    if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN || stats->egressGroup != DAQ_PKTHDR_UNKNOWN)
     {
         printf("  Egress:\n");
         if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN)
             printf("    Interface: %d\n", stats->egressIntf);
-        if (stats->egressZone != DAQ_PKTHDR_UNKNOWN)
-            printf("    Zone: %d\n", stats->egressZone);
+        if (stats->egressGroup != DAQ_PKTHDR_UNKNOWN)
+            printf("    Group: %hd\n", stats->egressGroup);
     }
     printf("  Protocol: %hhu\n", stats->protocol);
     if (stats->vlan_tag != 0)

@@ -254,8 +254,8 @@ typedef struct _daq_ha_state_data
 /* Flow statistics structure used for DAQ_MSG_TYPE_SOF and DAQ_MSG_TYPE_EOF. */
 typedef struct _flow_stats
 {
-    int32_t ingressZone;
-    int32_t egressZone;
+    int16_t ingressGroup;
+    int16_t egressGroup;
     int32_t ingressIntf;
     int32_t egressIntf;
     /* The IP addresses should be IPv6 or IPv6 representation of IPv4 (::FFFF:<ipv4>) */

@@ -245,8 +245,8 @@ bool FstTcpTracker::get_meta_ack_data(DAQ_PktTcpAckData_t &ptad, bool c2s)
 
 FstEntry::FstEntry(const DAQ_PktHdr_t *pkthdr, const FstKey &key, uint32_t id, bool swapped)
 {
-    flow_stats.ingressZone = pkthdr->ingress_group;
-    flow_stats.egressZone = pkthdr->egress_group;
+    flow_stats.ingressGroup = pkthdr->ingress_group;
+    flow_stats.egressGroup = pkthdr->egress_group;
     flow_stats.ingressIntf = pkthdr->ingress_index;
     flow_stats.egressIntf = pkthdr->egress_index;
 
