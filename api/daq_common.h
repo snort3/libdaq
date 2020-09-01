@@ -132,8 +132,8 @@ typedef struct _daq_pkt_hdr
     uint32_t pktlen;            /* Original length of this packet (off the wire) */
     int32_t ingress_index;      /* Index of the inbound interface. */
     int32_t egress_index;       /* Index of the outbound interface. */
-    int32_t ingress_group;      /* Index of the inbound group. */
-    int32_t egress_group;       /* Index of the outbound group. */
+    int16_t ingress_group;      /* Index of the inbound group. */
+    int16_t egress_group;       /* Index of the outbound group. */
     uint32_t opaque;            /* Opaque context value from the DAQ module or underlying hardware.
                                     Directly related to the opaque value in FlowStats. */
     uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
@@ -214,8 +214,8 @@ typedef struct _daq_flow_desc
     /* Interface/Flow ID/Address Space Information */
     int32_t ingress_index;  /* Index of the inbound interface */
     int32_t egress_index;   /* Index of the outbound interface */
-    int32_t ingress_group;  /* Index of the inbound group */
-    int32_t egress_group;   /* Index of the outbound group */
+    int16_t ingress_group;  /* Index of the inbound group */
+    int16_t egress_group;   /* Index of the outbound group */
     uint32_t flow_id;       /* Flow ID value provided from the DAQ module or underlying hardware. */
     uint16_t addr_space_id; /* Address space this traffic belongs to */
     /* L2 Information */
