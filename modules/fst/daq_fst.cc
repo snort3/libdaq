@@ -256,7 +256,10 @@ static int fst_daq_stop(void *handle)
 
 static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned max_recv, unsigned &idx)
 {
-    while (!fc->flow_table.purgatory_empty())
+    if (fc->flow_table.purgatory_empty())
+        return true;
+
+    while (idx < max_recv && !fc->flow_table.purgatory_empty())
     {
         FstMsgDesc *desc = fc->pool.get_free();
         if (!desc)
@@ -279,13 +282,11 @@ static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned
         msgs[idx++] = &desc->msg;
 
         debugf("%" PRIu64 ": Produced EoF message for flow %u\n", fc->processed, entry->flow_id);
-
-        /* Corner case: EoF filled the last slot available, return that processing was incomplete. */
-        if (idx == max_recv)
-            return false;
     }
 
-    return true;
+    /* Corner case: If EoF filled the last slot available (or there were none available to begin with),
+        return false to indicate that processing was incomplete. */
+    return idx < max_recv;
 }
 
 static bool process_new_soul(FstContext *fc, std::shared_ptr<FstEntry> entry, const DAQ_Msg_t *msgs[], unsigned max_recv, unsigned &idx)
@@ -555,24 +556,36 @@ static int fst_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t argle
     return rval;
 }
 
+static bool process_unjudged_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned max_recv, unsigned &idx)
+{
+    if (fc->limbo.empty())
+        return true;
+
+    while (idx < max_recv && !fc->limbo.empty())
+    {
+        if (!process_daq_msg(fc, fc->limbo.front(), msgs, max_recv, idx))
+            return false;
+        fc->limbo.pop_front();
+    }
+
+    /* Corner case: If souls from limbo filled the last slot available (or there were none available to begin with),
+        return false to indicate that processing was incomplete. */
+    return idx < max_recv;
+}
+
 static unsigned fst_daq_msg_receive(void *handle, const unsigned max_recv, const DAQ_Msg_t *msgs[], DAQ_RecvStatus *rstat)
 {
     FstContext *fc = static_cast<FstContext*>(handle);
     unsigned idx = 0;
 
-    /* If there's anyone sitting in limbo, process them first. */
     *rstat = DAQ_RSTAT_OK;
-    while (!fc->limbo.empty())
+    /* If there's anyone sitting in limbo, process them first. */
+    if (!process_unjudged_souls(fc, msgs, max_recv, idx))
     {
-        if (!process_daq_msg(fc, fc->limbo.front(), msgs, max_recv, idx))
-        {
-            if (idx != max_recv)
-                *rstat = DAQ_RSTAT_NOBUF;
-            break;
-        }
-        fc->limbo.pop_front();
+        if (idx != max_recv)
+            *rstat = DAQ_RSTAT_NOBUF;
     }
-    /* Then process any lost souls in purgatory. */
+    /* Then, process any lost souls in purgatory. */
     if (!process_lost_souls(fc, msgs, max_recv, idx))
     {
         if (idx != max_recv)
