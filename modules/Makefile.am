@@ -76,6 +76,7 @@ if BUILD_SHARED_MODULES
     pkgconfig_DATA += fst/libdaq_static_fst.pc
     fst_daq_fst_la_SOURCES = \
 						 fst/daq_fst.cc \
+						 fst/fst.h \
 						 fst/PMurHash.c \
 						 fst/PMurHash.h
     fst_daq_fst_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/example -DBUILDING_SO
@@ -84,6 +85,7 @@ endif
     lib_LTLIBRARIES += fst/libdaq_static_fst.la
     fst_libdaq_static_fst_la_SOURCES = \
 						 fst/daq_fst.cc \
+						 fst/fst.h \
 						 fst/PMurHash.c \
 						 fst/PMurHash.h
     fst_libdaq_static_fst_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/example
