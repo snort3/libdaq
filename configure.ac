@@ -4,7 +4,8 @@
 m4_define([daq_major_version], [3])
 m4_define([daq_minor_version], [0])
 m4_define([daq_patch_version], [0])
-m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version])
+m4_define([daq_extra_version], [beta1])
+m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version-daq_extra_version])
 
 # Kill the 'divert' macro with extreme prejudice so it stops clashing with references
 # to the module directory of the same name.
