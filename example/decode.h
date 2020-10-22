@@ -358,7 +358,10 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
 
     uint32_t dlen = ntohs(ip->tot_len);
     /* Allow the buffer length to exceed the total length from the IP header to account for
-        Ethernet frame trailers/padding. */
+        Ethernet frame trailers/padding.  Adjust the length going forward accordingly. */
+    if (len > dlen)
+        len = dlen;
+
     if (dlen > len || dlen < hlen)
         return false;
 
