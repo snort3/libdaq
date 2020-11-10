@@ -293,8 +293,10 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
 
     uint32_t plen = ntohs(ip6->ip6_plen);
     uint16_t offset = sizeof(*ip6);
-    if (offset + plen != len)
-        return false;
+    /* Allow the buffer length to exceed the total length from the IP header to account for
+        Ethernet frame trailers/padding.  Adjust the length going forward accordingly. */
+    if (len > offset + plen)
+        len = offset + plen;
 
     dd->ip6 = ip6;
     dd->decoded_data.flags.bits.l3 = true;
