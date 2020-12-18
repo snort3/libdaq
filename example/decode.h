@@ -462,7 +462,7 @@ static inline bool decode_raw(const uint8_t *cursor, uint32_t len, DecodeData *d
     return false;
 }
 
-static inline void decode_data_init(DecodeData *dd, const uint8_t *packet_data)
+static inline void decode_data_init(DecodeData *dd, const uint8_t *packet_data, bool ignore_checksums)
 {
     memset(dd, 0, sizeof(*dd));
     dd->packet_data = packet_data;
@@ -470,6 +470,7 @@ static inline void decode_data_init(DecodeData *dd, const uint8_t *packet_data)
     dd->decoded_data.l3_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
     dd->decoded_data.l4_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
     dd->decoded_data.payload_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
+    dd->ignore_checksums = ignore_checksums;
 }
 
 #ifdef __cplusplus

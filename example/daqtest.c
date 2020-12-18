@@ -718,7 +718,6 @@ static DAQ_Verdict process_packet(DAQTestPacket *dtp)
 
 static bool decode_packet(const uint8_t *packet, uint32_t len, DecodeData *dd)
 {
-    decode_data_init(dd, packet);
     switch (dlt)
     {
         case DLT_EN10MB:
@@ -874,7 +873,7 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     memset(&dtp, 0, sizeof(dtp));
     dtp.msg = msg;
     dtp.ctxt = ctxt;
-    dtp.dd.ignore_checksums = cfg->ignore_checksum_errors;
+    decode_data_init(&dtp.dd, data, cfg->ignore_checksum_errors);
     if (!decode_packet(data, data_len, &dtp.dd))
         return ctxt->cfg->default_verdict;
 

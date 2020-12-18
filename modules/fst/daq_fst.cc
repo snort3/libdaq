@@ -124,7 +124,7 @@ void FstMsgPool::put_free(FstMsgDesc *desc)
 
 static bool decode_packet(FstContext *fc, const uint8_t *packet_data, uint32_t packet_data_len, DecodeData *dd)
 {
-    decode_data_init(dd, packet_data);
+    decode_data_init(dd, packet_data, false);
     switch (fc->dlt)
     {
         case DLT_EN10MB:
