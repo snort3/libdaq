@@ -155,7 +155,7 @@ static inline uint16_t in_cksum_v6(const Ip6Hdr *ip6, const uint16_t *data, uint
 
 static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(IcmpHdr))
         return false;
@@ -182,7 +182,7 @@ static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *
 
 static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(Icmp6Hdr))
         return false;
@@ -268,7 +268,7 @@ static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len)
 
 static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(TcpHdr))
         return false;
@@ -315,7 +315,7 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
 
 static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = cursor - dd->packet_data;
+    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(UdpHdr))
         return false;
@@ -357,7 +357,7 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
 
 static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l3_offset = cursor - dd->packet_data;
+    dd->decoded_data.l3_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(Ip6Hdr))
         return false;
@@ -420,7 +420,7 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
 
 static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l3_offset = cursor - dd->packet_data;
+    dd->decoded_data.l3_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(IpHdr))
         return false;
@@ -474,6 +474,7 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
 
 static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
     if (len < sizeof(EthArpHdr))
         return false;
     dd->arp = (const EthArpHdr *) cursor;
@@ -498,7 +499,7 @@ static inline bool is_vlan_ethertype(uint16_t ether_type)
 
 static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l2_offset = cursor - dd->packet_data;
+    dd->decoded_data.l2_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
 
     if (len < sizeof(EthHdr))
         return false;
