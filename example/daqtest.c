@@ -820,8 +820,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     if (pdd)
     {
         printf("Decode Data:\n");
-        printf("  Offsets: L2 = %hu, L3 = %hu, L4 = %hu, PL = %hu\n", pdd->l2_offset,
-                pdd->l3_offset, pdd->l4_offset, pdd->payload_offset);
+        printf("  Offsets: L2 = %hu, L3 = %hu, L4 = %hu, PL = %hu, CO = %hu\n", pdd->l2_offset,
+                pdd->l3_offset, pdd->l4_offset, pdd->payload_offset, pdd->checksum_offset);
         printf("  Flags:");
         if (pdd->flags.bits.l2)
             printf(" L2");
@@ -835,6 +835,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf(" L4");
         if (pdd->flags.bits.l4_checksum)
             printf(" L4_CKSUM");
+        if (pdd->flags.bits.checksum_error)
+            printf(" CKSUM_ERR");
         if (pdd->flags.bits.vlan)
             printf(" VLAN");
         if (pdd->flags.bits.vlan_qinq)

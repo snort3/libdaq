@@ -174,6 +174,8 @@ typedef union {
         uint32_t l4:1;              /* Parsed known L4 protocol */
         uint32_t l4_checksum:1;     /* L4 checksum was calculated and validated. */
 
+        uint32_t checksum_error:1;  /* One or more checksum errors were encountered during parsing. */
+
         uint32_t vlan:1;            /* Parsed VLAN header */
         uint32_t vlan_qinq:1;       /* Stacked VLAN header (QinQ) found and parsed */
 
@@ -195,10 +197,11 @@ typedef union {
 typedef struct _daq_pkt_decode_data
 {
     DAQ_PktDecodeFlags_t flags;
-    uint16_t l2_offset;
-    uint16_t l3_offset;
-    uint16_t l4_offset;
-    uint16_t payload_offset;
+    uint16_t l2_offset;         /* Start of the first L2 header. */
+    uint16_t l3_offset;         /* Start of the first L3 header. */
+    uint16_t l4_offset;         /* Start of the first L4 header. */
+    uint16_t payload_offset;    /* First byte past all successfully decoded headers. */
+    uint16_t checksum_offset;   /* End of the last decoded header without checksum errors. */
 } DAQ_PktDecodeData_t;
 
 /* Relevant contents of empty TCP ACK packets that have been elided by the dataplane.  This

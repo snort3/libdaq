@@ -153,9 +153,17 @@ static inline uint16_t in_cksum_v6(const Ip6Hdr *ip6, const uint16_t *data, uint
     return in_cksum_vec(vec, 2);
 }
 
+static inline void update_pyld_csum_offsets(const uint8_t *cursor, DecodeData *dd)
+{
+    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    if (!dd->decoded_data.flags.bits.checksum_error)
+        dd->decoded_data.checksum_offset = dd->decoded_data.payload_offset;
+}
+
 static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
 
     if (len < sizeof(IcmpHdr))
         return false;
@@ -164,6 +172,7 @@ static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *
     struct cksum_vec vec = { (const uint16_t *) icmp, len };
     if (in_cksum_vec(&vec, 1) != 0)
     {
+        dd->decoded_data.flags.bits.checksum_error = true;
         if (!dd->ignore_checksums)
             return false;
     }
@@ -175,14 +184,15 @@ static inline bool decode_icmp(const uint8_t *cursor, uint32_t len, DecodeData *
     dd->decoded_data.flags.bits.icmp = true;
 
     cursor += sizeof(*icmp);
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
 static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
 
     if (len < sizeof(Icmp6Hdr))
         return false;
@@ -190,6 +200,7 @@ static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData 
 
     if (in_cksum_v6(dd->ip6, (const uint16_t *) icmp6, len, IPPROTO_ICMPV6) != 0)
     {
+        dd->decoded_data.flags.bits.checksum_error = true;
         if (!dd->ignore_checksums)
             return false;
     }
@@ -201,12 +212,12 @@ static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData 
     dd->decoded_data.flags.bits.icmp = true;
 
     cursor += sizeof(*icmp6);
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
-static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len)
+static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
     while (len > 0)
     {
@@ -268,7 +279,8 @@ static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len)
 
 static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
 
     if (len < sizeof(TcpHdr))
         return false;
@@ -281,6 +293,7 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     {
         if (in_cksum_v4(dd->ip, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
         {
+            dd->decoded_data.flags.bits.checksum_error = true;
             if (!dd->ignore_checksums)
                 return false;
         }
@@ -291,6 +304,7 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     {
         if (in_cksum_v6(dd->ip6, (const uint16_t *) tcp, len, IPPROTO_TCP) != 0)
         {
+            dd->decoded_data.flags.bits.checksum_error = true;
             if (!dd->ignore_checksums)
                 return false;
         }
@@ -299,7 +313,7 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     }
 
     uint16_t optlen = hlen - sizeof(*tcp);
-    if (optlen && !decode_tcp_opts(cursor + sizeof(*tcp), optlen))
+    if (optlen && !decode_tcp_opts(cursor + sizeof(*tcp), optlen, dd))
         return false;
 
     dd->tcp = tcp;
@@ -308,14 +322,15 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
     dd->tcp_data_segment = (len > hlen) ? true : false;
 
     cursor += hlen;
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
 static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l4_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l4_offset = cursor - dd->packet_data;
 
     if (len < sizeof(UdpHdr))
         return false;
@@ -328,6 +343,7 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
     {
         if (in_cksum_v4(dd->ip, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
         {
+            dd->decoded_data.flags.bits.checksum_error = true;
             if (!dd->ignore_checksums)
                 return false;
         }
@@ -338,6 +354,7 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
     {
         if (in_cksum_v6(dd->ip6, (const uint16_t *) udp, len, IPPROTO_UDP) != 0)
         {
+            dd->decoded_data.flags.bits.checksum_error = true;
             if (!dd->ignore_checksums)
                 return false;
         }
@@ -350,14 +367,15 @@ static inline bool decode_udp(const uint8_t *cursor, uint32_t len, DecodeData *d
     dd->decoded_data.flags.bits.udp = true;
 
     cursor += sizeof(*udp);
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
 static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l3_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l3_offset = cursor - dd->packet_data;
 
     if (len < sizeof(Ip6Hdr))
         return false;
@@ -418,14 +436,15 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
     }
 
     cursor += offset;
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
 static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l3_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l3_offset = cursor - dd->packet_data;
 
     if (len < sizeof(IpHdr))
         return false;
@@ -450,6 +469,8 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
     struct cksum_vec vec = { (const uint16_t *) ip, hlen };
     if (in_cksum_vec(&vec, 1) != 0)
     {
+        dd->decoded_data.flags.bits.checksum_error = true;
+
         if (!dd->ignore_checksums)
             return false;
     }
@@ -472,14 +493,14 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
     }
 
     cursor += offset;
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
 
 static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
     if (len < sizeof(EthArpHdr))
         return false;
     dd->arp = (const EthArpHdr *) cursor;
@@ -504,7 +525,8 @@ static inline bool is_vlan_ethertype(uint16_t ether_type)
 
 static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
-    dd->decoded_data.l2_offset = dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
+    dd->decoded_data.l2_offset = cursor - dd->packet_data;
 
     if (len < sizeof(EthHdr))
         return false;
@@ -531,6 +553,7 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
         if (dd->vlan_tags > 1)
             dd->decoded_data.flags.bits.vlan_qinq = true;
     }
+
     switch (ether_type)
     {
         case ETYPE_ARP:
@@ -542,7 +565,7 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     }
 
     cursor += offset;
-    dd->decoded_data.payload_offset = cursor - dd->packet_data;
+    update_pyld_csum_offsets(cursor, dd);
 
     return true;
 }
@@ -567,6 +590,7 @@ static inline void decode_data_init(DecodeData *dd, const uint8_t *packet_data, 
     dd->decoded_data.l3_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
     dd->decoded_data.l4_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
     dd->decoded_data.payload_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
+    dd->decoded_data.checksum_offset = DAQ_PKT_DECODE_OFFSET_INVALID;
     dd->ignore_checksums = ignore_checksums;
 }
 
