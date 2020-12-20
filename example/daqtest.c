@@ -753,8 +753,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     if (cfg->performance_mode)
         return cfg->default_verdict;
 
-    printf("\nGot Packet! Size = %u/%u, Ingress = %d (Group = %hd), Egress = %d (Group = %hd), Addr Space ID = %u",
-            data_len, hdr->pktlen, hdr->ingress_index, hdr->ingress_group,
+    printf("\nPacket %" PRIu64 ": Size = %u/%u, Ingress = %d (Group = %hd), Egress = %d (Group = %hd), Addr Space ID = %hu",
+            ctxt->packet_count, data_len, hdr->pktlen, hdr->ingress_index, hdr->ingress_group,
             hdr->egress_index, hdr->egress_group, hdr->address_space_id);
     if (hdr->flags & DAQ_PKT_FLAG_OPAQUE_IS_VALID)
         printf(", Opaque = %u", hdr->opaque);
