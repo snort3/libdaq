@@ -565,7 +565,7 @@ static DAQ_Verdict process_arp(DAQTestPacket *dtp)
     memcpy(&addr.s_addr, etharp->arp_tpa, 4);
     printf(" (%s)\n", inet_ntoa(addr));
 
-    if (ntohs(dtp->dd.arp->ar_op) != ARPOP_REQUEST || ntohs(dtp->dd.arp->ar_pro) != ETHERTYPE_IP)
+    if (ntohs(dtp->dd.arp->ar_op) != ARPOP_REQUEST || ntohs(dtp->dd.arp->ar_pro) != ETYPE_IP)
         return dtp->ctxt->cfg->default_verdict;
 
     for (ip = dtp->ctxt->cfg->ip_addrs; ip; ip = ip->next)
@@ -660,7 +660,7 @@ static DAQ_Verdict process_eth(DAQTestPacket *dtp)
         printf(" VLAN Tags (%hu):", dtp->dd.vlan_tags);
         ether_type = ntohs(dtp->dd.eth->ether_type);
         offset = sizeof(*dtp->dd.eth);
-        while (ether_type == ETHERTYPE_VLAN)
+        while (is_vlan_ethertype(ether_type))
         {
             const VlanTagHdr *vlan;
 

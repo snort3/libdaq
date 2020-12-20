@@ -28,6 +28,17 @@ extern "C" {
 #include "daq_common.h"
 #include "netinet_compat.h"
 
+/* Relevant ethertypes lifted from Linux's if_ether.h since there doesn't seem to be a reliable
+    cross-platform way of obtaining all of them. */
+#define ETYPE_ARP       0x0806      /* Address Resolution packet    */
+#define ETYPE_IP        0x0800      /* Internet Protocol packet */
+#define ETYPE_IPV6      0x86DD      /* IPv6 over bluebook       */
+#define ETYPE_8021Q     0x8100      /* 802.1Q VLAN Extended Header  */
+#define ETYPE_8021AD    0x88A8      /* 802.1ad Service VLAN         */
+#define ETYPE_QINQ1     0x9100      /* deprecated QinQ VLAN [ NOT AN OFFICIALLY REGISTERED ID ] */
+#define ETYPE_QINQ2     0x9200      /* deprecated QinQ VLAN [ NOT AN OFFICIALLY REGISTERED ID ] */
+#define ETYPE_QINQ3     0x9300      /* deprecated QinQ VLAN [ NOT AN OFFICIALLY REGISTERED ID ] */
+
 #define VTH_PRIORITY(vh)  ((unsigned short)((ntohs((vh)->vth_pri_cfi_vlan) & 0xe000) >> 13))
 #define VTH_CFI(vh)       ((ntohs((vh)->vth_pri_cfi_vlan) & 0x0100) >> 12)
 #define VTH_VLAN(vh)      ((unsigned short)(ntohs((vh)->vth_pri_cfi_vlan) & 0x0FFF))
@@ -405,6 +416,22 @@ static inline bool decode_arp(const uint8_t *cursor, uint32_t len, DecodeData *d
     return true;
 }
 
+static inline bool is_vlan_ethertype(uint16_t ether_type)
+{
+    switch (ether_type)
+    {
+        case ETYPE_8021Q:
+        case ETYPE_8021AD:
+        case ETYPE_QINQ1:
+        case ETYPE_QINQ2:
+        case ETYPE_QINQ3:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
     dd->decoded_data.l2_offset = cursor - dd->packet_data;
@@ -420,7 +447,7 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     dd->decoded_data.flags.bits.l2 = true;
     dd->decoded_data.flags.bits.ethernet = true;
 
-    while (ether_type == ETHERTYPE_VLAN)
+    while (is_vlan_ethertype(ether_type))
     {
         if (offset + sizeof(VlanTagHdr) > len)
             return false;
@@ -436,11 +463,11 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     }
     switch (ether_type)
     {
-        case ETHERTYPE_ARP:
+        case ETYPE_ARP:
             return decode_arp(cursor + offset, len - offset, dd);
-        case ETHERTYPE_IP:
+        case ETYPE_IP:
             return decode_ip(cursor + offset, len - offset, dd);
-        case ETHERTYPE_IPV6:
+        case ETYPE_IPV6:
             return decode_ip6(cursor + offset, len - offset, dd);
     }
 
