@@ -245,11 +245,13 @@ static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len, DecodeDa
             case TCPOPT_MAXSEG:
                 if (optlen != TCPOLEN_MAXSEG)
                     return false;
+                dd->decoded_data.flags.bits.tcp_opt_mss = true;
                 break;
 
             case TCPOPT_WINDOW:
                 if (optlen != TCPOLEN_WINDOW)
                     return false;
+                dd->decoded_data.flags.bits.tcp_opt_ws = true;
                 break;
 
             case TCPOPT_SACK_PERMITTED:
@@ -263,6 +265,7 @@ static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len, DecodeDa
             case TCPOPT_TIMESTAMP:
                 if (optlen != TCPOLEN_TIMESTAMP)
                     return false;
+                dd->decoded_data.flags.bits.tcp_opt_ts = true;
                 break;
 
             default:

@@ -853,6 +853,12 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf(" TCP");
         if (pdd->flags.bits.icmp)
             printf(" ICMP");
+        if (pdd->flags.bits.tcp_opt_mss)
+            printf(" TCP_OPT_MSS");
+        if (pdd->flags.bits.tcp_opt_ws)
+            printf(" TCP_OPT_WS");
+        if (pdd->flags.bits.tcp_opt_ts)
+            printf(" TCP_OPT_TS");
         printf("\n");
     }
 

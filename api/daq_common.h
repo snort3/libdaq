@@ -164,7 +164,7 @@ typedef struct _daq_napt_info
     duplicate protocols like IP-in-IP).  The offsets for layers not found are set to
     DAQ_PKT_DECODE_OFFSET_INVALID. */
 typedef union {
-    uint16_t all;
+    uint32_t all;
 
     struct {
         uint32_t l2:1;              /* Parsed known L2 protocol */
@@ -190,6 +190,11 @@ typedef union {
         uint32_t udp:1;             /* UDP */
         uint32_t tcp:1;             /* TCP */
         uint32_t icmp:1;            /* ICMP */
+
+        /* Decoded TCP observations */
+        uint32_t tcp_opt_mss:1;     /* TCP Option MSS seen */
+        uint32_t tcp_opt_ws:1;      /* TCP Option Window Scale seen */
+        uint32_t tcp_opt_ts:1;      /* TCP Option Timestamp seen */
     } bits;
 } DAQ_PktDecodeFlags_t;
 
