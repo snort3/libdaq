@@ -206,6 +206,66 @@ static inline bool decode_icmp6(const uint8_t *cursor, uint32_t len, DecodeData 
     return true;
 }
 
+static inline bool decode_tcp_opts(const uint8_t *cursor, uint32_t len)
+{
+    while (len > 0)
+    {
+        uint8_t opt = cursor[0];
+
+        if (opt == TCPOPT_EOL)
+            return true;
+
+        if (opt == TCPOPT_NOP)
+        {
+            cursor++;
+            len--;
+            continue;
+        }
+
+        if (len < 2)
+            return false;
+
+        uint8_t optlen = cursor[1];
+        if (optlen < 2 || len < optlen)
+            return false;
+
+        switch (opt)
+        {
+            case TCPOPT_MAXSEG:
+                if (optlen != TCPOLEN_MAXSEG)
+                    return false;
+                break;
+
+            case TCPOPT_WINDOW:
+                if (optlen != TCPOLEN_WINDOW)
+                    return false;
+                break;
+
+            case TCPOPT_SACK_PERMITTED:
+                if (optlen != TCPOLEN_SACK_PERMITTED)
+                    return false;
+                break;
+
+            case TCPOPT_SACK:
+                break;
+
+            case TCPOPT_TIMESTAMP:
+                if (optlen != TCPOLEN_TIMESTAMP)
+                    return false;
+                break;
+
+            default:
+                /* Unrecognized option, no validation; hope for the best. */
+                break;
+        }
+
+        cursor += optlen;
+        len -= optlen;
+    }
+
+    return (len == 0);
+}
+
 static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
     dd->decoded_data.l4_offset = cursor - dd->packet_data;
@@ -237,6 +297,10 @@ static inline bool decode_tcp(const uint8_t *cursor, uint32_t len, DecodeData *d
         else
             dd->decoded_data.flags.bits.l4_checksum = true;
     }
+
+    uint16_t optlen = hlen - sizeof(*tcp);
+    if (optlen && !decode_tcp_opts(cursor + sizeof(*tcp), optlen))
+        return false;
 
     dd->tcp = tcp;
     dd->decoded_data.flags.bits.l4 = true;
