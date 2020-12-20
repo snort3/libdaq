@@ -31,10 +31,11 @@ near future, some amount of TCP state tracking will be added to allow for the
 transition to the TCP Long timeout.
 
 Note: The decoder will bail on packets with bad checksums and fail to classify
-them.  In the future, this should become configurable behavior.
+them.  Specifying the 'ignore_checksums' variable will disable this behavior
+(use with caution - garbage in, garbage out).
 
-There is a hardcoded flow state table size of 1024 entries.  This will also
-become configurable in the future.
+There is a hardcoded flow state table size of 1024 entries.  This will become
+configurable in the future.
 
 TCP Bare ACK Filtering
 ------------------

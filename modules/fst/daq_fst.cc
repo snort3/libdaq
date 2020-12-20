@@ -81,6 +81,7 @@ struct FstContext
     /* Configuration */
     bool binding_verdicts = true;
     bool meta_ack_enabled = false;
+    bool ignore_checksums = false;
     /* State */
     DAQ_ModuleInstance_h modinst;
     DAQ_InstanceAPI_t subapi;
@@ -99,6 +100,7 @@ struct FstContext
 static DAQ_VariableDesc_t fst_variable_descriptions[] = {
     { "no_binding_verdicts", "Disables enforcement of binding verdicts", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
     { "enable_meta_ack", "Enables support for filtering bare TCP acks", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
+    { "ignore_checksums", "Ignore bad checksums while decoding", DAQ_VAR_DESC_FORBIDS_ARGUMENT },
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -124,7 +126,7 @@ void FstMsgPool::put_free(FstMsgDesc *desc)
 
 static bool decode_packet(FstContext *fc, const uint8_t *packet_data, uint32_t packet_data_len, DecodeData *dd)
 {
-    decode_data_init(dd, packet_data, false);
+    decode_data_init(dd, packet_data, fc->ignore_checksums);
     switch (fc->dlt)
     {
         case DLT_EN10MB:
@@ -189,6 +191,8 @@ static int fst_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInstan
             fc->binding_verdicts = false;
         else if (!strcmp(varKey, "enable_meta_ack"))
             fc->meta_ack_enabled = true;
+        else if (!strcmp(varKey, "ignore_checksums"))
+            fc->ignore_checksums = true;
 
         daq_base_api.config_next_variable(modcfg, &varKey, &varValue);
     }
