@@ -400,7 +400,7 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
                     return false;
                 const Ip6Ext *ext = (const Ip6Ext *) (cursor + offset);
                 next_hdr = ext->ip6e_nxt;
-                offset += sizeof(*ext) + ext->ip6e_len;
+                offset += (ext->ip6e_len + 1) << 3;
                 break;
             }
             case IPPROTO_TCP:
@@ -409,6 +409,11 @@ static inline bool decode_ip6(const uint8_t *cursor, uint32_t len, DecodeData *d
                 return decode_udp(cursor + offset, len - offset, dd);
             case IPPROTO_ICMPV6:
                 return decode_icmp6(cursor + offset, len - offset, dd);
+            case IPPROTO_NONE:
+            default:
+                /* If there was still payload left and we got NONE or there's another protocol
+                    or extension that we don't recognize, just fail the decode for now. */
+                return false;
         }
     }
 
