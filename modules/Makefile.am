@@ -1,5 +1,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
+pkglibdir = $(libdir)/daq
 lib_LTLIBRARIES =
 pkglib_LTLIBRARIES =
 pkgconfig_DATA =
