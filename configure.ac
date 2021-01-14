@@ -12,7 +12,7 @@ m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_vers
 m4_undefine([divert])
 
 AC_PREREQ([2.69])
-AC_INIT([daq],[daq_version_str],[snort-team@cisco.com])
+AC_INIT([libdaq],[daq_version_str],[snort-team@cisco.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([api/daq.h])
 AC_CONFIG_HEADERS([config.h])
