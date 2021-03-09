@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030000
+#define DAQ_COMMON_API_VERSION  0x00030001
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -139,7 +139,7 @@ typedef struct _daq_pkt_hdr
     int16_t ingress_group;      /* Index of the inbound group. */
     int16_t egress_group;       /* Index of the outbound group. */
     uint32_t opaque;            /* Opaque context value from the DAQ module or underlying hardware.
-                                    Directly related to the opaque value in FlowStats. */
+                                    Directly related to the opaque value in DAQ_FlowStats_t. */
     uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
     uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
     uint16_t address_space_id;  /* Unique ID of the address space */
@@ -166,10 +166,12 @@ typedef struct _daq_napt_info
     to the first protocol of each layer encountered (no information is conveyed about encapsulated
     duplicate protocols like IP-in-IP).  The offsets for layers not found are set to
     DAQ_PKT_DECODE_OFFSET_INVALID. */
-typedef union {
+typedef union _daq_pkt_decode_flags
+{
     uint32_t all;
 
-    struct {
+    struct
+    {
         uint32_t l2:1;              /* Parsed known L2 protocol */
         uint32_t l2_checksum:1;     /* L2 checksum was calculated and validated. */
         uint32_t l3:1;              /* Parsed known L3 protocol */
@@ -233,11 +235,13 @@ typedef struct _daq_flow_desc
     /* L2 Information */
     uint16_t vlan_tag;
     /* L3 Information */
-    union {
+    union
+    {
         struct in_addr in_addr;
         struct in6_addr in6_addr;
     } src_addr;
-    union {
+    union
+    {
         struct in_addr in_addr;
         struct in6_addr in6_addr;
     } dst_addr;
@@ -266,38 +270,39 @@ typedef struct _daq_ha_state_data
 #define DAQ_FS_FLAG_SIGNIFICANT_GROUPS 0x1
 
 /* Flow statistics structure used for DAQ_MSG_TYPE_SOF and DAQ_MSG_TYPE_EOF. */
-typedef struct _flow_stats
+typedef struct _daq_flow_stats
 {
-    int16_t ingressGroup;
-    int16_t egressGroup;
-    int32_t ingressIntf;
-    int32_t egressIntf;
+    int16_t ingress_group;
+    int16_t egress_group;
+    int32_t ingress_intf;
+    int32_t egress_intf;
     /* The IP addresses should be IPv6 or IPv6 representation of IPv4 (::FFFF:<ipv4>) */
-    uint8_t initiatorIp[16];
-    uint8_t responderIp[16];
-    uint16_t initiatorPort;
-    uint16_t responderPort;
+    uint8_t initiator_ip[16];
+    uint8_t responder_ip[16];
+    uint16_t initiator_port;
+    uint16_t responder_port;
     uint32_t opaque;
-    uint64_t initiatorPkts;         /* Not populated for SoF stats. */
-    uint64_t responderPkts;         /* Not populated for SoF stats. */
-    uint64_t initiatorBytes;        /* Not populated for SoF stats. */
-    uint64_t responderBytes;        /* Not populated for SoF stats. */
+    uint64_t initiator_pkts;            /* Not populated for SoF stats. */
+    uint64_t responder_pkts;            /* Not populated for SoF stats. */
+    uint64_t initiator_bytes;           /* Not populated for SoF stats. */
+    uint64_t responder_bytes;           /* Not populated for SoF stats. */
     /* QoS related variables */
-    uint64_t initiatorPktsDropped;  /* Not populated for SoF stats. */
-    uint64_t responderPktsDropped;  /* Not populated for SoF stats. */
-    uint64_t initiatorBytesDropped; /* Not populated for SoF stats. */
-    uint64_t responderBytesDropped; /* Not populated for SoF stats. */
-    uint8_t isQoSAppliedOnSrcIntf;  /* Not populated for SoF stats. */
+    uint64_t initiator_pkts_dropped;    /* Not populated for SoF stats. */
+    uint64_t responder_pkts_dropped;    /* Not populated for SoF stats. */
+    uint64_t initiator_bytes_dropped;   /* Not populated for SoF stats. */
+    uint64_t responder_bytes_dropped;   /* Not populated for SoF stats. */
+    uint8_t is_qos_applied_on_src_intf; /* Not populated for SoF stats. */
     struct timeval sof_timestamp;
-    struct timeval eof_timestamp;   /* Not populated for SoF stats. */
+    struct timeval eof_timestamp;       /* Not populated for SoF stats. */
     uint16_t vlan_tag;
     uint16_t address_space_id;
     uint8_t protocol;
     uint8_t flags;
-} Flow_Stats_t;
+} DAQ_FlowStats_t;
 
 /* Packet verdicts passed to daq_msg_finalize(). */
-typedef enum {
+typedef enum
+{
     DAQ_VERDICT_PASS,       /* Pass the packet. */
     DAQ_VERDICT_BLOCK,      /* Block the packet. */
     DAQ_VERDICT_REPLACE,    /* Pass a packet that has been modified in-place. (No resizing allowed!) */
@@ -309,7 +314,8 @@ typedef enum {
     MAX_DAQ_VERDICT
 } DAQ_Verdict;
 
-typedef enum {
+typedef enum
+{
     DAQ_MODE_NONE,
     DAQ_MODE_PASSIVE,
     DAQ_MODE_INLINE,
@@ -326,7 +332,8 @@ typedef struct _daq_variable_desc
     uint32_t flags;
 } DAQ_VariableDesc_t;
 
-typedef enum {
+typedef enum
+{
     DAQ_STATE_UNINITIALIZED,
     DAQ_STATE_INITIALIZED,
     DAQ_STATE_STARTED,
@@ -506,7 +513,7 @@ typedef enum
     DAQ_TCP_OPTS_TS_CHANGED = 0x08,
 } DAQ_TCP_Opts_flags_t;
 
-typedef struct
+typedef struct _daq_tcp_opts
 {
     uint8_t flags;                  // DAQ_TCP_OPTS_*
     uint8_t window_scale;
@@ -533,14 +540,17 @@ typedef struct
 #define DAQ_EFLOW_TUNNEL_TYPE_GTP_TUNNEL    1
 #define DAQ_EFLOW_TUNNEL_TYPE_MPLS_TUNNEL   2
 #define DAQ_EFLOW_TUNNEL_TYPE_OTHER_TUNNEL  3
-typedef struct _DAQ_EFlow_Key_t {
+typedef struct _daq_eflow_key
+{
     uint16_t src_af;                /* AF_INET or AF_INET6 */
     uint16_t dst_af;                /* AF_INET or AF_INET6 */
-    union {
+    union
+    {
         struct in_addr src_ip4;
         struct in6_addr src_ip6;
     } sa;
-    union {
+    union
+    {
         struct in_addr dst_ip4;
         struct in6_addr dst_ip6;
     } da;
@@ -556,7 +566,7 @@ typedef struct _DAQ_EFlow_Key_t {
 #define DAQ_EFLOW_FLOAT             0x01 /* the expected flow can float to a different reader */
 #define DAQ_EFLOW_ALLOW_MULTIPLE    0x02 /* allow multiple connections to use the same expected flow entry */
 #define DAQ_EFLOW_PERSIST           0x04 /* expected flow entry persists even if control channel terminates */
-typedef struct _DAQ_EFlow_Setup_t
+typedef struct
 {
     DAQ_Msg_h ctrl_msg;     // [in] Message containing the companion control channel packet
     DAQ_EFlow_Key_t key;    // [in] Flow key describing the expected flow

@@ -895,7 +895,7 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
     if (cfg->performance_mode)
         return;
 
-    const Flow_Stats_t *stats = (const Flow_Stats_t *) daq_msg_get_hdr(msg);
+    const DAQ_FlowStats_t *stats = (const DAQ_FlowStats_t *) daq_msg_get_hdr(msg);
     char addr_str[INET6_ADDRSTRLEN];
     const struct in6_addr* tmpIp;
     struct tm tm;
@@ -903,21 +903,21 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
 
     printf("\nReceived %s message.\n", msg->type == DAQ_MSG_TYPE_SOF ? "SoF" : "EoF");
 
-    if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN || stats->ingressGroup != DAQ_PKTHDR_UNKNOWN)
+    if (stats->ingress_intf != DAQ_PKTHDR_UNKNOWN || stats->ingress_group != DAQ_PKTHDR_UNKNOWN)
     {
         printf("  Ingress:\n");
-        if (stats->ingressIntf != DAQ_PKTHDR_UNKNOWN)
-            printf("    Interface: %d\n", stats->ingressIntf);
-        if (stats->ingressGroup != DAQ_PKTHDR_UNKNOWN)
-            printf("    Group: %hd\n", stats->ingressGroup);
+        if (stats->ingress_intf != DAQ_PKTHDR_UNKNOWN)
+            printf("    Interface: %d\n", stats->ingress_intf);
+        if (stats->ingress_group != DAQ_PKTHDR_UNKNOWN)
+            printf("    Group: %hd\n", stats->ingress_group);
     }
-    if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN || stats->egressGroup != DAQ_PKTHDR_UNKNOWN)
+    if (stats->egress_intf != DAQ_PKTHDR_UNKNOWN || stats->egress_group != DAQ_PKTHDR_UNKNOWN)
     {
         printf("  Egress:\n");
-        if (stats->egressIntf != DAQ_PKTHDR_UNKNOWN)
-            printf("    Interface: %d\n", stats->egressIntf);
-        if (stats->egressGroup != DAQ_PKTHDR_UNKNOWN)
-            printf("    Group: %hd\n", stats->egressGroup);
+        if (stats->egress_intf != DAQ_PKTHDR_UNKNOWN)
+            printf("    Interface: %d\n", stats->egress_intf);
+        if (stats->egress_group != DAQ_PKTHDR_UNKNOWN)
+            printf("    Group: %hd\n", stats->egress_group);
     }
     printf("  Protocol: %hhu\n", stats->protocol);
     if (stats->vlan_tag != 0)
@@ -932,7 +932,7 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
         printf("\n");
     }
     printf("  Initiator:\n");
-    tmpIp = (const struct in6_addr*)stats->initiatorIp;
+    tmpIp = (const struct in6_addr*)stats->initiator_ip;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
         inet_ntop(AF_INET6, tmpIp, addr_str, sizeof(addr_str));
     else
@@ -940,12 +940,12 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
     printf("    IP: %s", addr_str);
     if (stats->protocol == IPPROTO_UDP || stats->protocol == IPPROTO_TCP
             || stats->protocol == IPPROTO_ICMP || stats->protocol == IPPROTO_ICMPV6)
-        printf(":%d", ntohs(stats->initiatorPort));
+        printf(":%d", ntohs(stats->initiator_port));
     printf("\n");
     if (msg->type == DAQ_MSG_TYPE_EOF)
-        printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->initiatorBytes, stats->initiatorPkts);
+        printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->initiator_bytes, stats->initiator_pkts);
     printf("  Responder:\n");
-    tmpIp = (const struct in6_addr*)stats->responderIp;
+    tmpIp = (const struct in6_addr*)stats->responder_ip;
     if (tmpIp->s6_addr32[0] || tmpIp->s6_addr32[1] || tmpIp->s6_addr16[4] || tmpIp->s6_addr16[5] != 0xFFFF)
         inet_ntop(AF_INET6, tmpIp, addr_str, sizeof(addr_str));
     else
@@ -953,10 +953,10 @@ static void handle_flow_stats_message(DAQTestThreadContext *ctxt, DAQ_Msg_h msg)
     printf("    IP: %s", addr_str);
     if (stats->protocol == IPPROTO_UDP || stats->protocol == IPPROTO_TCP
             || stats->protocol == IPPROTO_ICMP || stats->protocol == IPPROTO_ICMPV6)
-        printf(":%d", ntohs(stats->responderPort));
+        printf(":%d", ntohs(stats->responder_port));
     printf("\n");
     if (msg->type == DAQ_MSG_TYPE_EOF)
-        printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->responderBytes, stats->responderPkts);
+        printf("    Sent: %" PRIu64 " bytes (%" PRIu64 " packets)\n", stats->responder_bytes, stats->responder_pkts);
 
     gmtime_r(&stats->sof_timestamp.tv_sec, &tm);
     strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", &tm);

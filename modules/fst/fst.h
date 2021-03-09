@@ -99,7 +99,7 @@ struct FstEntry
     void update_stats(const DAQ_PktHdr_t *pkthdr, bool swapped);
 
     FstTcpTracker tcp_tracker;
-    Flow_Stats_t flow_stats = { };
+    DAQ_FlowStats_t flow_stats = { };
     uint8_t *ha_state = nullptr;
     uint32_t ha_state_len = 0;
     uint32_t flow_id;
@@ -245,50 +245,50 @@ bool FstTcpTracker::get_meta_ack_data(DAQ_PktTcpAckData_t &ptad, bool c2s)
 
 FstEntry::FstEntry(const DAQ_PktHdr_t *pkthdr, const FstKey &key, uint32_t id, bool swapped)
 {
-    flow_stats.ingressGroup = pkthdr->ingress_group;
-    flow_stats.egressGroup = pkthdr->egress_group;
-    flow_stats.ingressIntf = pkthdr->ingress_index;
-    flow_stats.egressIntf = pkthdr->egress_index;
+    flow_stats.ingress_group = pkthdr->ingress_group;
+    flow_stats.egress_group = pkthdr->egress_group;
+    flow_stats.ingress_intf = pkthdr->ingress_index;
+    flow_stats.egress_intf = pkthdr->egress_index;
 
     if (key.ipver == 4)
     {
-        struct in6_addr *initiatorIp = (struct in6_addr *) &flow_stats.initiatorIp;
-        struct in6_addr *responderIp = (struct in6_addr *) &flow_stats.responderIp;
-        initiatorIp->s6_addr16[5] = 0xFFFF;
-        responderIp->s6_addr16[5] = 0xFFFF;
+        struct in6_addr *initiator_ip = (struct in6_addr *) &flow_stats.initiator_ip;
+        struct in6_addr *responder_ip = (struct in6_addr *) &flow_stats.responder_ip;
+        initiator_ip->s6_addr16[5] = 0xFFFF;
+        responder_ip->s6_addr16[5] = 0xFFFF;
         if (!swapped)
         {
-            initiatorIp->s6_addr32[3] = key.ip_l.ip4.s_addr;
-            responderIp->s6_addr32[3] = key.ip_h.ip4.s_addr;
+            initiator_ip->s6_addr32[3] = key.ip_l.ip4.s_addr;
+            responder_ip->s6_addr32[3] = key.ip_h.ip4.s_addr;
         }
         else
         {
-            initiatorIp->s6_addr32[3] = key.ip_h.ip4.s_addr;
-            responderIp->s6_addr32[3] = key.ip_l.ip4.s_addr;
+            initiator_ip->s6_addr32[3] = key.ip_h.ip4.s_addr;
+            responder_ip->s6_addr32[3] = key.ip_l.ip4.s_addr;
         }
     }
     else if (key.ipver == 6)
     {
         if (!swapped)
         {
-            memcpy(&flow_stats.initiatorIp, key.ip_l.ip6.s6_addr, sizeof(flow_stats.initiatorIp));
-            memcpy(&flow_stats.responderIp, key.ip_h.ip6.s6_addr, sizeof(flow_stats.responderIp));
+            memcpy(&flow_stats.initiator_ip, key.ip_l.ip6.s6_addr, sizeof(flow_stats.initiator_ip));
+            memcpy(&flow_stats.responder_ip, key.ip_h.ip6.s6_addr, sizeof(flow_stats.responder_ip));
         }
         else
         {
-            memcpy(&flow_stats.initiatorIp, key.ip_h.ip6.s6_addr, sizeof(flow_stats.initiatorIp));
-            memcpy(&flow_stats.responderIp, key.ip_l.ip6.s6_addr, sizeof(flow_stats.responderIp));
+            memcpy(&flow_stats.initiator_ip, key.ip_h.ip6.s6_addr, sizeof(flow_stats.initiator_ip));
+            memcpy(&flow_stats.responder_ip, key.ip_l.ip6.s6_addr, sizeof(flow_stats.responder_ip));
         }
     }
     if (!swapped)
     {
-        flow_stats.initiatorPort = key.l4_port_l;
-        flow_stats.responderPort = key.l4_port_h;
+        flow_stats.initiator_port = key.l4_port_l;
+        flow_stats.responder_port = key.l4_port_h;
     }
     else
     {
-        flow_stats.initiatorPort = key.l4_port_h;
-        flow_stats.responderPort = key.l4_port_l;
+        flow_stats.initiator_port = key.l4_port_h;
+        flow_stats.responder_port = key.l4_port_l;
     }
 
     flow_stats.sof_timestamp = pkthdr->ts;
@@ -307,13 +307,13 @@ void FstEntry::update_stats(const DAQ_PktHdr_t *pkthdr, bool swapped)
 {
     if (!swapped == !(flags & FST_ENTRY_FLAG_SWAPPED))
     {
-        flow_stats.initiatorPkts++;
-        flow_stats.initiatorBytes += pkthdr->pktlen;
+        flow_stats.initiator_pkts++;
+        flow_stats.initiator_bytes += pkthdr->pktlen;
     }
     else
     {
-        flow_stats.responderPkts++;
-        flow_stats.responderBytes += pkthdr->pktlen;
+        flow_stats.responder_pkts++;
+        flow_stats.responder_bytes += pkthdr->pktlen;
     }
     flow_stats.eof_timestamp = pkthdr->ts;
 }
