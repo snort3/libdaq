@@ -31,6 +31,9 @@ extern "C" {
 #include <stdint.h>
 #include <unistd.h>
 
+// Comprehensive version number covering all elements of this header
+#define DAQ_COMMON_API_VERSION  0x00030000
+
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
 #    define DAQ_SO_PUBLIC  __attribute__ ((visibility("default")))
