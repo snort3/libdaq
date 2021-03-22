@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030001
+#define DAQ_COMMON_API_VERSION  0x00030002
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -108,25 +108,24 @@ typedef struct _daq_msg
 } DAQ_Msg_t;
 
 /* The DAQ packet header structure. */
-#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x00001  /* The DAQ module actively set the opaque value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_NOT_FORWARDING     0x00002  /* The DAQ module will not be actively forwarding this packet
+#define DAQ_PKT_FLAG_OPAQUE_IS_VALID    0x0001  /* The DAQ module actively set the opaque value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_NOT_FORWARDING     0x0002  /* The DAQ module will not be actively forwarding this packet
                                                     regardless of the verdict (e.g, Passive or Inline Tap interfaces). */
-#define DAQ_PKT_FLAG_PRE_ROUTING        0x00004  /* The packet is being routed via us but packet modifications
+#define DAQ_PKT_FLAG_PRE_ROUTING        0x0004  /* The packet is being routed via us but packet modifications
                                                     (MAC and TTL) have not yet been made. */
-#define DAQ_PKT_FLAG_IGNORE_VLAN        0x00008  /* Ignore vlan tags in the packet */
-#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x00010  /* The DAQ module actively set the flow ID value in the DAQ packet header. */
-#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x00020  /* The packet is destined for local delivery */
-#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x00040  /* The packet was originated locally */
-#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x00080  /* Scrubbed tcp options may be available */
-#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x00100  /* HA State is availble for the flow this packet is associated with. */
-#define DAQ_PKT_FLAG_ERROR_PACKET       0x00200  /* Lower level reports that the packet has errors. */
-#define DAQ_PKT_FLAG_RETRY_PACKET       0x00400  /* Packet is from the retry queue. */
-#define DAQ_PKT_FLAG_TRACE_ENABLED      0x00800  /* The packet has been flagged for tracing by the lower layer. */
-#define DAQ_PKT_FLAG_SIMULATED          0x01000  /* Packet is simulated/virtual */
-#define DAQ_PKT_FLAG_NEW_FLOW           0x02000  /* The packet was the first of a new flow. */
-#define DAQ_PKT_FLAG_REV_FLOW           0x04000  /* The packet is going the reverse direction of the flow initiator.*/
-#define DAQ_PKT_FLAG_DEBUG_ENABLED      0x08000  /* The packet has been flagged for debugging by the lower layer. */
-#define DAQ_PKT_FLAG_SIGNIFICANT_GROUPS 0x10000  /* Interface groups should be used for flow classification. */
+#define DAQ_PKT_FLAG_IGNORE_VLAN        0x0008  /* Ignore vlan tags in the packet */
+#define DAQ_PKT_FLAG_FLOWID_IS_VALID    0x0010  /* The DAQ module actively set the flow ID value in the DAQ packet header. */
+#define DAQ_PKT_FLAG_LOCALLY_DESTINED   0x0020  /* The packet is destined for local delivery */
+#define DAQ_PKT_FLAG_LOCALLY_ORIGINATED 0x0040  /* The packet was originated locally */
+#define DAQ_PKT_FLAG_SCRUBBED_TCP_OPTS  0x0080  /* Scrubbed tcp options may be available */
+#define DAQ_PKT_FLAG_HA_STATE_AVAIL     0x0100  /* HA State is availble for the flow this packet is associated with. */
+#define DAQ_PKT_FLAG_ERROR_PACKET       0x0200  /* Lower level reports that the packet has errors. */
+#define DAQ_PKT_FLAG_TRACE_ENABLED      0x0400  /* Tracing due to packet trace or capture with trace */
+#define DAQ_PKT_FLAG_SIMULATED          0x0800  /* Packet is simulated/virtual */
+#define DAQ_PKT_FLAG_NEW_FLOW           0x1000  /* The packet was the first of a new flow. */
+#define DAQ_PKT_FLAG_REV_FLOW           0x2000  /* The packet is going the reverse direction of the flow initiator.*/
+#define DAQ_PKT_FLAG_DEBUG_ENABLED      0x4000  /* The packet has been flagged for debugging by the lower layer. */
+#define DAQ_PKT_FLAG_SIGNIFICANT_GROUPS 0x8000  /* Interface groups should be used for flow classification. */
 
 #define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
 #define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
@@ -309,8 +308,6 @@ typedef enum
     DAQ_VERDICT_WHITELIST,  /* Pass the packet and fastpath all future packets in the same flow systemwide. */
     DAQ_VERDICT_BLACKLIST,  /* Block the packet and block all future packets in the same flow systemwide. */
     DAQ_VERDICT_IGNORE,     /* Pass the packet and fastpath all future packets in the same flow for this application. */
-    DAQ_VERDICT_RETRY,      /* Hold the packet briefly and resend it to Snort while Snort waits for external response.
-                               Drop any new packets received on that flow while holding before sending them to Snort. */
     MAX_DAQ_VERDICT
 } DAQ_Verdict;
 
@@ -380,16 +377,15 @@ typedef struct _daq_msg_pool_info
 #define DAQ_CAPA_BPF            0x00000080   /* can call set_filter() to establish a BPF */
 #define DAQ_CAPA_DEVICE_INDEX   0x00000100   /* can consistently fill the device_index field in DAQ_PktHdr */
 #define DAQ_CAPA_INJECT_RAW     0x00000200   /* injection of raw packets (no layer-2 headers) */
-#define DAQ_CAPA_RETRY          0x00000400   /* resend packet to Snort after brief delay. */
-#define DAQ_CAPA_DECODE_GTP     0x00000800   /* decodes and tracks flows within GTP. */
-#define DAQ_CAPA_DECODE_TEREDO  0x00001000   /* decodes and tracks flows within Teredo. */
-#define DAQ_CAPA_DECODE_GRE     0x00002000   /* decodes and tracks flows within GRE. */
-#define DAQ_CAPA_DECODE_4IN4    0x00004000   /* decodes and tracks flows of IPv4 within IPv4. */
-#define DAQ_CAPA_DECODE_6IN4    0x00008000   /* decodes and tracks flows of IPv6 within IPv4. */
-#define DAQ_CAPA_DECODE_4IN6    0x00010000   /* decodes and tracks flows of IPv4 within IPv6. */
-#define DAQ_CAPA_DECODE_6IN6    0x00020000   /* decodes and tracks flows of IPv6 within IPv6. */
-#define DAQ_CAPA_DECODE_MPLS    0x00040000   /* decodes and tracks flows within MPLS. */
-#define DAQ_CAPA_DECODE_VXLAN   0x00080000   /* decodes and tracks flows within VXLAN. */
+#define DAQ_CAPA_DECODE_GTP     0x00000400   /* decodes and tracks flows within GTP. */
+#define DAQ_CAPA_DECODE_TEREDO  0x00000800   /* decodes and tracks flows within Teredo. */
+#define DAQ_CAPA_DECODE_GRE     0x00001000   /* decodes and tracks flows within GRE. */
+#define DAQ_CAPA_DECODE_4IN4    0x00002000   /* decodes and tracks flows of IPv4 within IPv4. */
+#define DAQ_CAPA_DECODE_6IN4    0x00004000   /* decodes and tracks flows of IPv6 within IPv4. */
+#define DAQ_CAPA_DECODE_4IN6    0x00008000   /* decodes and tracks flows of IPv4 within IPv6. */
+#define DAQ_CAPA_DECODE_6IN6    0x00010000   /* decodes and tracks flows of IPv6 within IPv6. */
+#define DAQ_CAPA_DECODE_MPLS    0x00020000   /* decodes and tracks flows within MPLS. */
+#define DAQ_CAPA_DECODE_VXLAN   0x00040000   /* decodes and tracks flows within VXLAN. */
 
 /*
  * DAQ I/O Controls (DIOCTLs)

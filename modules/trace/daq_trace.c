@@ -505,8 +505,7 @@ static const char *daq_verdict_strings[MAX_DAQ_VERDICT] = {
     "Replace",      // DAQ_VERDICT_REPLACE
     "Whitelist",    // DAQ_VERDICT_WHITELIST
     "Blacklist",    // DAQ_VERDICT_BLACKLIST
-    "Ignore",       // DAQ_VERDICT_IGNORE
-    "Retry"         // DAQ_VERDICT_RETRY
+    "Ignore"        // DAQ_VERDICT_IGNORE
 };
 
 static int trace_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)

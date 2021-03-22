@@ -785,8 +785,6 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
             printf("HA_STATE_AVAIL ");
         if (hdr->flags & DAQ_PKT_FLAG_ERROR_PACKET)
             printf("ERROR_PACKET ");
-        if (hdr->flags & DAQ_PKT_FLAG_RETRY_PACKET)
-            printf("RETRY_PACKET ");
         if (hdr->flags & DAQ_PKT_FLAG_TRACE_ENABLED)
             printf("TRACE_ENABLED ");
         if (hdr->flags & DAQ_PKT_FLAG_SIMULATED)

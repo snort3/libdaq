@@ -412,7 +412,7 @@ static unsigned dump_daq_msg_receive(void *handle, const unsigned max_recv, cons
 
 static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)
 {
-    static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1, 0 };
+    static const int s_fwd[MAX_DAQ_VERDICT] = { 1, 0, 1, 1, 0, 1 };
     DumpContext *dc = (DumpContext *) handle;
 
     dc->stats.verdicts[verdict]++;

@@ -97,7 +97,6 @@ static struct verdict_xlate {
     { DAQ_VERDICT_WHITELIST, "whitelist" },
     { DAQ_VERDICT_BLACKLIST, "blacklist" },
     { DAQ_VERDICT_IGNORE, "ignore" },
-    { DAQ_VERDICT_RETRY, "retry" },
 };
 
 static void test_string_translation(void **state)

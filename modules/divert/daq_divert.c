@@ -395,8 +395,7 @@ static const DAQ_Verdict verdict_translation_table[MAX_DAQ_VERDICT] = {
     DAQ_VERDICT_PASS,       /* DAQ_VERDICT_REPLACE */
     DAQ_VERDICT_PASS,       /* DAQ_VERDICT_WHITELIST */
     DAQ_VERDICT_BLOCK,      /* DAQ_VERDICT_BLACKLIST */
-    DAQ_VERDICT_PASS,       /* DAQ_VERDICT_IGNORE */
-    DAQ_VERDICT_BLOCK       /* DAQ_VERDICT_RETRY */
+    DAQ_VERDICT_PASS        /* DAQ_VERDICT_IGNORE */
 };
 
 static int divert_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict verdict)

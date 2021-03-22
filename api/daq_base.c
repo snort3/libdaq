@@ -59,8 +59,7 @@ static const char *daq_verdict_strings[MAX_DAQ_VERDICT] = {
     "replace",      // DAQ_VERDICT_REPLACE
     "whitelist",    // DAQ_VERDICT_WHITELIST
     "blacklist",    // DAQ_VERDICT_BLACKLIST
-    "ignore",       // DAQ_VERDICT_IGNORE
-    "retry"         // DAQ_VERDICT_RETRY
+    "ignore"        // DAQ_VERDICT_IGNORE
 };
 
 static const char *daq_mode_strings[MAX_DAQ_MODE] = {
