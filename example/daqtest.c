@@ -24,6 +24,7 @@
 #endif
 
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <errno.h>
 #include <grp.h>
 #include <inttypes.h>
@@ -96,7 +97,8 @@ typedef struct _DAQTestConfig
     bool list_and_exit;
     bool modify_opaque_value;
     bool performance_mode;
-    bool dump_packets;
+    bool dump_hex;
+    bool dump_ascii;
     bool ignore_checksum_errors;
     bool explicit_thread_count;
 } DAQTestConfig;
@@ -229,7 +231,8 @@ static void usage(void)
     printf("  -u <username>     Run as the specified user after initialization (accepts UID)\n");
     printf("  -v                Increase the verbosity level of the DAQ library (may be specified multiple times)\n");
     printf("  -V <verdict>      Specify a default verdict to render on packets (pass (default), block, blacklist, whitelist)\n");
-    printf("  -x                Print a hexdump of each packet received\n");
+    printf("  -x                Dump message data in hex\n");
+    printf("  -X                Dump message data in hex and ASCII\n");
     printf("  -z <num>          Specify the number of packet threads to run (default = 1)\n");
 }
 
@@ -238,19 +241,37 @@ static void print_mac(const uint8_t *addr)
     printf("%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx:%.2hhx", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 }
 
-static void print_hex_dump(const uint8_t *data, unsigned len)
+#define HEXDUMP_BYTES_PER_LINE 16
+static void hexdump(const uint8_t *data, unsigned len, bool ascii)
 {
-    unsigned i;
+    char text[HEXDUMP_BYTES_PER_LINE + 1];
+    unsigned i = 0;
 
-    for (i = 0; i < len; i++)
+    printf("\n");
+    while (i < len)
     {
-        if (i % 16 == 0)
-            printf("\n");
-        else if (i % 2 == 0)
+        if (i % 2 == 0)
             printf(" ");
         printf("%02x", data[i]);
+        if (ascii)
+            text[i % HEXDUMP_BYTES_PER_LINE] = isprint(data[i]) ? data[i] : '.';
+        i++;
+        if (i % HEXDUMP_BYTES_PER_LINE == 0 || i == len)
+        {
+            if (ascii)
+            {
+                text[(i - 1) % HEXDUMP_BYTES_PER_LINE] = '\0';
+                while (i % HEXDUMP_BYTES_PER_LINE != 0)
+                {
+                    printf("%*s", (i % 2) ? 3 : 2, "");
+                    i++;
+                }
+                printf("  %s", text);
+            }
+            printf("\n");
+        }
     }
-    printf("\n\n");
+    printf("\n");
 }
 
 static void initialize_static_data(void)
@@ -292,10 +313,7 @@ static int replace_icmp_data(DAQTestPacket *dtp)
         data += offset;
         dlen -= offset;
     }
-/*
-    printf("%d bytes of data:\n", dlen);
-    print_hex_dump(data, dlen);
-*/
+
     if (memcmp(data, normal_ping_data + offset, dlen) == 0)
     {
         printf("Replacing the ping request padding.\n");
@@ -864,8 +882,8 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     if (ptad)
         printf("TCP ACK Data: SN = %u, WS = %hu\n", ptad->tcp_ack_seq_num, ptad->tcp_window_size);
 
-    if (cfg->dump_packets)
-        print_hex_dump(data, daq_msg_get_data_len(msg));
+    if (cfg->dump_hex)
+        hexdump(data, data_len, cfg->dump_ascii);
 
     if (cfg->modify_opaque_value)
     {
@@ -1076,7 +1094,7 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
 {
     DAQTestModuleConfig *dtmc;
     IPv4Addr *ip;
-    const char *options = "A:b:c:C:d:D:f:g:hi:klm:M:OpP:s:t:T:u:vV:xz:";
+    const char *options = "A:b:c:C:d:D:f:g:hi:klm:M:OpP:s:t:T:u:vV:xXz:";
     char *endptr;
     int ch;
 
@@ -1311,7 +1329,12 @@ static int parse_command_line(int argc, char *argv[], DAQTestConfig *cfg)
                 break;
 
             case 'x':
-                cfg->dump_packets = true;
+                cfg->dump_hex = true;
+                break;
+
+            case 'X':
+                cfg->dump_hex = true;
+                cfg->dump_ascii = true;
                 break;
 
             case 'z':
