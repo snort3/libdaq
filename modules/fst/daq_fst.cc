@@ -281,8 +281,7 @@ static bool process_lost_souls(FstContext *fc, const DAQ_Msg_t *msgs[], unsigned
         msg->hdr = &entry->flow_stats;
         msg->data_len = 0;
         msg->data = nullptr;
-        msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
-        msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = nullptr;
+        memset(msg->meta, 0, sizeof(msg->meta));
         msgs[idx++] = &desc->msg;
 
         debugf("%" PRIu64 ": Produced EoF message for flow %u\n", fc->processed, entry->flow_id);
@@ -307,8 +306,7 @@ static bool process_new_soul(FstContext *fc, std::shared_ptr<FstEntry> entry, co
     msg->hdr = &entry->flow_stats;
     msg->data_len = 0;
     msg->data = nullptr;
-    msg->meta[DAQ_PKT_META_DECODE_DATA] = nullptr;
-    msg->meta[DAQ_PKT_META_TCP_ACK_DATA] = nullptr;
+    memset(msg->meta, 0, sizeof(msg->meta));
     msgs[idx++] = &desc->msg;
 
     debugf("%" PRIu64 ": Produced SoF message for flow %u\n", fc->processed, entry->flow_id);
@@ -434,6 +432,14 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
     msg->hdr = &desc->pkthdr;
     msg->data_len = orig_msg->data_len;
     msg->data = orig_msg->data;
+
+    /* Copy over any metadata from the wrapped message that we won't produce. */
+    for (int slot = 0; slot < DAQ_MSG_META_SLOTS; slot++)
+    {
+        if (slot == DAQ_PKT_META_DECODE_DATA || DAQ_PKT_META_TCP_ACK_DATA)
+            continue;
+        msg->meta[slot] = orig_msg->meta[slot];
+    }
 
     /* Then, set up the DAQ packet header. */
     DAQ_PktHdr_t *pkthdr = &desc->pkthdr;
