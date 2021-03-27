@@ -247,6 +247,13 @@ fi
 AM_CONDITIONAL([BUILD_PCAP_MODULE], [test "$enable_pcap_module" = yes])
 AM_COND_IF([BUILD_PCAP_MODULE], [AC_CONFIG_FILES([modules/pcap/libdaq_static_pcap.pc])])
 
+# Savefile Module
+AC_ARG_ENABLE(savefile-module,
+              AS_HELP_STRING([--disable-savefile-module],[do not build the bundled Savefile module]),
+              [enable_savefile_module="$enableval"], [enable_savefile_module="$DEFAULT_ENABLE"])
+AM_CONDITIONAL([BUILD_SAVEFILE_MODULE], [test "$enable_savefile_module" = yes])
+AM_COND_IF([BUILD_SAVEFILE_MODULE], [AC_CONFIG_FILES([modules/savefile/libdaq_static_savefile.pc])])
+
 # Trace Module
 AC_ARG_ENABLE(trace-module,
               AS_HELP_STRING([--disable-trace-module],[do not build the bundled Trace module]),
@@ -347,8 +354,9 @@ AC_MSG_RESULT([
     Build Divert DAQ module.... : $enable_divert_module
     Build Dump DAQ module...... : $enable_dump_module
     Build FST DAQ module....... : $enable_fst_module
+    Build netmap DAQ module.... : $enable_netmap_module
     Build NFQ DAQ module....... : $enable_nfq_module
     Build PCAP DAQ module...... : $enable_pcap_module
-    Build netmap DAQ module.... : $enable_netmap_module
+    Build Savefile DAQ module.. : $enable_savefile_module
     Build Trace DAQ module..... : $enable_trace_module
 ])

@@ -44,6 +44,10 @@ if BUILD_PCAP_MODULE
 daqtest_static_CFLAGS += -DBUILD_PCAP_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/pcap/libdaq_static_pcap.la $(DAQ_PCAP_LIBS)
 endif
+if BUILD_SAVEFILE_MODULE
+daqtest_static_CFLAGS += -DBUILD_SAVEFILE_MODULE
+daqtest_static_LDADD += ${top_builddir}/modules/savefile/libdaq_static_savefile.la
+endif
 if BUILD_TRACE_MODULE
 daqtest_static_CFLAGS += -DBUILD_TRACE_MODULE
 daqtest_static_LDADD += ${top_builddir}/modules/trace/libdaq_static_trace.la

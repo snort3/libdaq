@@ -137,6 +137,20 @@ endif
     pcap_libdaq_static_pcap_la_LDFLAGS = -static -avoid-version
 endif
 
+if BUILD_SAVEFILE_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += savefile/daq_savefile.la
+    pkgconfig_DATA += savefile/libdaq_static_savefile.pc
+    savefile_daq_savefile_la_SOURCES = savefile/daq_savefile.c
+    savefile_daq_savefile_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    savefile_daq_savefile_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+endif
+    lib_LTLIBRARIES += savefile/libdaq_static_savefile.la
+    savefile_libdaq_static_savefile_la_SOURCES = savefile/daq_savefile.c
+    savefile_libdaq_static_savefile_la_CPPFLAGS = $(AM_CPPFLAGS)
+    savefile_libdaq_static_savefile_la_LDFLAGS = -static -avoid-version
+endif
+
 if BUILD_TRACE_MODULE
 if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += trace/daq_trace.la

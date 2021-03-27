@@ -152,6 +152,9 @@ extern const DAQ_ModuleAPI_t pcap_daq_module_data;
 #ifdef BUILD_NETMAP_MODULE
 extern const DAQ_ModuleAPI_t netmap_daq_module_data;
 #endif
+#ifdef BUILD_SAVEFILE_MODULE
+extern const DAQ_ModuleAPI_t savefile_daq_module_data;
+#endif
 #ifdef BUILD_TRACE_MODULE
 extern const DAQ_ModuleAPI_t trace_daq_module_data;
 #endif
@@ -181,6 +184,9 @@ static DAQ_Module_h static_modules[] =
 #endif
 #ifdef BUILD_NETMAP_MODULE
     &netmap_daq_module_data,
+#endif
+#ifdef BUILD_SAVEFILE_MODULE
+    &savefile_daq_module_data,
 #endif
 #ifdef BUILD_TRACE_MODULE
     &trace_daq_module_data,
