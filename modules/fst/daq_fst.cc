@@ -436,7 +436,7 @@ static bool process_daq_msg(FstContext *fc, const DAQ_Msg_t *orig_msg, const DAQ
     /* Copy over any metadata from the wrapped message that we won't produce. */
     for (int slot = 0; slot < DAQ_MSG_META_SLOTS; slot++)
     {
-        if (slot == DAQ_PKT_META_DECODE_DATA || DAQ_PKT_META_TCP_ACK_DATA)
+        if ((slot == DAQ_PKT_META_DECODE_DATA) || (slot == DAQ_PKT_META_TCP_ACK_DATA))
             continue;
         msg->meta[slot] = orig_msg->meta[slot];
     }
