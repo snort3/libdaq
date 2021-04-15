@@ -267,6 +267,7 @@ typedef struct _daq_ha_state_data
 } DAQ_HA_State_Data_t;
 
 #define DAQ_FS_FLAG_SIGNIFICANT_GROUPS 0x1
+#define DAQ_FS_FLAG_LOGGING_OPTIONAL   0x2
 
 /* Flow statistics structure used for DAQ_MSG_TYPE_SOF and DAQ_MSG_TYPE_EOF. */
 typedef struct _daq_flow_stats
