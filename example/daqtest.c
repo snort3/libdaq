@@ -835,7 +835,7 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
         inet_ntop(daq_napt_info_dst_addr_family(napti), &napti->dst_addr, dst_addr_str, sizeof(dst_addr_str));
         dst_port = ntohs(napti->dst_port);
 
-        printf("NAPT: %s : %hu -> %s : %hu\n", src_addr_str, src_port, dst_addr_str, dst_port);
+        printf("NAPT: Layer %hhu: %s : %hu -> %s : %hu\n", napti->ip_layer, src_addr_str, src_port, dst_addr_str, dst_port);
     }
 
     const DAQ_PktDecodeData_t *pdd = (const DAQ_PktDecodeData_t *) daq_msg_get_meta(msg, DAQ_PKT_META_DECODE_DATA);

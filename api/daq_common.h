@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030002
+#define DAQ_COMMON_API_VERSION  0x00030003
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -159,6 +159,7 @@ typedef struct _daq_napt_info
     uint16_t src_port;
     uint16_t dst_port;
     uint8_t flags;
+    uint8_t ip_layer;
 } DAQ_NAPTInfo_t;
 
 /* Decoded packet information parsed from the Packet message's data.  Currently, all fields refer
