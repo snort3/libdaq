@@ -274,6 +274,11 @@ AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
 
 LIBS=${save_LIBS}
 
+AC_ARG_ENABLE(example,
+              AS_HELP_STRING([--disable-example],[do not build the example]),
+              [enable_example="$enableval"], [enable_example=yes])
+AM_CONDITIONAL([BUILD_EXAMPLE], [test "$enable_example" = yes])
+
 AC_CHECK_LIB([dl], [dlopen], [LIBDL="-ldl"])
 
 AM_CONDITIONAL([BUILD_SHARED_MODULES], [ test "$enable_shared" = yes ])
