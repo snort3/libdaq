@@ -564,6 +564,8 @@ typedef struct _daq_eflow_key
 #define DAQ_EFLOW_FLOAT             0x01 /* the expected flow can float to a different reader */
 #define DAQ_EFLOW_ALLOW_MULTIPLE    0x02 /* allow multiple connections to use the same expected flow entry */
 #define DAQ_EFLOW_PERSIST           0x04 /* expected flow entry persists even if control channel terminates */
+#define DAQ_EFLOW_BIDIRECTIONAL     0x08 /* create expected flow in both direction */
+
 typedef struct
 {
     DAQ_Msg_h ctrl_msg;     // [in] Message containing the companion control channel packet
