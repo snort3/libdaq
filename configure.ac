@@ -207,13 +207,18 @@ AC_ARG_ENABLE(netmap-module,
               AS_HELP_STRING([--disable-netmap-module],[do not build the bundled netmap module]),
               [enable_netmap_module="$enableval"], [enable_netmap_module="$DEFAULT_ENABLE"])
 if test "$enable_netmap_module" = yes; then
+    save_CPPFLAGS="$CPPFLAGS"
+    CPPFLAGS="$NETMAP_CPPFLAGS $CPPFLAGS"
     AC_CHECK_HEADERS([net/netmap.h net/netmap_user.h], [], [enable_netmap_module=no], [
+                      #include <stdint.h>
                       #include <net/if.h>
                       ])
     AC_CHECK_DECL([NETMAP_API], [], [enable_netmap_module=no], [
+                   #include <stdint.h>
                    #include <net/if.h>
                    #include <net/netmap.h>
                    ])
+    CPPFLAGS="$save_CPPFLAGS"
 fi
 AM_CONDITIONAL([BUILD_NETMAP_MODULE], [test "$enable_netmap_module" = yes])
 AM_COND_IF([BUILD_NETMAP_MODULE], [AC_CONFIG_FILES([modules/netmap/libdaq_static_netmap.pc])])
@@ -312,6 +317,7 @@ AC_SUBST(DAQ_DUMP_LIBS)
 AC_SUBST(DAQ_FST_LIBS)
 AC_SUBST(DAQ_NFQ_LIBS)
 AC_SUBST(DAQ_PCAP_LIBS)
+AC_SUBST(NETMAP_CPPFLAGS)
 
 if test "${CODE_COVERAGE_ENABLED}" = yes ; then
     CFLAGS=`echo $CFLAGS | ${SED} 's/-O\w//g'`
