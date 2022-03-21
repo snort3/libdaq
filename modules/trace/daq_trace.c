@@ -415,7 +415,7 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
                 inet_ntop(AF_INET6, &key->da.dst_ip6, dst_addr_str, sizeof(dst_addr_str));
             fprintf(tc->outfile, "    %s:%hu -> %s:%hu (%hhu)\n", src_addr_str, key->src_port,
                     dst_addr_str, key->dst_port, key->protocol);
-            fprintf(tc->outfile, "    %hu %hu %hu %hu 0x%X %u\n", key->address_space_id, key->tunnel_type,
+            fprintf(tc->outfile, "    %u %hu %hu %hu 0x%X %u\n", key->address_space_id, key->tunnel_type,
                     key->vlan_id, key->vlan_cnots, cef->flags, cef->timeout_ms);
             break;
         }

@@ -777,7 +777,7 @@ static DAQ_Verdict handle_packet_message(DAQTestThreadContext *ctxt, DAQ_Msg_h m
     if (cfg->performance_mode)
         return cfg->default_verdict;
 
-    printf("\nPacket %" PRIu64 ": Size = %u/%u, Ingress = %d (Group = %hd), Egress = %d (Group = %hd), Addr Space ID = %hu",
+    printf("\nPacket %" PRIu64 ": Size = %u/%u, Ingress = %d (Group = %hd), Egress = %d (Group = %hd), Addr Space ID = %u",
             ctxt->packet_count, data_len, hdr->pktlen, hdr->ingress_index, hdr->ingress_group,
             hdr->egress_index, hdr->egress_group, hdr->address_space_id);
     if (hdr->flags & DAQ_PKT_FLAG_OPAQUE_IS_VALID)

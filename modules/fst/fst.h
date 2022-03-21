@@ -75,7 +75,7 @@ struct FstKey
     } ip_h;
     uint16_t l4_port_l;
     uint16_t l4_port_h;
-    uint16_t addr_space_id;
+    uint32_t addr_space_id;
     uint16_t vlan_tag;
     uint8_t protocol;
     uint8_t ipver;

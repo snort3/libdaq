@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030003
+#define DAQ_COMMON_API_VERSION  0x00030004
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -141,7 +141,8 @@ typedef struct _daq_pkt_hdr
                                     Directly related to the opaque value in DAQ_FlowStats_t. */
     uint32_t flow_id;           /* Flow ID value provided from the DAQ module or underlying hardware. */
     uint32_t flags;             /* Flags for the packet (DAQ_PKT_FLAG_*) */
-    uint16_t address_space_id;  /* Unique ID of the address space */
+    uint32_t address_space_id;  /* Unique ID of the address space */
+    uint32_t tenant_id;         /* Unique ID of the tenant */
 } DAQ_PktHdr_t;
 
 #define DAQ_PKT_META_NAPT_INFO      0
@@ -295,8 +296,9 @@ typedef struct _daq_flow_stats
     uint8_t is_qos_applied_on_src_intf; /* Not populated for SoF stats. */
     struct timeval sof_timestamp;
     struct timeval eof_timestamp;       /* Not populated for SoF stats. */
+    uint32_t address_space_id;
+    uint32_t tenant_id;
     uint16_t vlan_tag;
-    uint16_t address_space_id;
     uint8_t protocol;
     uint8_t flags;
 } DAQ_FlowStats_t;
@@ -555,7 +557,7 @@ typedef struct _daq_eflow_key
     uint8_t protocol;           /* TCP or UDP (IPPROTO_TCP or IPPROTO_UDP )*/
     uint16_t src_port;          /* TCP/UDP source port */
     uint16_t dst_port;          /* TCP/UDP destination port */
-    uint16_t address_space_id;  /* Address Space ID */
+    uint32_t address_space_id;  /* Address Space ID */
     uint16_t tunnel_type;       /* Tunnel type (DAQ_DP_TUNNEL_TYPE_*) */
     uint16_t vlan_id;           /* VLAN ID */
     uint16_t vlan_cnots;        /* VLAN ID is a C-Tag (0x8100) rather than an S-Tag (0x8a88) */
