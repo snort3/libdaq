@@ -261,6 +261,13 @@ AC_ARG_ENABLE(trace-module,
 AM_CONDITIONAL([BUILD_TRACE_MODULE], [test "$enable_trace_module" = yes])
 AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/trace/libdaq_static_trace.pc])])
 
+# GWLB Module
+AC_ARG_ENABLE(gwlb-module,
+              AS_HELP_STRING([--disable-gwlb-module],[do not build the bundled GWLB module]),
+              [enable_gwlb_module="$enableval"], [enable_gwlb_module="$DEFAULT_ENABLE"])
+AM_CONDITIONAL([BUILD_GWLB_MODULE], [test "$enable_gwlb_module" = yes])
+AM_COND_IF([BUILD_GWLB_MODULE], [AC_CONFIG_FILES([modules/gwlb/libdaq_static_gwlb.pc])])
+
 #AC_SUBST(DNET_LDFLAGS)
 
 AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
@@ -270,7 +277,8 @@ AM_CONDITIONAL([BUILD_MODULES], [test "$enable_afpacket_module" = yes -o \
                                       "$enable_fst_module" = yes -o \
                                       "$enable_nfq_module" = yes -o \
                                       "$enable_pcap_module" = yes -o \
-                                      "$enable_trace_module" = yes])
+                                      "$enable_trace_module" = yes -o \
+                                      "$enable_gwlb_module" = yes])
 
 LIBS=${save_LIBS}
 
@@ -359,4 +367,5 @@ AC_MSG_RESULT([
     Build PCAP DAQ module...... : $enable_pcap_module
     Build Savefile DAQ module.. : $enable_savefile_module
     Build Trace DAQ module..... : $enable_trace_module
+    Build GWLB DAQ module...... : $enable_gwlb_module
 ])

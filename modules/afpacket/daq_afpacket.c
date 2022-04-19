@@ -797,6 +797,7 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
     char intf[IFNAMSIZ];
     size_t len;
     int num_intfs = 0;
+    int tot_intfs = 0;
     int rval = DAQ_ERROR;
 
     afpc = calloc(1, sizeof(AFPacket_Context_t));
@@ -920,6 +921,7 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
             afi->next = afpc->instances;
             afpc->instances = afi;
             num_intfs++;
+            tot_intfs++;
             if (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE)
             {
                 if (num_intfs == 2)
@@ -943,11 +945,20 @@ static int afpacket_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleI
         dev += len;
     }
 
-    /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
-    if (!afpc->instances || (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE && num_intfs != 0))
+    /* Special case for gwlb wrapper interface.. Work with one interface */
+    if ((daq_base_api.config_get_mode(modcfg) == DAQ_MODE_INLINE) && (tot_intfs == 1))
     {
-        SET_ERROR(modinst, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
-        goto err;
+        afi = afpc->instances;
+        afi->peer = afi;
+    }
+    else
+    {
+        /* If there are any leftover unbridged interfaces and we're not in Passive mode, error out. */
+        if (!afpc->instances || (daq_base_api.config_get_mode(modcfg) != DAQ_MODE_PASSIVE && num_intfs != 0))
+        {
+            SET_ERROR(modinst, "%s: Invalid interface specification: '%s'!", __func__, afpc->device);
+            goto err;
+        }
     }
 
     /*

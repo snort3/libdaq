@@ -16,6 +16,9 @@ or this:
 
     eth0:eth1::eth2:eth3
 
+An exception to this rule is when this DAQ is used in GWLB environment
+(see below) where a single interface is used for ingress and egress.
+
 Passive mode can listen on multiple interfaces simultaneously with a similarly
 crafted input specification consisting of colon-separated interface names like
 this:
@@ -23,6 +26,21 @@ this:
     eth0:eth1:eth2:eth3
 
 The AFPacket DAQ module will always run the interfaces in promiscuous mode.
+
+Use in GWLB environment
+-----------------------
+A Gateway Load Balancer (GWLB) is used to deploy, scale and manage third-party
+virtual appliances in a public cloud environment. It provides a bump in the
+wire technology and ensures that traffic to a public endpoint is first
+processed by the virtual appliance before being sent to the target application. The
+GWLB and registered virtual appliances exchange application traffic by using
+some encapsulation protocol like Geneve (RFC 8926) or VxLAN (RFC 7348).
+
+This DAQ could be used in such an environment by using daq_gwlb as wrapper
+on this daq. To use AFPacket in this mode, a single interface is to be
+specified in the device string and the inline mode of operation enabled.
+
+Also see README.gwlb.md
 
 Requirements
 ------------

@@ -165,5 +165,19 @@ endif
     trace_libdaq_static_trace_la_LDFLAGS = -static -avoid-version
 endif
 
+if BUILD_GWLB_MODULE
+if BUILD_SHARED_MODULES
+    pkglib_LTLIBRARIES += gwlb/daq_gwlb.la
+    pkgconfig_DATA += gwlb/libdaq_static_gwlb.pc
+    gwlb_daq_gwlb_la_SOURCES = gwlb/daq_gwlb.cc
+    gwlb_daq_gwlb_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    gwlb_daq_gwlb_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
+endif
+    lib_LTLIBRARIES += gwlb/libdaq_static_gwlb.la
+    gwlb_libdaq_static_gwlb_la_SOURCES = gwlb/daq_gwlb.cc
+    gwlb_libdaq_static_gwlb_la_CPPFLAGS = $(AM_CPPFLAGS)
+    gwlb_libdaq_static_gwlb_la_LDFLAGS = -static -avoid-version
+endif
+
 AM_CPPFLAGS = @AM_CPPFLAGS@ -I$(top_srcdir)/api
 
