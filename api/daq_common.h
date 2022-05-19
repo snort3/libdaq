@@ -126,6 +126,7 @@ typedef struct _daq_msg
 #define DAQ_PKT_FLAG_REV_FLOW           0x2000  /* The packet is going the reverse direction of the flow initiator.*/
 #define DAQ_PKT_FLAG_DEBUG_ENABLED      0x4000  /* The packet has been flagged for debugging by the lower layer. */
 #define DAQ_PKT_FLAG_SIGNIFICANT_GROUPS 0x8000  /* Interface groups should be used for flow classification. */
+#define DAQ_PKT_FLAG_SKIP_EF            0x10000 /* Skip processing for EF. */
 
 #define DAQ_PKTHDR_UNKNOWN  -1  /* Ingress or Egress not known */
 #define DAQ_PKTHDR_FLOOD    -2  /* Egress is flooding */
