@@ -28,7 +28,6 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <linux/if_ether.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
