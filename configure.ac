@@ -265,6 +265,9 @@ AM_COND_IF([BUILD_TRACE_MODULE], [AC_CONFIG_FILES([modules/trace/libdaq_static_t
 AC_ARG_ENABLE(gwlb-module,
               AS_HELP_STRING([--disable-gwlb-module],[do not build the bundled GWLB module]),
               [enable_gwlb_module="$enableval"], [enable_gwlb_module="$DEFAULT_ENABLE"])
+if test "$enable_gwlb_module" = yes -a "$enable_afpacket_module" != yes; then
+    enable_gwlb_module=no
+fi
 AM_CONDITIONAL([BUILD_GWLB_MODULE], [test "$enable_gwlb_module" = yes])
 AM_COND_IF([BUILD_GWLB_MODULE], [AC_CONFIG_FILES([modules/gwlb/libdaq_static_gwlb.pc])])
 
