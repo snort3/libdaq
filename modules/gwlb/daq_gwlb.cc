@@ -47,6 +47,9 @@
 #define CALL_SUBAPI(ctxt, fname, ...) \
     ctxt->subapi.fname.func(ctxt->subapi.fname.context, __VA_ARGS__)
 
+#define CALL_SUBAPI_NOARGS(ctxt, fname) \
+    ctxt->subapi.fname.func(ctxt->subapi.fname.context)
+
 struct vlan_header {
     uint16_t                    tpid;
     uint16_t                    ether_type;
@@ -283,6 +286,14 @@ static int gwlb_daq_inject_relative (void* handle, const DAQ_Msg_t* msg, const u
     return CALL_SUBAPI(ctx, inject_relative, msg, data, dlen, reverse);
 }
 
+static uint32_t gwlb_daq_get_capabilities(void *handle)
+{
+    GWLBContext* ctx = static_cast<GWLBContext*>(handle);
+
+    return (CALL_SUBAPI_NOARGS(ctx, get_capabilities) | DAQ_CAPA_DECODE_GENEVE);
+}
+
+
 extern "C" {
 #ifdef BUILDING_SO
 DAQ_SO_PUBLIC DAQ_ModuleAPI_t DAQ_MODULE_DATA =
@@ -310,7 +321,7 @@ DAQ_ModuleAPI_t gwlb_daq_module_data =
     /* .get_stats = */          NULL,
     /* .reset_stats = */        NULL,
     /* .get_snaplen = */        NULL,
-    /* .get_capabilities = */   NULL,
+    /* .get_capabilities = */   gwlb_daq_get_capabilities,
     /* .get_datalink_type = */  NULL,
     /* .config_load = */        NULL,
     /* .config_swap = */        NULL,
