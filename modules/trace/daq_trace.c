@@ -449,6 +449,10 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
             fprintf(tc->outfile, "\n");
             break;
         }
+        case DIOCTL_GET_PRIV_DATA_LEN:
+        {
+            break;
+        }
 
         default:
             fprintf(tc->outfile, "IOCTL: %d (%zu)\n", cmd, arglen);

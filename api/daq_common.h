@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030004
+#define DAQ_COMMON_API_VERSION  0x00030005
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -411,6 +411,7 @@ typedef enum
     DIOCTL_CREATE_EXPECTED_FLOW,
     DIOCTL_DIRECT_INJECT_PAYLOAD,
     DIOCTL_DIRECT_INJECT_RESET,
+    DIOCTL_GET_PRIV_DATA_LEN,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
@@ -615,6 +616,17 @@ typedef struct
     DAQ_Msg_h msg;      // [in] Message belonging to the flow to be injected on
     uint8_t direction;  // [in] Direction in which to inject the reset relative to the message (DAQ_DIR_*)
 } DIOCTL_DirectInjectReset;
+
+/*
+ * Command: DIOCTL_GET_PRIV_DATA_LEN
+ * Description: Get length of private data.
+ * Argument: DIOCTL_GetPrivDataLen
+ */
+typedef struct
+{
+    DAQ_Msg_h msg;           // [in] Message from which to get priv data length.
+    uint16_t priv_data_len;  // [out] Length of priv data.
+} DIOCTL_GetPrivDataLen;
 
 #ifdef __cplusplus
 }
