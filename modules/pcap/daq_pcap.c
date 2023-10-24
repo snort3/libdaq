@@ -530,6 +530,11 @@ static int pcap_daq_get_stats(void *handle, DAQ_Stats_t *stats)
 
     memcpy(stats, &pc->stats, sizeof(DAQ_Stats_t));
 
+    if (pc->mode == DAQ_MODE_READ_FILE)
+    {
+        stats->hw_packets_received = stats->packets_received + stats->packets_filtered;
+    }
+
     return DAQ_SUCCESS;
 }
 
