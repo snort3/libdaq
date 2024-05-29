@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030005
+#define DAQ_COMMON_API_VERSION  0x00030006
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -412,6 +412,7 @@ typedef enum
     DIOCTL_DIRECT_INJECT_PAYLOAD,
     DIOCTL_DIRECT_INJECT_RESET,
     DIOCTL_GET_PRIV_DATA_LEN,
+    DIOCTL_GET_CPU_PROFILE_DATA,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
@@ -627,6 +628,18 @@ typedef struct
     DAQ_Msg_h msg;           // [in] Message from which to get priv data length.
     uint16_t priv_data_len;  // [out] Length of priv data.
 } DIOCTL_GetPrivDataLen;
+
+/*
+ * Command: DIOCTL_GET_CPU_PROFILE_DATA 
+ * Description: Get CPU Profile Data
+ * Argument: DIOCTL_GetCpuProfileData 
+ */
+typedef struct
+{
+    float cpu_usage_percent_30s;   /* [out] cpu profile data for the last  30 seconds  */
+    float cpu_usage_percent_120s;  /* [out] cpu profile data for the last 120 seconds */
+    float cpu_usage_percent_300s;  /* [out] cpu profile data for the last 300 seconds */
+} DIOCTL_GetCpuProfileData;
 
 #ifdef __cplusplus
 }
