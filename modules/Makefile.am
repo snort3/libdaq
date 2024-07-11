@@ -98,12 +98,12 @@ if BUILD_SHARED_MODULES
     pkglib_LTLIBRARIES += netmap/daq_netmap.la
     pkgconfig_DATA += netmap/libdaq_static_netmap.pc
     netmap_daq_netmap_la_SOURCES = netmap/daq_netmap.c
-    netmap_daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO
+    netmap_daq_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) -DBUILDING_SO $(NETMAP_CPPFLAGS)
     netmap_daq_netmap_la_LDFLAGS = -module -export-dynamic -avoid-version -shared
 endif
     lib_LTLIBRARIES += netmap/libdaq_static_netmap.la
     netmap_libdaq_static_netmap_la_SOURCES = netmap/daq_netmap.c
-    netmap_libdaq_static_netmap_la_CPPFLAGS = $(AM_CPPFLAGS)
+    netmap_libdaq_static_netmap_la_CPPFLAGS = $(AM_CPPFLAGS) $(NETMAP_CPPFLAGS)
     netmap_libdaq_static_netmap_la_LDFLAGS = -static -avoid-version
 endif
 
