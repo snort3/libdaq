@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030006
+#define DAQ_COMMON_API_VERSION  0x00030007
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -351,6 +351,7 @@ typedef struct _daq_stats
     uint64_t packets_received;          /* Packets received by this instance */
     uint64_t packets_filtered;          /* Packets filtered by this instance's BPF */
     uint64_t packets_injected;          /* Packets injected by this instance */
+    uint64_t packets_outstanding;       /* Packets outstanding in this instance */
     uint64_t verdicts[MAX_DAQ_VERDICT]; /* Counters of packets handled per-verdict. */
 } DAQ_Stats_t;
 
