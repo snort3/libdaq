@@ -30,6 +30,7 @@ extern "C" {
 
 /* Relevant ethertypes lifted from Linux's if_ether.h since there doesn't seem to be a reliable
     cross-platform way of obtaining all of them. */
+#define ETYPE_MIN       1536        /* smaller values encode 802.3 length */
 #define ETYPE_ARP       0x0806      /* Address Resolution packet    */
 #define ETYPE_IP        0x0800      /* Internet Protocol packet */
 #define ETYPE_IPV6      0x86DD      /* IPv6 over bluebook       */
@@ -47,6 +48,15 @@ typedef struct
     uint16_t vth_pri_cfi_vlan;
     uint16_t vth_proto;  /* protocol field... */
 } VlanTagHdr;
+
+#define SNAP_SAPS       0xaaaa
+typedef struct
+{
+    uint16_t sh_dsap_ssap;
+    uint16_t sh_ctl_oc0;
+    uint16_t sh_oc1_oc2;
+    uint16_t sh_proto;
+} SnapHdr;
 
 typedef struct
 {
@@ -526,6 +536,23 @@ static inline bool is_vlan_ethertype(uint16_t ether_type)
     }
 }
 
+static inline bool decode_snap(const uint8_t *cursor, uint32_t len, uint16_t *ether_type, uint16_t *offset)
+{
+    if (*ether_type >= ETYPE_MIN)
+        return true;
+
+    if (len < *offset + sizeof(SnapHdr))
+        return false;
+
+    const SnapHdr *snap = (const SnapHdr *) (cursor + *offset);
+    if (snap->sh_dsap_ssap != htons(SNAP_SAPS))
+        return false;
+
+    *ether_type = ntohs(snap->sh_proto);
+    *offset += sizeof(*snap);
+    return true;
+}
+
 static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *dd)
 {
     update_pyld_csum_offsets(cursor, dd);
@@ -537,6 +564,9 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
     const EthHdr *eth = (const EthHdr *) cursor;
     uint16_t ether_type = ntohs(eth->ether_type);
     uint16_t offset = sizeof(*eth);
+
+    if (!decode_snap(cursor, len, &ether_type, &offset))
+        return false;
 
     dd->eth = eth;
     dd->decoded_data.flags.bits.l2 = true;
@@ -556,6 +586,9 @@ static inline bool decode_eth(const uint8_t *cursor, uint32_t len, DecodeData *d
         if (dd->vlan_tags > 1)
             dd->decoded_data.flags.bits.vlan_qinq = true;
     }
+
+    if (!decode_snap(cursor, len, &ether_type, &offset))
+        return false;
 
     switch (ether_type)
     {
