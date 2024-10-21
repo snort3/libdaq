@@ -3,7 +3,7 @@
 
 m4_define([daq_major_version], [3])
 m4_define([daq_minor_version], [0])
-m4_define([daq_patch_version], [16])
+m4_define([daq_patch_version], [17])
 m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version])
 
 # Kill the 'divert' macro with extreme prejudice so it stops clashing with references
