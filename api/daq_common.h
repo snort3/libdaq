@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030007
+#define DAQ_COMMON_API_VERSION  0x00030008
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -414,6 +414,7 @@ typedef enum
     DIOCTL_DIRECT_INJECT_RESET,
     DIOCTL_GET_PRIV_DATA_LEN,
     DIOCTL_GET_CPU_PROFILE_DATA,
+    DIOCTL_GET_SNORT_LATENCY_DATA,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
@@ -641,6 +642,20 @@ typedef struct
     float cpu_usage_percent_120s;  /* [out] cpu profile data for the last 120 seconds */
     float cpu_usage_percent_300s;  /* [out] cpu profile data for the last 300 seconds */
 } DIOCTL_GetCpuProfileData;
+
+/*
+ * Command: DIOCTL_GET_SNORT_LATENCY_DATA
+ * Description: Get Snort Latency Data
+ * Argument: DIOCTL_GetSnortLatencyData 
+ */
+typedef struct
+{
+    uint64_t max_pkt_time;             /* Max packet snort processing latency seen in last 5 minutes */
+    uint64_t snort_up_max_pkt_time;    /* Max packet snort processing latency seen from snort up */
+    uint64_t pkt_count;                /* Total packets pulled by snort for processing in last 5 minutes */
+    uint64_t sum_time;                 /* Total latency of all packets processed by snort in last 5 minutes */
+    uint64_t conn_meta_null_counters;  /* Number of times packet conn meta was null in last 5 minutes */
+} DIOCTL_GetSnortLatencyData;
 
 #ifdef __cplusplus
 }
