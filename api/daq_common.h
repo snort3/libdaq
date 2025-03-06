@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030008
+#define DAQ_COMMON_API_VERSION  0x00030009
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -643,19 +643,32 @@ typedef struct
     float cpu_usage_percent_300s;  /* [out] cpu profile data for the last 300 seconds */
 } DIOCTL_GetCpuProfileData;
 
-/*
- * Command: DIOCTL_GET_SNORT_LATENCY_DATA
- * Description: Get Snort Latency Data
- * Argument: DIOCTL_GetSnortLatencyData 
- */
-typedef struct
+* Command: DIOCTL_GET_SNORT_LATENCY_DATA
+* Description: Get Snort Latency Data
+* Argument: DIOCTL_GetSnortLatencyData
+*/
+
+typedef enum
+{
+    DAQ_SNORT_LATENCY_PROTO_TCP,     /* TCP flow Snort processing time */
+    DAQ_SNORT_LATENCY_PROTO_UDP,     /* UDP flow Snort processing time */
+    DAQ_SNORT_LATENCY_PROTO_OTHERS,  /* Non TCP, UDP Snort processing time */
+    DAQ_SNORT_LATENCY_PROTO_MAX
+} DAQ_snort_latency_proto_t;
+
+typedef struct _daq_snort_latency_data
 {
     uint64_t max_pkt_time;             /* Max packet snort processing latency seen in last 5 minutes */
     uint64_t snort_up_max_pkt_time;    /* Max packet snort processing latency seen from snort up */
     uint64_t pkt_count;                /* Total packets pulled by snort for processing in last 5 minutes */
     uint64_t sum_time;                 /* Total latency of all packets processed by snort in last 5 minutes */
     uint64_t conn_meta_null_counters;  /* Number of times packet conn meta was null in last 5 minutes */
-} DIOCTL_GetSnortLatencyData;
+} DAQ_snort_latency_data_t;
+
+typedef struct {
+    /* Array of Snort processing time based on protocol */
+    DAQ_snort_latency_data_t snort_latency_data[DAQ_SNORT_LATENCY_PROTO_MAX];
+} DIOCTL_ GetSnortLatencyData;
 
 #ifdef __cplusplus
 }
