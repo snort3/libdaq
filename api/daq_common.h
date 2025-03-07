@@ -643,7 +643,8 @@ typedef struct
     float cpu_usage_percent_300s;  /* [out] cpu profile data for the last 300 seconds */
 } DIOCTL_GetCpuProfileData;
 
-* Command: DIOCTL_GET_SNORT_LATENCY_DATA
+
+/* Command: DIOCTL_GET_SNORT_LATENCY_DATA
 * Description: Get Snort Latency Data
 * Argument: DIOCTL_GetSnortLatencyData
 */
@@ -668,7 +669,7 @@ typedef struct _daq_snort_latency_data
 typedef struct {
     /* Array of Snort processing time based on protocol */
     DAQ_snort_latency_data_t snort_latency_data[DAQ_SNORT_LATENCY_PROTO_MAX];
-} DIOCTL_ GetSnortLatencyData;
+} DIOCTL_GetSnortLatencyData;
 
 #ifdef __cplusplus
 }
