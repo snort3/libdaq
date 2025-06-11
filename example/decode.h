@@ -494,15 +494,21 @@ static inline bool decode_ip(const uint8_t *cursor, uint32_t len, DecodeData *dd
     dd->decoded_data.flags.bits.l3 = true;
     dd->decoded_data.flags.bits.ipv4 = true;
 
+    const uint16_t ipoff = ntohs(ip->frag_off);
+    const bool is_fragmented = (ipoff & IP_MF) != 0 || (ipoff & IP_OFFMASK) != 0;
     uint16_t offset = hlen;
-    switch (dd->ip->protocol)
+    
+    if (!is_fragmented) 
     {
-        case IPPROTO_TCP:
-            return decode_tcp(cursor + offset, len - offset, dd);
-        case IPPROTO_UDP:
-            return decode_udp(cursor + offset, len - offset, dd);
-        case IPPROTO_ICMP:
-            return decode_icmp(cursor + offset, len - offset, dd);
+        switch (dd->ip->protocol)
+        {
+            case IPPROTO_TCP:
+                return decode_tcp(cursor + offset, len - offset, dd);
+            case IPPROTO_UDP:
+                return decode_udp(cursor + offset, len - offset, dd);
+            case IPPROTO_ICMP:
+                return decode_icmp(cursor + offset, len - offset, dd);
+        }
     }
 
     cursor += offset;
