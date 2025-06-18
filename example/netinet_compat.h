@@ -66,6 +66,9 @@ typedef struct icmp6_hdr Icmp6Hdr;
 #else
 
 #define       IP_MAXPACKET    65535           /* maximum packet size */
+#define       IP_DF		      0x4000		  /* don't fragment flag */
+#define       IP_MF           0x2000          /* more fragments flag */
+#define       IP_OFFMASK      0x1fff          /* mask for fragmenting bits */
 typedef struct _ip_hdr
 {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
