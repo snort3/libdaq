@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030009
+#define DAQ_COMMON_API_VERSION  0x00030010
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -393,6 +393,7 @@ typedef struct _daq_msg_pool_info
 #define DAQ_CAPA_DECODE_MPLS    0x00020000   /* decodes and tracks flows within MPLS. */
 #define DAQ_CAPA_DECODE_VXLAN   0x00040000   /* decodes and tracks flows within VXLAN. */
 #define DAQ_CAPA_DECODE_GENEVE  0x00080000   /* decodes and tracks flows within Geneve. */
+#define DAQ_CAPA_INJECT_DROP    0x00100000   /* can call ioctl() for DIOCTL_SET_INJECT_DROP */
 
 /*
  * DAQ I/O Controls (DIOCTLs)
@@ -415,6 +416,7 @@ typedef enum
     DIOCTL_GET_PRIV_DATA_LEN,
     DIOCTL_GET_CPU_PROFILE_DATA,
     DIOCTL_GET_SNORT_LATENCY_DATA,
+    DIOCTL_SET_INJECT_DROP,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
