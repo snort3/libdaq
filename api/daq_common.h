@@ -302,6 +302,7 @@ typedef struct _daq_flow_stats
     uint16_t vlan_tag;
     uint8_t protocol;
     uint8_t flags;
+    uint64_t drop_reason;
 } DAQ_FlowStats_t;
 
 /* Packet verdicts passed to daq_msg_finalize(). */
