@@ -303,6 +303,7 @@ typedef struct _daq_flow_stats
     uint8_t protocol;
     uint8_t flags;
     uint64_t drop_reason;
+    uint16_t tcp_flag;
 } DAQ_FlowStats_t;
 
 /* Packet verdicts passed to daq_msg_finalize(). */
