@@ -668,6 +668,24 @@ typedef struct _daq_snort_latency_data
     uint64_t pkt_count;                /* Total packets pulled by snort for processing in last 5 minutes */
     uint64_t sum_time;                 /* Total latency of all packets processed by snort in last 5 minutes */
     uint64_t conn_meta_null_counters;  /* Number of times packet conn meta was null in last 5 minutes */
+    /* L3 ip addr Information for a packet identified as having the max latency in last 5 mins */
+    struct in6_addr max_pkt_src_addr;
+    struct in6_addr max_pkt_dst_addr;
+    /* L4 Information for a packet identified as having the max latency in last 5 mins */
+    uint16_t max_pkt_src_port;
+    uint16_t max_pkt_dst_port;
+    /* L3 ip addr Information for a packet identified as having the max latency since snort up */
+    struct in6_addr snort_up_max_pkt_src_addr;
+    struct in6_addr snort_up_max_pkt_dst_addr;
+    /* L4 Information for a packet identified as having the max latency since snort up */
+    uint16_t snort_up_max_pkt_src_port;
+    uint16_t snort_up_max_pkt_dst_port;
+    /* L3 ipv6 validation flags for a packet identified as having the max latency in last 5 mins */
+    uint32_t max_pkt_src_ipv6:1;
+    uint32_t max_pkt_dst_ipv6:1;
+    /* L3 ipv6 validation flags for a packet identified as having the max latency since snort up */
+    uint32_t snort_up_max_pkt_src_ipv6:1;
+    uint32_t snort_up_max_pkt_dst_ipv6:1;
 } DAQ_snort_latency_data_t;
 
 typedef struct {
