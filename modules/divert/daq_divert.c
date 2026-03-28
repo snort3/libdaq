@@ -183,7 +183,11 @@ static int divert_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleIns
     dc->passive = (daq_base_api.config_get_mode(modcfg) == DAQ_MODE_PASSIVE);
 
     /* Open the divert socket.  Traffic will not start going to it until we bind it in start(). */
+#ifdef PF_DIVERT
+    if ((dc->sock = socket(PF_DIVERT, SOCK_RAW, 0)) == -1)
+#else
     if ((dc->sock = socket(PF_INET, SOCK_RAW, IPPROTO_DIVERT)) == -1)
+#endif
     {
         SET_ERROR(modinst, "%s: Couldn't open the DIVERT socket: %s", __func__, strerror(errno));
         divert_daq_destroy(dc);

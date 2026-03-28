@@ -161,7 +161,10 @@ AC_ARG_ENABLE(divert-module,
               AS_HELP_STRING([--disable-divert-module],[do not build the bundled Divert module]),
               [enable_divert_module="$enableval"], [enable_divert_module="$DEFAULT_ENABLE"])
 if test "$enable_divert_module" = yes; then
-    AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_divert_module=no], [[#include <netinet/in.h>]])
+    AC_CHECK_DECLS([PF_DIVERT], [],
+	AC_CHECK_DECLS([IPPROTO_DIVERT], [], [enable_divert_module=no],
+	    [[#include <netinet/in.h>]]),
+	[[#include <sys/socket.h>]])
 fi
 AM_CONDITIONAL([BUILD_DIVERT_MODULE], [test "$enable_divert_module" = yes])
 AM_COND_IF([BUILD_DIVERT_MODULE], [AC_CONFIG_FILES([modules/divert/libdaq_static_divert.pc])])
