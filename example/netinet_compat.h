@@ -41,6 +41,9 @@ typedef struct ether_header EthHdr;
 #define IPPROTO_MH 135
 #endif
 
+#if defined(__linux__)
+#define __FAVOR_BSD
+#endif
 #include <netinet/tcp.h>
 
 typedef struct tcphdr TcpHdr;
