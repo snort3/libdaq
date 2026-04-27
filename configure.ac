@@ -31,7 +31,7 @@ AC_PROG_SED
 
 AX_CXX_COMPILE_STDCXX_11(,optional)
 
-LT_INIT
+LT_INIT([pic-only])
 
 # Initialize pkg-config since we are installing a .pc file
 PKG_INSTALLDIR
