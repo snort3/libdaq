@@ -4,7 +4,8 @@
 m4_define([daq_major_version], [3])
 m4_define([daq_minor_version], [0])
 m4_define([daq_patch_version], [27])
-m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version])
+m4_define([daq_sublevel_version], [0])
+m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version.daq_sublevel_version])
 
 # Kill the 'divert' macro with extreme prejudice so it stops clashing with references
 # to the module directory of the same name.
@@ -21,6 +22,7 @@ AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 DAQ_MAJOR_VERSION=daq_major_version
 DAQ_MINOR_VERSION=daq_minor_version
 DAQ_PATCH_VERSION=daq_patch_version
+DAQ_SUBLEVEL_VERSION=daq_sublevel_version
 
 # Checks for programs.
 AC_PROG_CC
@@ -318,6 +320,7 @@ AC_SUBST(CFLAGS)
 AC_SUBST(DAQ_MAJOR_VERSION)
 AC_SUBST(DAQ_MINOR_VERSION)
 AC_SUBST(DAQ_PATCH_VERSION)
+AC_SUBST(DAQ_SUBLEVEL_VERSION)
 AC_SUBST(PCAP_CPPFLAGS)
 AC_SUBST(PCAP_LDFLAGS)
 

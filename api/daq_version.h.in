@@ -28,18 +28,19 @@ extern "C" {
 #define DAQ_VERSION_MAJOR @DAQ_MAJOR_VERSION@
 #define DAQ_VERSION_MINOR @DAQ_MINOR_VERSION@
 #define DAQ_VERSION_PATCH @DAQ_PATCH_VERSION@
+#define DAQ_VERSION_SUBLEVEL @DAQ_SUBLEVEL_VERSION@
 
-#define DAQ_VERSION_NUMERIC ((DAQ_VERSION_MAJOR << 24) | (DAQ_VERSION_MINOR << 16) | (DAQ_VERSION_PATCH << 8) | 0)
+#define DAQ_VERSION_NUMERIC ((DAQ_VERSION_MAJOR << 24) | (DAQ_VERSION_MINOR << 16) | (DAQ_VERSION_PATCH << 8) | DAQ_VERSION_SUBLEVEL)
 
-#define DAQ_VERSION_STRING_C_(major, minor, patch) \
-            #major "." #minor "." #patch
+#define DAQ_VERSION_STRING_C_(major, minor, patch, sublevel) \
+            #major "." #minor "." #patch "." #sublevel
 
-#define DAQ_VERSION_STRING_C(major, minor, patch) \
-            DAQ_VERSION_STRING_C_(major, minor, patch)
+#define DAQ_VERSION_STRING_C(major, minor, patch, sublevel) \
+            DAQ_VERSION_STRING_C_(major, minor, patch, sublevel)
 
 #define DAQ_VERSION_STRING DAQ_VERSION_STRING_C( \
                 DAQ_VERSION_MAJOR, DAQ_VERSION_MINOR, \
-                DAQ_VERSION_PATCH)
+                DAQ_VERSION_PATCH, DAQ_VERSION_SUBLEVEL)
 
 #ifdef __cplusplus
 }
