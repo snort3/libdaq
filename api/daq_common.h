@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030010
+#define DAQ_COMMON_API_VERSION  0x00030011
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -95,6 +95,7 @@ typedef enum
 
 /* The DAQ message structure.  Ordered by element size to avoid padding. */
 #define DAQ_MSG_META_SLOTS  8
+#define DAQ_EOF_DROP_REASON_STR_LEN 96
 typedef struct _daq_msg
 {
     void *hdr;                      /* Pointer to the message header structure for this message */
@@ -304,6 +305,7 @@ typedef struct _daq_flow_stats
     uint8_t flags;
     uint64_t drop_reason;
     uint16_t tcp_flag;
+    char drop_reason_str[DAQ_EOF_DROP_REASON_STR_LEN];
 } DAQ_FlowStats_t;
 
 /* Packet verdicts passed to daq_msg_finalize(). */
