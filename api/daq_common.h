@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030011
+#define DAQ_COMMON_API_VERSION  0x00030012
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -300,7 +300,8 @@ typedef struct _daq_flow_stats
     struct timeval eof_timestamp;       /* Not populated for SoF stats. */
     uint32_t address_space_id;
     uint32_t tenant_id;
-    uint16_t vlan_tag;
+    uint16_t vlan_tag;                  /* Holds inner most vlan tag (Default) */
+    uint16_t outer_vlan_tag;            /* In case multi vlan tag, holds outer most vlan tag  */
     uint8_t protocol;
     uint8_t flags;
     uint64_t drop_reason;
