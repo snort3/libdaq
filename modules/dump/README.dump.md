@@ -16,6 +16,17 @@ variable.  The 'dump-rx' variable takes an optional argument for the filename
 to dump received packets to; it defaults to 'inline-in.pcap' if no argument is
 given.
 
+The output files can be automatically rolled (rotated) based on file size
+and/or packet count.  The 'roll-size' variable takes a size in MiB and rolls
+an output file when it reaches that size.  The 'roll-pkts' variable takes a
+packet count and rolls an output file when it contains that many packets.  If
+both are specified, an output file is rolled when either limit is reached.
+When a file is rolled, the current file is closed and a new one is opened with
+a numeric suffix appended to the configured filename, incrementing with each
+roll.  For example, with the default TX output filename, the files would be
+'inline-out.pcap', 'inline-out.pcap.1', 'inline-out.pcap.2', and so on.  The
+TX and RX output files are tracked and rolled independently.
+
 When running with multiple instances, the both the TX and RX output filenames
 will be mangled to start with the instance ID followed by an underscore.  For
 example, the default TX output filename would be '2_inline-out.pcap' for the
