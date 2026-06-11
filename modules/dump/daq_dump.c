@@ -23,14 +23,16 @@
 #include "config.h"
 #endif
 
+#include <limits.h>
 #include <pcap.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "daq_module_api.h"
 
-#define DAQ_DUMP_VERSION 5
+#define DAQ_DUMP_VERSION 6
 
 #define DEFAULT_TX_DUMP_FILE "inline-out.pcap"
 #define DEFAULT_RX_DUMP_FILE "inline-in.pcap"
@@ -53,9 +55,18 @@ typedef struct
 
     pcap_dumper_t *tx_dumper;
     char *tx_filename;
+    uint64_t tx_pkt_count;
+    unsigned tx_file_index;
 
     pcap_dumper_t *rx_dumper;
     char *rx_filename;
+    uint64_t rx_pkt_count;
+    unsigned rx_file_index;
+
+    int dlt;
+    int snaplen;
+    uint64_t roll_size;
+    uint64_t roll_pkts;
 
     DAQ_Stats_t stats;
 } DumpContext;
@@ -63,7 +74,9 @@ typedef struct
 static DAQ_VariableDesc_t dump_variable_descriptions[] = {
     { "file", "PCAP filename to output transmitted packets to (default: " DEFAULT_TX_DUMP_FILE ")", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
     { "output", "Set to none to prevent output from being written to file (deprecated)", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
-    { "dump-rx", "Also dump received packets to their own PCAP file (default: " DEFAULT_RX_DUMP_FILE ")", 0 }
+    { "dump-rx", "Also dump received packets to their own PCAP file (default: " DEFAULT_RX_DUMP_FILE ")", 0 },
+    { "roll-size", "Roll output files when they reach the given size in MiB", DAQ_VAR_DESC_REQUIRES_ARGUMENT },
+    { "roll-pkts", "Roll output files when they contain the given number of packets", DAQ_VAR_DESC_REQUIRES_ARGUMENT }
 };
 
 static DAQ_BaseAPI_t daq_base_api;
@@ -129,6 +142,30 @@ static int dump_daq_instantiate(const DAQ_ModuleConfig_h modcfg, DAQ_ModuleInsta
             tx_filename = varValue;
         else if (!strcmp(varKey, "dump-rx"))
             rx_filename = varValue ? varValue : DEFAULT_RX_DUMP_FILE;
+        else if (!strcmp(varKey, "roll-size"))
+        {
+            char *endptr;
+            unsigned long mb = varValue ? strtoul(varValue, &endptr, 10) : 0;
+            if (!varValue || *varValue < '0' || *varValue > '9' || *endptr != '\0' || mb == 0)
+            {
+                SET_ERROR(modinst, "%s: Invalid roll size (%s)", __func__, varValue ? varValue : "");
+                free(dc);
+                return DAQ_ERROR_INVAL;
+            }
+            dc->roll_size = (uint64_t) mb * 1024 * 1024;
+        }
+        else if (!strcmp(varKey, "roll-pkts"))
+        {
+            char *endptr;
+            unsigned long pkts = varValue ? strtoul(varValue, &endptr, 10) : 0;
+            if (!varValue || *varValue < '0' || *varValue > '9' || *endptr != '\0' || pkts == 0)
+            {
+                SET_ERROR(modinst, "%s: Invalid roll packet count (%s)", __func__, varValue ? varValue : "");
+                free(dc);
+                return DAQ_ERROR_INVAL;
+            }
+            dc->roll_pkts = pkts;
+        }
         else if (!strcmp(varKey, "output"))
         {
             if (!strcmp(varValue, "none"))
@@ -212,6 +249,61 @@ static void dump_daq_destroy(void *handle)
     free(dc);
 }
 
+static int open_dumper(DumpContext *dc, pcap_dumper_t **dumper, const char *filename, unsigned file_index)
+{
+    char namebuf[PATH_MAX];
+
+    // The base filename is used as-is for the first file; rolled files get a numeric suffix
+    if (file_index > 0)
+    {
+        snprintf(namebuf, sizeof(namebuf), "%s.%u", filename, file_index);
+        filename = namebuf;
+    }
+
+    pcap_t *pcap = pcap_open_dead(dc->dlt, dc->snaplen);
+    if (!pcap)
+    {
+        SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
+        return DAQ_ERROR;
+    }
+    *dumper = pcap_dump_open(pcap, filename);
+    if (!*dumper)
+    {
+        SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", filename, pcap_geterr(pcap));
+        pcap_close(pcap);
+        return DAQ_ERROR;
+    }
+    pcap_close(pcap);
+
+    return DAQ_SUCCESS;
+}
+
+static void check_roll(DumpContext *dc, pcap_dumper_t **dumper, const char *filename,
+        uint64_t *pkt_count, unsigned *file_index)
+{
+    (*pkt_count)++;
+
+    bool roll = false;
+    if (dc->roll_pkts && *pkt_count >= dc->roll_pkts)
+        roll = true;
+    else if (dc->roll_size)
+    {
+        long pos = pcap_dump_ftell(*dumper);
+        if (pos >= 0 && (uint64_t) pos >= dc->roll_size)
+            roll = true;
+    }
+
+    if (roll)
+    {
+        pcap_dump_close(*dumper);
+        *dumper = NULL;
+        (*file_index)++;
+        *pkt_count = 0;
+        // If reopening fails, dumping stops and the error is left in the error buffer
+        open_dumper(dc, dumper, filename, *file_index);
+    }
+}
+
 static int dump_daq_start(void *handle)
 {
     DumpContext *dc = (DumpContext*) handle;
@@ -220,47 +312,28 @@ static int dump_daq_start(void *handle)
     if (rval != DAQ_SUCCESS)
         return rval;
 
-    int dlt = CALL_SUBAPI_NOARGS(dc, get_datalink_type);
-    int snaplen = CALL_SUBAPI_NOARGS(dc, get_snaplen);
+    dc->dlt = CALL_SUBAPI_NOARGS(dc, get_datalink_type);
+    dc->snaplen = CALL_SUBAPI_NOARGS(dc, get_snaplen);
+    dc->tx_pkt_count = 0;
+    dc->tx_file_index = 0;
+    dc->rx_pkt_count = 0;
+    dc->rx_file_index = 0;
 
-    if (dc->tx_filename)
+    if (dc->tx_filename && open_dumper(dc, &dc->tx_dumper, dc->tx_filename, 0) != DAQ_SUCCESS)
     {
-        pcap_t *pcap = pcap_open_dead(dlt, snaplen);
-        if (!pcap)
-        {
-            CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
-            return DAQ_ERROR;
-        }
-        dc->tx_dumper = pcap_dump_open(pcap, dc->tx_filename);
-        if (!dc->tx_dumper)
-        {
-            CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", dc->tx_filename, pcap_geterr(pcap));
-            pcap_close(pcap);
-            return DAQ_ERROR;
-        }
-        pcap_close(pcap);
+        CALL_SUBAPI_NOARGS(dc, stop);
+        return DAQ_ERROR;
     }
 
-    if (dc->rx_filename)
+    if (dc->rx_filename && open_dumper(dc, &dc->rx_dumper, dc->rx_filename, 0) != DAQ_SUCCESS)
     {
-        pcap_t *pcap = pcap_open_dead(dlt, snaplen);
-        if (!pcap)
+        if (dc->tx_dumper)
         {
-            CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not create a dead PCAP handle!");
-            return DAQ_ERROR;
+            pcap_dump_close(dc->tx_dumper);
+            dc->tx_dumper = NULL;
         }
-        dc->rx_dumper = pcap_dump_open(pcap, dc->rx_filename);
-        if (!dc->rx_dumper)
-        {
-            CALL_SUBAPI_NOARGS(dc, stop);
-            SET_ERROR(dc->modinst, "Could not open PCAP %s for writing: %s", dc->rx_filename, pcap_geterr(pcap));
-            pcap_close(pcap);
-            return DAQ_ERROR;
-        }
-        pcap_close(pcap);
+        CALL_SUBAPI_NOARGS(dc, stop);
+        return DAQ_ERROR;
     }
 
     return DAQ_SUCCESS;
@@ -281,6 +354,7 @@ static int dump_daq_inject(void *handle, DAQ_MsgType type, const void *hdr, cons
         pcap_hdr.len = data_len;
 
         pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
+        check_roll(dc, &dc->tx_dumper, dc->tx_filename, &dc->tx_pkt_count, &dc->tx_file_index);
     }
 
     if (CHECK_SUBAPI(dc, inject))
@@ -310,6 +384,7 @@ static int dump_daq_inject_relative(void *handle, const DAQ_Msg_t *msg, const ui
         pcap_hdr.len = data_len;
 
         pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
+        check_roll(dc, &dc->tx_dumper, dc->tx_filename, &dc->tx_pkt_count, &dc->tx_file_index);
     }
 
     if (CHECK_SUBAPI(dc, inject_relative))
@@ -404,6 +479,9 @@ static unsigned dump_daq_msg_receive(void *handle, const unsigned max_recv, cons
             pcap_hdr.caplen = msg->data_len;
             pcap_hdr.len = hdr->pktlen;
             pcap_dump((u_char *) dc->rx_dumper, &pcap_hdr, data);
+            check_roll(dc, &dc->rx_dumper, dc->rx_filename, &dc->rx_pkt_count, &dc->rx_file_index);
+            if (!dc->rx_dumper)
+                break;
         }
     }
 
@@ -427,6 +505,7 @@ static int dump_daq_msg_finalize(void *handle, const DAQ_Msg_t *msg, DAQ_Verdict
         pcap_hdr.caplen = msg->data_len;
         pcap_hdr.len = hdr->pktlen;
         pcap_dump((u_char *) dc->tx_dumper, &pcap_hdr, data);
+        check_roll(dc, &dc->tx_dumper, dc->tx_filename, &dc->tx_pkt_count, &dc->tx_file_index);
     }
 
     return CALL_SUBAPI(dc, msg_finalize, msg, verdict);
