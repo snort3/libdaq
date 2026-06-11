@@ -6,7 +6,6 @@ api_base_test_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS) $(CMOCKA_CFLAGS) -I$
 api_base_test_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	$(CODE_COVERAGE_LDFLAGS) \
-	-static-libtool-libs \
 	-Wl,--wrap,printf \
 	-Wl,--wrap,__printf_chk \
 	-Wl,--wrap,fprintf \
@@ -19,7 +18,7 @@ api_base_test_LDFLAGS = \
 	-Wl,--wrap,dlopen \
 	-Wl,--wrap,dlsym \
 	-Wl,--wrap,dlclose
-api_base_test_LDADD = ${top_builddir}/api/libdaq.la $(LIBDL) $(CMOCKA_LIBS)
+api_base_test_LDADD = ${top_builddir}/api/libdaq_check.la $(LIBDL) $(CMOCKA_LIBS)
 
 api_config_test_SOURCES = api_config_test.c daq_test_module.c daq_test_module.h
 api_config_test_CFLAGS = $(AM_CFLAGS) $(CODE_COVERAGE_CFLAGS) $(CMOCKA_CFLAGS) -I${top_srcdir}/api
@@ -28,3 +27,6 @@ api_config_test_LDFLAGS = \
 	$(CODE_COVERAGE_LDFLAGS) \
 	-static-libtool-libs
 api_config_test_LDADD = ${top_builddir}/api/libdaq.la $(LIBDL) $(CMOCKA_LIBS)
+
+${top_builddir}/api/libdaq_check.la:
+	$(MAKE) -C ${top_builddir}/api libdaq_check.la

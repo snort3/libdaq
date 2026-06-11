@@ -135,7 +135,15 @@ int __wrap_closedir(DIR *dirp)
     return 0;
 }
 
+/* Prior to glibc 2.33, stat() could be an extern inline function calling __xstat(),
+   so references from the library under test resolve to __xstat instead of stat. */
 #ifdef __USE_EXTERN_INLINES
+#if !defined(__GLIBC_PREREQ) || !__GLIBC_PREREQ(2, 33)
+#define WRAP_XSTAT
+#endif
+#endif
+
+#ifdef WRAP_XSTAT
 
 int __wrap___xstat(int ver, const char *pathname, struct stat *buf);
 int __wrap___xstat(int ver, const char *pathname, struct stat *buf)
@@ -155,7 +163,7 @@ int __wrap_stat(const char *pathname, struct stat *buf)
     return mock();
 }
 
-#endif /* __USE_EXTERN_INLINES */
+#endif /* WRAP_XSTAT */
 
 void *__wrap_dlopen(const char *filename, int flags);
 void *__wrap_dlopen(const char *filename, int flags)
@@ -286,7 +294,7 @@ static void test_daq_load_modules(void **state)
 
     expect_value(__wrap_readdir, dirp, 0xdeadbeef);
     will_return(__wrap_readdir, &deadbeef_dir_entry);
-#ifdef __USE_EXTERN_INLINES
+#ifdef WRAP_XSTAT
     expect_string(__wrap___xstat, pathname, MODULE_PATH "/" BAD_MODULE_NAME ".so");
     will_return(__wrap___xstat, 0);
 #else
