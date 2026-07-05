@@ -32,7 +32,7 @@ extern "C" {
 #include <unistd.h>
 
 // Comprehensive version number covering all elements of this header
-#define DAQ_COMMON_API_VERSION  0x00030012
+#define DAQ_COMMON_API_VERSION  0x00030013
 
 #ifndef DAQ_SO_PUBLIC
 #  ifdef HAVE_VISIBILITY
@@ -422,6 +422,8 @@ typedef enum
     DIOCTL_GET_CPU_PROFILE_DATA,
     DIOCTL_GET_SNORT_LATENCY_DATA,
     DIOCTL_SET_INJECT_DROP,
+    /* Generic DAQ counters summary (module-specific counters exposed by name) */
+    DIOCTL_GET_DAQ_COUNTERS_SUMMARY,
     LAST_BUILTIN_DIOCTL_CMD = 1024,     /* End of reserved space for "official" DAQ ioctl commands.
                                            Any externally defined ioctl commands should be larger than this. */
     MAX_DIOCTL_CMD = UINT16_MAX
@@ -695,6 +697,29 @@ typedef struct {
     /* Array of Snort processing time based on protocol */
     DAQ_snort_latency_data_t snort_latency_data[DAQ_SNORT_LATENCY_PROTO_MAX];
 } DIOCTL_GetSnortLatencyData;
+
+/*
+ * Command: DIOCTL_GET_DAQ_COUNTERS_SUMMARY
+ * Description: Retrieve a flat array of DAQ counters (names and values)
+ *              suitable for applications like Snort to consume without
+ *              knowledge of any module-specific internal layouts.
+ * Argument: DIOCTL_GetDaqCountersSummary
+ */
+
+#define DAQ_COUNTER_NAME_MAX      64
+#define DAQ_DYNAMIC_COUNTERS_MAX  256
+
+typedef struct
+{
+    char     name[DAQ_COUNTER_NAME_MAX];  /* null-terminated counter name */
+    uint64_t value;                       /* counter value */
+} DAQ_CounterEntry;
+
+typedef struct
+{
+    uint32_t num_entries;                          /* number of valid entries */
+    DAQ_CounterEntry entries[DAQ_DYNAMIC_COUNTERS_MAX];
+} DIOCTL_GetDaqCountersSummary;
 
 #ifdef __cplusplus
 }
