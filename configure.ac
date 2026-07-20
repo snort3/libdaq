@@ -3,7 +3,7 @@
 
 m4_define([daq_major_version], [3])
 m4_define([daq_minor_version], [0])
-m4_define([daq_patch_version], [27])
+m4_define([daq_patch_version], [28])
 m4_define([daq_sublevel_version], [0])
 m4_define([daq_version_str], [daq_major_version.daq_minor_version.daq_patch_version.daq_sublevel_version])
 

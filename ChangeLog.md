@@ -1,3 +1,10 @@
+2026-07-05: 3.0.28
+
+* api: add DIOCTL_GET_DAQ_COUNTERS_SUMMARY for generic DAQ counter export
+* api: QinQ outer vlan tag addition
+* build: add fourth digit to daq version field
+* daq: add drop_reason_str to DAQ_FlowStats_t
+
 2026-03-17: 3.0.27
 
 * libdaq: add a ChangeLog.md file to track changes
