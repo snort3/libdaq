@@ -454,6 +454,13 @@ static int trace_daq_ioctl(void *handle, DAQ_IoctlCmd cmd, void *arg, size_t arg
             break;
         }
 
+        case DIOCTL_GET_DAQ_COUNTERS_SUMMARY:
+        {
+            /* Output-only struct; do not hex-dump the large output buffer. */
+            fprintf(tc->outfile, "IOCTL: GetDaqCountersSummary (%zu)\n", arglen);
+            break;
+        }
+
         default:
             fprintf(tc->outfile, "IOCTL: %d (%zu)\n", cmd, arglen);
             hexdump(tc->outfile, arg, arglen, "    ");
