@@ -1,3 +1,7 @@
+2026-08-28: 3.0.29
+
+* trace: suppress the hex-dump for DIOCTL_GET_DAQ_COUNTERS_SUMMARY
+
 2026-07-05: 3.0.28
 
 * api: add DIOCTL_GET_DAQ_COUNTERS_SUMMARY for generic DAQ counter export
