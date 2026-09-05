@@ -23,8 +23,17 @@
 #include "config.h"
 #endif
 
+// #include <dirent.h>
+// #include <dlfcn.h>
 #include <dirent.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#else
 #include <dlfcn.h>
+#endif
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +48,56 @@
 #include "daq_version.h"
 
 #define NAME_SIZE       512
+
+#ifdef _WIN32
+
+static char daq_dl_error[256];
+
+static void* daq_dlopen(const char* filename)
+{
+    HMODULE handle = LoadLibraryA(filename);
+
+    if (!handle)
+    {
+        snprintf(daq_dl_error, sizeof(daq_dl_error),
+            "Windows error %lu", (unsigned long)GetLastError());
+    }
+
+    return (void*)handle;
+}
+
+static void* daq_dlsym(void* handle, const char* symbol)
+{
+    FARPROC proc = GetProcAddress((HMODULE)handle, symbol);
+
+    if (!proc)
+    {
+        snprintf(daq_dl_error, sizeof(daq_dl_error),
+            "Windows error %lu", (unsigned long)GetLastError());
+    }
+
+    return (void*)proc;
+}
+
+static void daq_dlclose(void* handle)
+{
+    if (handle)
+        FreeLibrary((HMODULE)handle);
+}
+
+static const char* daq_dlerror(void)
+{
+    return daq_dl_error;
+}
+
+#else
+
+#define daq_dlopen dlopen
+#define daq_dlsym dlsym
+#define daq_dlclose dlclose
+#define daq_dlerror dlerror
+
+#endif
 
 int daq_verbosity = 0;
 
@@ -184,7 +243,7 @@ static int register_module(const DAQ_ModuleAPI_t *dm, void *dl_handle, const cha
         if (node->module->unload)
             node->module->unload();
         if (node->dl_handle)
-            dlclose(node->dl_handle);
+            daq_dlclose(node->dl_handle);
     }
 
     DEBUG("Registered daq module: %s\n", dm->name);
@@ -210,16 +269,20 @@ static int daq_load_dynamic_module(const char *filename)
         return DAQ_ERROR;
     }
 
-    if ((dl_handle = dlopen(filename, RTLD_NOW|RTLD_LOCAL)) == NULL)
+#ifdef _WIN32
+    if ((dl_handle = daq_dlopen(filename)) == NULL)
+#else
+    if ((dl_handle = daq_dlopen(filename, RTLD_NOW|RTLD_LOCAL)) == NULL)
+#endif
     {
-        fprintf(stderr, "%s: dlopen: %s\n", filename, dlerror());
+        fprintf(stderr, "%s: daq_dlopen: %s\n", filename, daq_dlerror());
         return DAQ_ERROR;
     }
 
-    if ((dm = (const DAQ_ModuleAPI_t*)dlsym(dl_handle, "DAQ_MODULE_DATA")) == NULL)
+    if ((dm = (const DAQ_ModuleAPI_t*)daq_dlsym(dl_handle, "DAQ_MODULE_DATA")) == NULL)
     {
-        fprintf(stderr, "%s: dlsym: %s\n", filename, dlerror());
-        dlclose(dl_handle);
+        fprintf(stderr, "%s: daq_dlsym: %s\n", filename, daq_dlerror());
+        daq_dlclose(dl_handle);
         return DAQ_ERROR;
     }
 
@@ -227,7 +290,7 @@ static int daq_load_dynamic_module(const char *filename)
     {
         if (rval != DAQ_ERROR_EXISTS)
             fprintf(stderr, "%s: Failed to register DAQ module.\n", filename);
-        dlclose(dl_handle);
+        daq_dlclose(dl_handle);
         return DAQ_ERROR;
     }
 
@@ -271,9 +334,19 @@ DAQ_LINKAGE int daq_load_dynamic_modules(const char *directory_list[])
 
         while ((de = readdir(dirp)) != NULL)
         {
+            // p = strrchr(de->d_name, '.');
+            // if (!p || strcmp(p, ".so"))
+            //     continue;
+
             p = strrchr(de->d_name, '.');
+
+            #ifdef _WIN32
+            if (!p || strcmp(p, ".dll"))
+                continue;
+            #else
             if (!p || strcmp(p, ".so"))
                 continue;
+            #endif
             snprintf(dirpath, sizeof(dirpath), "%s/%s", *directory_list, de->d_name);
 
             ret = daq_load_dynamic_module(dirpath);
@@ -303,7 +376,7 @@ DAQ_LINKAGE void daq_unload_modules(void)
         if (node->module->unload)
             node->module->unload();
         if (node->dl_handle)
-            dlclose(node->dl_handle);
+            daq_dlclose(node->dl_handle);
         free(node);
         num_modules--;
     }
